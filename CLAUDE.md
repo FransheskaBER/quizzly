@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 0: Foundation (Week 1)
-Current task: 001 — Monorepo setup (npm workspaces, tsconfig, shared/server/client packages, ESLint, Prettier)
-Next task: 002 — Docker Compose + Prisma setup (schema, initial migration, seed)
+Current task: 002 — Docker Compose + Prisma setup (schema, initial migration, seed)
+Next task: 003 — Express scaffold (middleware chain, health, pino, env validation)
 
 ## Task Reference
 ```
