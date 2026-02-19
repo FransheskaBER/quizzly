@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { createHash, randomBytes } from 'node:crypto';
 import { env } from '../config/env.js';
 
-interface TokenPayload {
+export interface TokenPayload {
   userId: string;
   email: string;
 }
@@ -28,12 +28,18 @@ export const verifyAccessToken = (token: string): TokenPayload => {
   return { userId: decoded.userId, email: decoded.email };
 };
 
-export const generateVerificationToken = (): string => {
-  return randomBytes(32).toString('hex');
+/** SHA-256 hash of a raw token. Used for both verification and reset tokens. */
+export const hashToken = (token: string): string =>
+  createHash('sha256').update(token).digest('hex');
+
+/** Returns a raw random token and its SHA-256 hash.
+ *  Store the hash; send the raw token via email. */
+export const generateVerificationToken = (): { token: string; hash: string } => {
+  const token = randomBytes(32).toString('hex');
+  return { token, hash: hashToken(token) };
 };
 
 export const generateResetToken = (): { token: string; hash: string } => {
   const token = randomBytes(32).toString('hex');
-  const hash = createHash('sha256').update(token).digest('hex');
-  return { token, hash };
+  return { token, hash: hashToken(token) };
 };

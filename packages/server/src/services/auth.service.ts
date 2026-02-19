@@ -1,11 +1,10 @@
-import { createHash } from 'node:crypto';
-
 import { prisma } from '../config/database.js';
 import { hashPassword, comparePassword } from '../utils/password.utils.js';
 import {
   generateAccessToken,
   generateVerificationToken,
   generateResetToken,
+  hashToken,
 } from '../utils/token.utils.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from './email.service.js';
 import {
@@ -38,7 +37,7 @@ export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
   }
 
   const passwordHash = await hashPassword(data.password);
-  const verificationToken = generateVerificationToken();
+  const { token: verificationToken, hash: verificationTokenHash } = generateVerificationToken();
   const verificationTokenExpiresAt = new Date(
     Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
   );
@@ -49,7 +48,7 @@ export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
       username: data.username,
       passwordHash,
       emailVerified: false,
-      verificationToken,
+      verificationToken: verificationTokenHash, // store hash; raw token goes via email
       verificationTokenExpiresAt,
     },
   });
@@ -86,8 +85,9 @@ export const login = async (data: LoginRequest): Promise<LoginResponse> => {
 };
 
 export const verifyEmail = async (data: VerifyEmailRequest): Promise<MessageResponse> => {
-  const user = await prisma.user.findFirst({
-    where: { verificationToken: data.token },
+  const tokenHash = hashToken(data.token);
+  const user = await prisma.user.findUnique({
+    where: { verificationToken: tokenHash },
   });
 
   if (!user) {
@@ -128,14 +128,14 @@ export const resendVerification = async (
     return genericResponse;
   }
 
-  const verificationToken = generateVerificationToken();
+  const { token: verificationToken, hash: verificationTokenHash } = generateVerificationToken();
   const verificationTokenExpiresAt = new Date(
     Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
   );
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { verificationToken, verificationTokenExpiresAt },
+    data: { verificationToken: verificationTokenHash, verificationTokenExpiresAt },
   });
 
   void sendVerificationEmail(user.email, verificationToken);
@@ -171,7 +171,7 @@ export const forgotPassword = async (data: ForgotPasswordRequest): Promise<Messa
 };
 
 export const resetPassword = async (data: ResetPasswordRequest): Promise<MessageResponse> => {
-  const tokenHash = createHash('sha256').update(data.token).digest('hex');
+  const tokenHash = hashToken(data.token);
 
   const resetRecord = await prisma.passwordReset.findFirst({
     where: {

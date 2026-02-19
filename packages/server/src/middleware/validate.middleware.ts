@@ -26,7 +26,7 @@ export const validate = (schema: ZodSchema | ValidateSchemas) => {
         if (schema.body) req.body = schema.body.parse(req.body);
         if (schema.params) req.params = schema.params.parse(req.params);
         if (schema.query) {
-          req.query = schema.query.parse(req.query) as Record<string, string>;
+          Object.assign(req.query, schema.query.parse(req.query));
         }
       }
       next();
