@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 0: Foundation (Week 1)
-Current task: 003 — Express scaffold (middleware chain, health, pino, env validation)
-Next task: 004 — React scaffold (Router, Redux, RTK Query base, ErrorBoundary, ProtectedRoute)
+Current task: 004 — React scaffold (Router, Redux, RTK Query base, ErrorBoundary, ProtectedRoute)
+Next task: 005 — Shared package (all Zod schemas, types, enums, constants)
 
 ## Task Reference
 ```
