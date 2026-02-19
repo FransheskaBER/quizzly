@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                      String    @unique @db.VarChar(255)
+  username                   String    @db.VarChar(50)
+  passwordHash               String    @map("password_hash") @db.VarChar(255)
+  emailVerified              Boolean   @default(false) @map("email_verified")
+  verificationToken          String?   @unique @map("verification_token") @db.VarChar(255)
+  verificationTokenExpiresAt DateTime? @map("verification_token_expires_at") @db.Timestamptz()
+  authProvider               String    @default("email") @map("auth_provider") @db.VarChar(20)
+  googleId                   String?   @unique @map("google_id") @db.VarChar(255)
+  subscriptionTier           String    @default("free") @map("subscription_tier") @db.VarChar(20)
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  sessions       Session[]
+  passwordResets PasswordReset[]
+  quizAttempts   QuizAttempt[]
+
+  @@map("users")
+}
+
+model PasswordReset {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+  usedAt    DateTime? @map("used_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  name         String   @db.VarChar(200)
+  subject      String   @db.VarChar(200)
+  goal         String   @db.Text
+  promptConfig Json?    @map("prompt_config")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials    Material[]
+  quizAttempts QuizAttempt[]
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("sessions")
+}
+
+model Material {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  fileName      String   @map("file_name") @db.VarChar(255)
+  fileType      String   @map("file_type") @db.VarChar(20)
+  fileSize      Int?     @map("file_size")
+  s3Key         String?  @map("s3_key") @db.VarChar(500)
+  sourceUrl     String?  @map("source_url") @db.VarChar(2000)
+  extractedText String   @map("extracted_text") @db.Text
+  tokenCount    Int      @map("token_count")
+  status        String   @default("processing") @db.VarChar(20)
+  errorMessage  String?  @map("error_message") @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, status])
+  @@map("materials")
+}
+
+model QuizAttempt {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId     String    @map("session_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  difficulty    String    @db.VarChar(10)
+  answerFormat  String    @map("answer_format") @db.VarChar(10)
+  questionCount Int       @map("question_count")
+  status        String    @default("generating") @db.VarChar(20)
+  score         Decimal?  @db.Decimal(5, 2)
+  materialsUsed Boolean   @default(false) @map("materials_used")
+  startedAt     DateTime? @map("started_at") @db.Timestamptz()
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz()
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  session   Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions Question[]
+  answers   Answer[]
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@map("quiz_attempts")
+}
+
+model Question {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quizAttemptId  String   @map("quiz_attempt_id") @db.Uuid
+  questionNumber Int      @map("question_number")
+  questionType   String   @map("question_type") @db.VarChar(20)
+  questionText   String   @map("question_text") @db.Text
+  options        Json?
+  correctAnswer  String   @map("correct_answer") @db.Text
+  explanation    String   @db.Text
+  difficulty     String   @db.VarChar(10)
+  tags           Json?    @default("[]")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  quizAttempt QuizAttempt @relation(fields: [quizAttemptId], references: [id], onDelete: Cascade)
+  answer      Answer?
+
+  @@index([quizAttemptId])
+  @@index([quizAttemptId, questionNumber])
+  @@map("questions")
+}
+
+model Answer {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId    String    @unique @map("question_id") @db.Uuid
+  quizAttemptId String    @map("quiz_attempt_id") @db.Uuid
+  userAnswer    String?   @map("user_answer") @db.Text
+  isCorrect     Boolean?  @map("is_correct")
+  score         Decimal?  @db.Decimal(3, 2)
+  feedback      String?   @db.Text
+  isFlagged     Boolean   @default(false) @map("is_flagged")
+  answeredAt    DateTime? @map("answered_at") @db.Timestamptz()
+  gradedAt      DateTime? @map("graded_at") @db.Timestamptz()
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  question    Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  quizAttempt QuizAttempt @relation(fields: [quizAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([quizAttemptId])
+  @@index([quizAttemptId, score])
+  @@map("answers")
+}
