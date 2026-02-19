@@ -1,11 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RootErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useAppSelector } from '@/store/store';
-import { selectIsAuthenticated, selectCurrentUser } from '@/store/slices/auth.slice';
+import { useAppSelector, useAppDispatch } from '@/store/store';
+import { selectIsAuthenticated, selectCurrentUser, logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
 
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
@@ -29,10 +29,20 @@ const QuizResultsPage = lazy(() => import('@/pages/quiz/QuizResultsPage'));
 const AuthGate = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectCurrentUser);
+  const dispatch = useAppDispatch();
 
   const needsHydration = isAuthenticated && user === null;
 
-  const { isLoading } = useGetMeQuery(undefined, { skip: !needsHydration });
+  const { isLoading, isError } = useGetMeQuery(undefined, { skip: !needsHydration });
+
+  // On network failure getMe errors without clearing the token. Dispatch logout so
+  // ProtectedRoute redirects to /login instead of spinning forever. (401s are already
+  // handled by baseQueryWithAuth, so this only fires on non-auth network errors.)
+  useEffect(() => {
+    if (isError) {
+      dispatch(logout());
+    }
+  }, [isError, dispatch]);
 
   if (needsHydration && isLoading) {
     return <LoadingSpinner fullPage />;

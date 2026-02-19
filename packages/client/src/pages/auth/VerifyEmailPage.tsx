@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useVerifyEmailMutation } from '@/api/auth.api';
-import { extractApiError } from '@/hooks/useApiError';
+import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import styles from './VerifyEmailPage.module.css';
 
@@ -21,6 +21,9 @@ const VerifyEmailPage = () => {
   useEffect(() => {
     if (!token) return;
 
+    setState('loading');
+    setErrorMessage('');
+
     let cancelled = false;
 
     const verify = async () => {
@@ -29,7 +32,7 @@ const VerifyEmailPage = () => {
         if (!cancelled) setState('success');
       } catch (err) {
         if (!cancelled) {
-          const { message } = extractApiError(err);
+          const { message } = parseApiError(err);
           setErrorMessage(message);
           setState('error');
         }

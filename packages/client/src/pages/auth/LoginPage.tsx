@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@skills-trainer/shared';
 import type { LoginRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
-import { extractApiError } from '@/hooks/useApiError';
+import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import styles from './LoginPage.module.css';
@@ -33,7 +33,7 @@ const LoginPage = () => {
       await login(data);
       navigate(from, { replace: true });
     } catch (err) {
-      const { code, message } = extractApiError(err);
+      const { code, message } = parseApiError(err);
       if (code === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(data.email);
       } else {
@@ -47,10 +47,10 @@ const LoginPage = () => {
     setResendStatus('sending');
     try {
       await resendVerification(unverifiedEmail);
-    } catch {
-      // resend always returns 200 on backend — any throw here is a network error
-    } finally {
       setResendStatus('sent');
+    } catch {
+      // network error — reset so user can retry
+      setResendStatus('idle');
     }
   };
 

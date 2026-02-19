@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { forgotPasswordSchema } from '@skills-trainer/shared';
 import type { ForgotPasswordRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
-import { extractApiError } from '@/hooks/useApiError';
+import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import styles from './ForgotPasswordPage.module.css';
@@ -27,7 +27,7 @@ const ForgotPasswordPage = () => {
       await forgotPassword(data.email);
       setSubmittedEmail(data.email);
     } catch (err) {
-      const { message } = extractApiError(err);
+      const { message } = parseApiError(err);
       setFormError(message);
     }
   };

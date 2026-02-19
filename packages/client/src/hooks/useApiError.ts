@@ -34,7 +34,7 @@ const isBackendErrorBody = (data: unknown): data is BackendErrorBody =>
  * - message:     human-readable message ready to display
  * - fieldErrors: map of field path → message for form-level errors, or null
  */
-export const extractApiError = (error: unknown): ApiErrorResult => {
+export const parseApiError = (error: unknown): ApiErrorResult => {
   if (!error) return { code: null, message: '', fieldErrors: null };
 
   if (isFetchBaseQueryError(error)) {

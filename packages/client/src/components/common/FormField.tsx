@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import styles from './FormField.module.css';
 
 interface FormFieldProps extends React.ComponentPropsWithRef<'input'> {
@@ -11,15 +11,28 @@ interface FormFieldProps extends React.ComponentPropsWithRef<'input'> {
  * Usage: <FormField label="Email" type="email" {...register('email')} error={errors.email?.message} />
  */
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, id, className, ...rest }, ref) => (
-    <div className={`${styles.field} ${className ?? ''}`}>
-      <label className={styles.label} htmlFor={id}>
-        {label}
-      </label>
-      <input ref={ref} id={id} className={`${styles.input} ${error ? styles.inputError : ''}`} {...rest} />
-      {error && <p className={styles.errorText}>{error}</p>}
-    </div>
-  ),
+  ({ label, error, id: idProp, className, ...rest }, ref) => {
+    const generatedId = useId();
+    const id = idProp ?? generatedId;
+    const errorId = `${id}-error`;
+
+    return (
+      <div className={`${styles.field} ${className ?? ''}`}>
+        <label className={styles.label} htmlFor={id}>
+          {label}
+        </label>
+        <input
+          ref={ref}
+          id={id}
+          className={`${styles.input} ${error ? styles.inputError : ''}`}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          {...rest}
+        />
+        {error && <p id={errorId} className={styles.errorText}>{error}</p>}
+      </div>
+    );
+  },
 );
 
 FormField.displayName = 'FormField';
