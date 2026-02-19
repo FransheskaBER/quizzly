@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 0: Foundation (Week 1)
-Current task: 002 — Docker Compose + Prisma setup (schema, initial migration, seed)
-Next task: 003 — Express scaffold (middleware chain, health, pino, env validation)
+Current task: 003 — Express scaffold (middleware chain, health, pino, env validation)
+Next task: 004 — React scaffold (Router, Redux, RTK Query base, ErrorBoundary, ProtectedRoute)
 
 ## Task Reference
 ```
