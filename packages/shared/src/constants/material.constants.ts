@@ -1,0 +1,9 @@
+export const MAX_FILES_PER_SESSION = 10;
+export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+export const MAX_SESSION_TOKEN_BUDGET = 150_000;
+export const ALLOWED_FILE_TYPES = ['pdf', 'docx', 'txt'] as const;
+export const URL_FETCH_TIMEOUT_MS = 10_000;
+export const URL_FETCH_MAX_BYTES = 5 * 1024 * 1024;
+export const MIN_EXTRACTED_TEXT_LENGTH = 50;
+export const PRESIGNED_URL_UPLOAD_EXPIRY_SECONDS = 300;
+export const PRESIGNED_URL_DOWNLOAD_EXPIRY_SECONDS = 900;
