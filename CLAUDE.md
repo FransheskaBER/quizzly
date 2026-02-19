@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 0: Foundation (Week 1)
-Current task: 005 — Shared package (all Zod schemas, types, enums, constants)
-Next task: 006 — CI pipeline (GitHub Actions)
+Current task: 006 — CI pipeline (GitHub Actions)
+Next task: 007 — Auth backend
 
 ## Task Reference
 ```
