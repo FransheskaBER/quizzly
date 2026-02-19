@@ -41,6 +41,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Build — shared
+        run: npm run build -w packages/shared
+
       - name: Type check — shared
         run: npm run typecheck -w packages/shared
 
