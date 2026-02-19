@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useApiError } from '@/hooks/useApiError';
+import { useVerifyEmailMutation } from '@/api/auth.api';
+import { extractApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import styles from './VerifyEmailPage.module.css';
 
@@ -9,8 +9,11 @@ type VerifyState = 'loading' | 'success' | 'error' | 'no-token';
 
 const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
-  const { verifyEmail } = useAuth();
   const token = searchParams.get('token');
+
+  // Use the mutation trigger directly — RTK Query guarantees a stable reference,
+  // so it can go in the useEffect dep array without causing repeated calls.
+  const [verifyEmail] = useVerifyEmailMutation();
 
   const [state, setState] = useState<VerifyState>(token ? 'loading' : 'no-token');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -22,11 +25,11 @@ const VerifyEmailPage = () => {
 
     const verify = async () => {
       try {
-        await verifyEmail(token);
+        await verifyEmail({ token }).unwrap();
         if (!cancelled) setState('success');
       } catch (err) {
         if (!cancelled) {
-          const { message } = useApiError(err);
+          const { message } = extractApiError(err);
           setErrorMessage(message);
           setState('error');
         }
@@ -38,8 +41,7 @@ const VerifyEmailPage = () => {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, verifyEmail]);
 
   if (state === 'loading') {
     return (

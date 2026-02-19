@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PASSWORD_MIN_LENGTH } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
-import { useApiError } from '@/hooks/useApiError';
+import { extractApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import styles from './ResetPasswordPage.module.css';
@@ -44,7 +44,7 @@ const ResetPasswordPage = () => {
       await resetPassword({ token, password: data.password });
       setSuccess(true);
     } catch (err) {
-      const { message } = useApiError(err);
+      const { message } = extractApiError(err);
       setFormError(message);
     }
   };

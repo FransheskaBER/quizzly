@@ -26,14 +26,15 @@ const isBackendErrorBody = (data: unknown): data is BackendErrorBody =>
 
 /**
  * Extracts structured error info from any RTK Query error shape.
- * Call this in catch blocks after a .unwrap() call throws.
+ * Plain utility function — NOT a React hook. Safe to call anywhere
+ * (event handlers, async functions, effects).
  *
  * Returns { code, message, fieldErrors } where:
  * - code:        backend error code (e.g. 'EMAIL_NOT_VERIFIED') or null
  * - message:     human-readable message ready to display
  * - fieldErrors: map of field path → message for form-level errors, or null
  */
-export const useApiError = (error: unknown): ApiErrorResult => {
+export const extractApiError = (error: unknown): ApiErrorResult => {
   if (!error) return { code: null, message: '', fieldErrors: null };
 
   if (isFetchBaseQueryError(error)) {

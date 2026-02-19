@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { signupSchema } from '@skills-trainer/shared';
 import type { SignupRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
-import { useApiError } from '@/hooks/useApiError';
+import { extractApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import styles from './SignupPage.module.css';
@@ -28,7 +28,7 @@ const SignupPage = () => {
       await signup(data);
       setSubmittedEmail(data.email);
     } catch (err) {
-      const { code, message } = useApiError(err);
+      const { code, message } = extractApiError(err);
       if (code === 'CONFLICT') {
         setError('email', { message: 'Email already registered' });
       } else if (code === 'RATE_LIMITED') {
