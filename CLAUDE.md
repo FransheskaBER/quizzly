@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 0: Foundation (Week 1)
-Current task: 006 — CI pipeline (GitHub Actions)
-Next task: 007 — Auth backend
+Current task: 007 — Auth backend
+Next task: 008 — Auth frontend
 
 ## Task Reference
 ```
