@@ -52,7 +52,7 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 ```
 
 ## Current Sprint
-Sprint 0: Foundation (Week 1)
+Sprint 1: Authentication (Week 2)
 Current task: 007 — Auth backend
 Next task: 008 — Auth frontend
 
