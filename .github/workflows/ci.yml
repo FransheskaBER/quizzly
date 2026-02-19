@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skills_test
+          POSTGRES_PASSWORD: skills_test
+          POSTGRES_DB: skills_trainer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U skills_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check — shared
+        run: npm run typecheck -w packages/shared
+
+      - name: Type check — server
+        run: npm run typecheck -w packages/server
+
+      - name: Type check — client
+        run: npm run typecheck -w packages/client
+
+      - name: Run Prisma migrations
+        run: npx prisma migrate deploy
+        working-directory: packages/server
+        env:
+          DATABASE_URL: postgresql://skills_test:skills_test@localhost:5432/skills_trainer_test
+
+      - name: Run tests
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://skills_test:skills_test@localhost:5432/skills_trainer_test
+          NODE_ENV: test
+          JWT_SECRET: ci-test-secret-key-that-is-at-least-32-characters-long
+          PORT: '3000'
+          CLIENT_URL: http://localhost:5173
+
+      - name: Build — server
+        run: npm run build -w packages/server
+
+      - name: Build — client
+        run: npm run build -w packages/client
