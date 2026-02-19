@@ -7,6 +7,7 @@ export const sanitizeString = (input: string): string => {
   return (
     input
       // Strip ASCII control characters except tab (\x09), newline (\x0A), carriage return (\x0D)
+      // eslint-disable-next-line no-control-regex
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
       // Strip zero-width and invisible Unicode characters
       .replace(/[\u200B-\u200F\u2028-\u202F\u205F-\u206F\uFEFF]/g, '')
