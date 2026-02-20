@@ -34,3 +34,11 @@ beforeAll(async () => { await prisma.$executeRawUnsafe('-- run migrations'); });
 afterEach(async () => { await prisma.user.deleteMany(); /* truncate in dependency order */ });
 afterAll(async () => { await prisma.$disconnect(); });
 ```
+
+## CI Pipeline Rules
+- **Pre-push checklist (every task):** Before committing, always run locally and verify zero errors: `npm run lint`, `npx tsc --noEmit` in both server and client packages, and `npm test` (full suite). Never push code that fails any of these locally.
+- **CI Postgres credentials:** The Postgres service container in `ci.yml` uses `POSTGRES_USER: skills_test`, `POSTGRES_PASSWORD: skills_test`, `POSTGRES_DB: skills_trainer_test`. The `DATABASE_URL` used in both the migrate and test steps is `postgresql://skills_test:skills_test@localhost:5432/skills_trainer_test`. These must always stay in sync — if one changes, update the other.
+- **Prisma in CI:** `npx prisma migrate deploy` must run before `npx prisma generate`, and both must run before tests. Both steps exist in `ci.yml` — don't remove them. If you modify the Prisma schema, verify both steps still work.
+- **CI environment updates:** Any task that introduces new test infrastructure — service containers, new environment variables, new generated files, or new test dependencies — must update `ci.yml` as part of that task. Do not leave CI updates for a separate PR.
+- **Test helpers:** Reusable test infrastructure lives in `packages/server/src/__tests__/helpers/`. Reuse `createTestUser()`, `getAuthToken()`, `createUnverifiedUser()`, `cleanDatabase()`, and `closeDatabase()`. Do not duplicate these. If a new helper is needed, add it to the existing helpers directory.
+- **Environment mismatches:** If CI fails on something that passes locally, check: database credentials, generated files (Prisma client), and platform-specific dependencies (rollup native binaries). The fix is always to align CI with what the code expects, not the other way around.
