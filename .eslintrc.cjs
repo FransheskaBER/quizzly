@@ -5,10 +5,11 @@ module.exports = {
     ecmaVersion: 2022,
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint'],
+  plugins: ['@typescript-eslint', 'react-hooks'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
+    'plugin:react-hooks/recommended',
     'prettier',
   ],
   rules: {
