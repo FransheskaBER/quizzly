@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 1: Authentication (Week 2)
-Current task: 008 — Auth frontend
-Next task: 009 — Auth tests
+Current task: 009 — Auth tests
+Next task: 010 — Session backend
 
 ## Task Reference
 ```
