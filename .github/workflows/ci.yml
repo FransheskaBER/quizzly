@@ -38,6 +38,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: packages/server
+
       - name: Lint
         run: npm run lint
 
@@ -58,10 +62,6 @@ jobs:
         working-directory: packages/server
         env:
           DATABASE_URL: postgresql://skills_test:skills_test@localhost:5432/skills_trainer_test
-
-      - name: Generate Prisma client
-        run: npx prisma generate
-        working-directory: packages/server
 
       - name: Run tests
         run: npm test
