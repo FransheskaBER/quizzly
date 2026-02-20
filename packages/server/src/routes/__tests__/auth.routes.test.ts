@@ -17,12 +17,6 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   globalRateLimiter: (_req: never, _res: never, next: () => void) => next(),
 }));
 
-// Mock the email service — never send real emails in tests
-vi.mock('../../services/email.service.js', () => ({
-  sendVerificationEmail: vi.fn(),
-  sendPasswordResetEmail: vi.fn(),
-}));
-
 import { sendPasswordResetEmail } from '../../services/email.service.js';
 
 const app = createApp();
