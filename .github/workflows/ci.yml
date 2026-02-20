@@ -59,6 +59,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://skills_test:skills_test@localhost:5432/skills_trainer_test
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: packages/server
+
       - name: Run tests
         run: npm test
         env:
