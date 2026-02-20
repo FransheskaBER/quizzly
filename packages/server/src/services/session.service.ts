@@ -54,7 +54,7 @@ export const listSessions = async (
   const nextCursor = hasMore ? items[items.length - 1].id : null;
 
   return {
-    sessions: items.map((s) => ({
+    sessions: items.map((s: (typeof items)[number]) => ({
       id: s.id,
       name: s.name,
       subject: s.subject,
@@ -116,7 +116,7 @@ export const getSession = async (
     goal: session.goal,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
-    materials: session.materials.map((m) => ({
+    materials: session.materials.map((m: (typeof session.materials)[number]) => ({
       id: m.id,
       fileName: m.fileName,
       fileType: m.fileType,
@@ -125,7 +125,7 @@ export const getSession = async (
       status: m.status as MaterialStatus,
       createdAt: m.createdAt.toISOString(),
     })),
-    quizAttempts: session.quizAttempts.map((q) => ({
+    quizAttempts: session.quizAttempts.map((q: (typeof session.quizAttempts)[number]) => ({
       id: q.id,
       difficulty: q.difficulty as QuizDifficulty,
       answerFormat: q.answerFormat as AnswerFormat,
