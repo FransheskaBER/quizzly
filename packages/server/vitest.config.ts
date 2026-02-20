@@ -4,5 +4,26 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     passWithNoTests: true,
+    setupFiles: ['src/__tests__/setup.ts'],
+    env: {
+      NODE_ENV: 'test',
+      // Resolution order:
+      // 1. TEST_DATABASE_URL — explicit test DB override (local or CI)
+      // 2. DATABASE_URL      — CI sets this on the "Run tests" step
+      // 3. hardcoded local fallback
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ??
+        process.env.DATABASE_URL ??
+        'postgresql://skills_dev:skills_dev@localhost:5432/skills_trainer_test',
+      JWT_SECRET: 'test-jwt-secret-must-be-at-least-32-characters-long!!',
+      JWT_EXPIRES_IN: '7d',
+      CLIENT_URL: 'http://localhost:5173',
+      PORT: '3001',
+    },
+    coverage: {
+      provider: 'v8',
+      include: ['src/services/**', 'src/utils/**'],
+      reporter: ['text', 'lcov'],
+    },
   },
 });
