@@ -23,7 +23,7 @@ vi.mock('../../services/email.service.js', () => ({
   sendPasswordResetEmail: vi.fn(),
 }));
 
-import { sendVerificationEmail, sendPasswordResetEmail } from '../../services/email.service.js';
+import { sendPasswordResetEmail } from '../../services/email.service.js';
 
 const app = createApp();
 
