@@ -388,8 +388,10 @@ describe('resetPassword', () => {
     expect(hashPassword).toHaveBeenCalledWith('NewPassword123!');
     expect(prisma.$transaction).toHaveBeenCalled();
 
-    // Transaction receives an array of two operations
-    const transactionArg = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown[];
+    // Transaction receives an array of two operations.
+    // Double-cast through unknown because Prisma's $transaction overloads
+    // make a direct cast to unknown[] fail the overlap check in tsc.
+    const transactionArg = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown as unknown[];
     expect(transactionArg).toHaveLength(2);
   });
 
