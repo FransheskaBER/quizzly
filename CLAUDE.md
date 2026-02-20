@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 2: Sessions & Dashboard (Week 3)
-Current task: 010 — Session backend
-Next task: 011 — Dashboard backend
+Current task: 011 — Dashboard backend
+Next task: 012 — Session + dashboard frontend
 
 ## Task Reference
 ```
