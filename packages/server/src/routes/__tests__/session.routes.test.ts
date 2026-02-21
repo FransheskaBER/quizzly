@@ -87,6 +87,19 @@ describe('POST /api/sessions', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('400 — name exceeds 200 characters', async () => {
+    const { user } = await createTestUser();
+    const token = getAuthToken(user);
+
+    const res = await request(app)
+      .post('/api/sessions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'x'.repeat(201), subject: 'TypeScript', goal: 'Learn TS fundamentals' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('401 — no Authorization header', async () => {
     const res = await request(app)
       .post('/api/sessions')
@@ -196,6 +209,47 @@ describe('GET /api/sessions/:id', () => {
     expect(res.body.id).toBe(session.id);
     expect(res.body.materials).toEqual([]);
     expect(res.body.quizAttempts).toEqual([]);
+  });
+
+  it('200 — returns seeded materials and quiz attempts in response', async () => {
+    const { user } = await createTestUser();
+    const token = getAuthToken(user);
+    const session = await createSession(user.id);
+
+    const material = await prisma.material.create({
+      data: {
+        sessionId: session.id,
+        fileName: 'notes.pdf',
+        fileType: 'pdf',
+        extractedText: 'Sample extracted text',
+        tokenCount: 150,
+        status: 'ready',
+      },
+    });
+
+    const quiz = await prisma.quizAttempt.create({
+      data: {
+        sessionId: session.id,
+        userId: user.id,
+        difficulty: 'easy',
+        answerFormat: 'mcq',
+        questionCount: 5,
+        status: 'completed',
+        score: 80,
+      },
+    });
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.materials).toHaveLength(1);
+    expect(res.body.materials[0].id).toBe(material.id);
+    expect(res.body.materials[0].fileName).toBe('notes.pdf');
+    expect(res.body.quizAttempts).toHaveLength(1);
+    expect(res.body.quizAttempts[0].id).toBe(quiz.id);
+    expect(res.body.quizAttempts[0].score).toBe(80);
   });
 
   it('404 — session does not exist', async () => {
@@ -338,6 +392,43 @@ describe('DELETE /api/sessions/:id', () => {
 
     const dbSession = await prisma.session.findUnique({ where: { id: session.id } });
     expect(dbSession).toBeNull();
+  });
+
+  it('DB — cascade deletes materials and quiz attempts', async () => {
+    const { user } = await createTestUser();
+    const token = getAuthToken(user);
+    const session = await createSession(user.id);
+
+    const material = await prisma.material.create({
+      data: {
+        sessionId: session.id,
+        fileName: 'lecture.pdf',
+        fileType: 'pdf',
+        extractedText: 'Content',
+        tokenCount: 200,
+        status: 'ready',
+      },
+    });
+
+    const quiz = await prisma.quizAttempt.create({
+      data: {
+        sessionId: session.id,
+        userId: user.id,
+        difficulty: 'medium',
+        answerFormat: 'mcq',
+        questionCount: 10,
+        status: 'completed',
+      },
+    });
+
+    await request(app)
+      .delete(`/api/sessions/${session.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    const dbMaterial = await prisma.material.findUnique({ where: { id: material.id } });
+    const dbQuiz = await prisma.quizAttempt.findUnique({ where: { id: quiz.id } });
+    expect(dbMaterial).toBeNull();
+    expect(dbQuiz).toBeNull();
   });
 
   it('404 — session does not exist', async () => {
