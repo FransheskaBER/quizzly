@@ -46,6 +46,18 @@ export const generateDownloadUrl = async (input: {
   return { downloadUrl, expiresIn: DOWNLOAD_EXPIRES_IN };
 };
 
+export const getObjectBuffer = async (key: string): Promise<Buffer> => {
+  const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+  const response = await s3Client.send(command);
+
+  if (!response.Body) {
+    throw new Error(`No body returned from S3 for key: ${key}`);
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+  return Buffer.from(bytes);
+};
+
 export const deleteObject = async (key: string): Promise<void> => {
   try {
     await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
