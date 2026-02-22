@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 3: Materials (Week 4)
-Current task: 015 — Material backend
-Next task: 016 — Material frontend
+Current task: 016 — Material frontend
+Next task: 017 — Material tests
 
 ## Task Reference
 ```

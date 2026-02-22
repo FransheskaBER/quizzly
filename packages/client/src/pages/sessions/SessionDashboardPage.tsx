@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
 import { SessionForm } from '@/components/session/SessionForm';
+import { MaterialUploader } from '@/components/session/MaterialUploader';
 import { Modal } from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
 import { parseApiError } from '@/hooks/useApiError';
 import { formatDate, formatScore } from '@/utils/formatters';
-import type { CreateSessionRequest, MaterialSummary, QuizAttemptSummary } from '@skills-trainer/shared';
+import type { CreateSessionRequest, QuizAttemptSummary } from '@skills-trainer/shared';
 import styles from './SessionDashboardPage.module.css';
 
 const isFetchError = (err: unknown): err is { status: number } =>
@@ -108,27 +109,7 @@ const SessionDashboardPage = () => {
           <h2 className={styles.sectionTitle}>
             Materials <span className={styles.count}>({session.materials.length})</span>
           </h2>
-          {session.materials.length === 0 ? (
-            <p className={styles.emptyText}>No materials yet. Material upload is coming soon.</p>
-          ) : (
-            <div className={styles.materialList}>
-              {session.materials.map((m: MaterialSummary) => (
-                <div key={m.id} className={styles.materialRow}>
-                  <div className={styles.materialInfo}>
-                    <span className={styles.materialName}>{m.fileName}</span>
-                    <span className={styles.materialMeta}>
-                      {m.fileType.toUpperCase()}
-                      {m.fileSize != null && ` · ${(m.fileSize / 1024).toFixed(0)} KB`}
-                      {` · ${m.tokenCount.toLocaleString()} tokens`}
-                    </span>
-                  </div>
-                  <span className={`${styles.statusBadge} ${styles[`status_${m.status}`]}`}>
-                    {m.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <MaterialUploader sessionId={session.id} materials={session.materials} />
         </div>
 
         {/* Quiz attempts */}

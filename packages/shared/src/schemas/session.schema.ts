@@ -37,8 +37,10 @@ export const materialSummarySchema = z.object({
   fileName: z.string(),
   fileType: z.string(),
   fileSize: z.number().nullable(),
+  sourceUrl: z.string().nullable(),
   tokenCount: z.number().int(),
   status: z.nativeEnum(MaterialStatus),
+  errorMessage: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 

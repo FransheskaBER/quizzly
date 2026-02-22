@@ -157,45 +157,6 @@
   text-decoration: none;
 }
 
-/* ---- Materials ---- */
-.materialList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.materialRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-sm);
-  flex-wrap: wrap;
-}
-
-.materialInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.materialName {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.materialMeta {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
 /* ---- Quiz attempts ---- */
 .quizList {
   display: flex;
