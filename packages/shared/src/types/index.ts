@@ -84,6 +84,7 @@ import type {
   quizResultsResponseSchema,
   llmGeneratedQuestionSchema,
   llmGradingResultSchema,
+  llmGradedAnswerSchema,
   sseProgressEventSchema,
   sseQuestionEventSchema,
   sseCompleteEventSchema,
@@ -105,6 +106,7 @@ export type QuizResultsSummary = z.infer<typeof quizResultsSummarySchema>;
 export type QuizResultsResponse = z.infer<typeof quizResultsResponseSchema>;
 export type LlmGeneratedQuestion = z.infer<typeof llmGeneratedQuestionSchema>;
 export type LlmGradingResult = z.infer<typeof llmGradingResultSchema>;
+export type LlmGradedAnswer = z.infer<typeof llmGradedAnswerSchema>;
 export type SseProgressEvent = z.infer<typeof sseProgressEventSchema>;
 export type SseQuestionEvent = z.infer<typeof sseQuestionEventSchema>;
 export type SseCompleteEvent = z.infer<typeof sseCompleteEventSchema>;
