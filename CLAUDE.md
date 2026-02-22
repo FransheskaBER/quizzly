@@ -53,8 +53,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 
 ## Current Sprint
 Sprint 3: Materials (Week 4)
-Current task: 018 — LLM service
-Next task: 019 — Prompt templates
+Current task: 019 — Prompt templates
+Next task: 020 — Quiz gen backend
 
 ## Task Reference
 ```
