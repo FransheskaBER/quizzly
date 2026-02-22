@@ -117,6 +117,20 @@ export const llmGeneratedQuestionSchema = z
   .refine((q) => q.questionType !== QuestionType.MCQ || q.options !== null, {
     message: 'MCQ questions must have options',
     path: ['options'],
+  })
+  .refine(
+    (q) =>
+      q.questionType !== QuestionType.MCQ ||
+      q.options === null ||
+      q.options.includes(q.correctAnswer),
+    {
+      message: 'MCQ correctAnswer must be one of the options',
+      path: ['correctAnswer'],
+    },
+  )
+  .refine((q) => q.questionType !== QuestionType.FREE_TEXT || q.options === null, {
+    message: 'Free-text questions must not have options',
+    path: ['options'],
   });
 
 export const llmGradingResultSchema = z.object({
@@ -125,8 +139,17 @@ export const llmGradingResultSchema = z.object({
   feedback: z.string().min(1),
 });
 
+// Used by the LLM grading service (Task 018). questionId-based schema above is for Task 025.
+export const llmGradedAnswerSchema = z.object({
+  questionNumber: z.number().int().min(1),
+  score: z.number().min(0).max(1),
+  isCorrect: z.boolean(),
+  feedback: z.string().min(1),
+});
+
 export const llmQuizOutputSchema = z.array(llmGeneratedQuestionSchema);
 export const llmGradingOutputSchema = z.array(llmGradingResultSchema);
+export const llmGradedAnswersOutputSchema = z.array(llmGradedAnswerSchema);
 
 // SSE event schemas
 
