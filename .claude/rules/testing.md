@@ -1,5 +1,14 @@
 # Testing Rules
 
+## Testing Integrity — Non-Negotiable
+
+- Tests validate the code. Code is NEVER modified to pass tests.
+- If a test fails, fix the implementation — not the test, not the data, not the filter.
+- Never add .filter(), .skip(), .only(), try/catch swallowing, or conditional logic to mask failures.
+- Never scope down test assertions to avoid catching a bug (e.g., checking array length but not content).
+- Never add UI-level workarounds (hiding errors, filtering bad data, fallback defaults) to compensate for broken backend logic.
+- If a bug exists in the code, STOP and fix the bug. Do not work around it anywhere in the stack.
+
 ## Tools & Layers
 - **Unit tests:** Vitest. Cover services, utils, shared schemas. Mock all external deps (Prisma, S3, Anthropic, Resend) via `vitest-mock-extended`.
 - **Integration tests:** Vitest + Supertest. Full request → middleware → service → DB → response. Run against real Postgres (Docker locally, service container in CI). Mock only: Anthropic SDK, S3 client, Resend client.
