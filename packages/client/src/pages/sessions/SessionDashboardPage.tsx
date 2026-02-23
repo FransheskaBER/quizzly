@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { MaterialUploader } from '@/components/session/MaterialUploader';
@@ -7,6 +8,9 @@ import { Modal } from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
 import { parseApiError } from '@/hooks/useApiError';
+import { useQuizGeneration } from '@/hooks/useQuizGeneration';
+import { QuizPreferences } from '@/components/quiz/QuizPreferences';
+import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { formatDate, formatScore } from '@/utils/formatters';
 import type { CreateSessionRequest, QuizAttemptSummary } from '@skills-trainer/shared';
 import styles from './SessionDashboardPage.module.css';
@@ -24,6 +28,18 @@ const SessionDashboardPage = () => {
   const { data: session, isLoading, error } = useGetSessionQuery(id ?? '');
   const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
+
+  const {
+    generate,
+    status: generationStatus,
+    questions,
+    quizAttemptId,
+    error: generationError,
+    totalExpected,
+    warning,
+    progressMessage,
+    reset: resetGeneration,
+  } = useQuizGeneration(id ?? '');
 
   if (isLoading) return <LoadingSpinner fullPage />;
 
@@ -96,9 +112,6 @@ const SessionDashboardPage = () => {
                 <button className={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>
                   Delete
                 </button>
-                <Link to={`/sessions/${session.id}/generate`} className={styles.generateBtn}>
-                  Generate Quiz
-                </Link>
               </div>
             </div>
           )}
@@ -110,6 +123,25 @@ const SessionDashboardPage = () => {
             Materials <span className={styles.count}>({session.materials.length})</span>
           </h2>
           <MaterialUploader sessionId={session.id} materials={session.materials} />
+        </div>
+
+        {/* Generate quiz */}
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>Generate Quiz</h2>
+          {generationStatus === 'idle' ? (
+            <QuizPreferences onGenerate={generate} isDisabled={false} error={null} />
+          ) : (
+            <QuizProgress
+              status={generationStatus}
+              questions={questions}
+              totalExpected={totalExpected}
+              progressMessage={progressMessage}
+              warning={warning}
+              error={generationError}
+              quizAttemptId={quizAttemptId}
+              onReset={resetGeneration}
+            />
+          )}
         </div>
 
         {/* Quiz attempts */}
