@@ -1,5 +1,5 @@
 import { api } from '@/store/api';
-import type { QuizAttemptResponse, SaveAnswersRequest } from '@skills-trainer/shared';
+import type { QuizAttemptResponse, SaveAnswersRequest, QuizResultsResponse } from '@skills-trainer/shared';
 
 type AnswerInput = SaveAnswersRequest['answers'][number];
 
@@ -18,9 +18,10 @@ const quizzesApi = api.injectEndpoints({
       }),
     }),
 
-    // POST /api/quizzes/:id/submit — response is an SSE stream (Task 026 handles the stream).
-    // For now we fire the request and navigate to results; the results page will connect
-    // to the grading stream.
+    // POST /api/quizzes/:id/submit — responds with an SSE stream.
+    // QuizTakingPage fires this and navigates away; the server grades independently.
+    // fetchBaseQuery gets a PARSING_ERROR (SSE body ≠ JSON) on 2xx — QuizTakingPage
+    // detects this and treats it as a successful submission.
     submitQuiz: builder.mutation<void, { id: string; answers: AnswerInput[] }>({
       query: ({ id, answers }) => ({
         url: `/quizzes/${id}/submit`,
@@ -28,7 +29,18 @@ const quizzesApi = api.injectEndpoints({
         body: { answers },
       }),
     }),
+
+    // GET /api/quizzes/:id/results — only available after status = 'completed'.
+    getResults: builder.query<QuizResultsResponse, string>({
+      query: (id) => `/quizzes/${id}/results`,
+      providesTags: (result, error, id) => [{ type: 'Quiz', id: `${id}-results` }],
+    }),
   }),
 });
 
-export const { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } = quizzesApi;
+export const {
+  useGetQuizQuery,
+  useSaveAnswersMutation,
+  useSubmitQuizMutation,
+  useGetResultsQuery,
+} = quizzesApi;

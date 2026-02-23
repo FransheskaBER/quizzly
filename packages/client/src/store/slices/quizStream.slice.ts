@@ -5,13 +5,26 @@ import type { RootState } from '../store';
 import type { Question } from '@skills-trainer/shared';
 
 type GenerationStatus = 'idle' | 'connecting' | 'generating' | 'complete' | 'error';
+type GradingStatus = 'idle' | 'connecting' | 'grading' | 'complete' | 'error';
+
+export interface GradedQuestion {
+  questionId: string;
+  score: number;
+  isCorrect: boolean;
+}
 
 interface QuizStreamState {
+  // Generation state
   status: GenerationStatus;
   questions: Question[];
   quizAttemptId: string | null;
   error: string | null;
   totalExpected: number;
+  // Grading state
+  gradingStatus: GradingStatus;
+  gradedQuestions: GradedQuestion[];
+  gradingError: string | null;
+  gradingFinalScore: number | null;
 }
 
 const initialState: QuizStreamState = {
@@ -20,12 +33,17 @@ const initialState: QuizStreamState = {
   quizAttemptId: null,
   error: null,
   totalExpected: 0,
+  gradingStatus: 'idle',
+  gradedQuestions: [],
+  gradingError: null,
+  gradingFinalScore: null,
 };
 
 const quizStreamSlice = createSlice({
   name: 'quizStream',
   initialState,
   reducers: {
+    // Generation actions
     generationStarted: (state, action: PayloadAction<number>) => {
       state.status = 'connecting';
       state.questions = [];
@@ -47,7 +65,38 @@ const quizStreamSlice = createSlice({
       state.status = 'error';
       state.error = action.payload;
     },
-    generationReset: () => initialState,
+    generationReset: (state) => {
+      state.status = initialState.status;
+      state.questions = initialState.questions;
+      state.quizAttemptId = initialState.quizAttemptId;
+      state.error = initialState.error;
+      state.totalExpected = initialState.totalExpected;
+    },
+    // Grading actions
+    gradingStarted: (state) => {
+      state.gradingStatus = 'connecting';
+      state.gradedQuestions = [];
+      state.gradingError = null;
+      state.gradingFinalScore = null;
+    },
+    questionGraded: (state, action: PayloadAction<GradedQuestion>) => {
+      state.gradingStatus = 'grading';
+      state.gradedQuestions.push(action.payload);
+    },
+    gradingCompleted: (state, action: PayloadAction<number>) => {
+      state.gradingStatus = 'complete';
+      state.gradingFinalScore = action.payload;
+    },
+    gradingFailed: (state, action: PayloadAction<string>) => {
+      state.gradingStatus = 'error';
+      state.gradingError = action.payload;
+    },
+    gradingReset: (state) => {
+      state.gradingStatus = initialState.gradingStatus;
+      state.gradedQuestions = initialState.gradedQuestions;
+      state.gradingError = initialState.gradingError;
+      state.gradingFinalScore = initialState.gradingFinalScore;
+    },
   },
 });
 
@@ -57,8 +106,19 @@ export const {
   generationCompleted,
   generationFailed,
   generationReset,
+  gradingStarted,
+  questionGraded,
+  gradingCompleted,
+  gradingFailed,
+  gradingReset,
 } = quizStreamSlice.actions;
 
 export const selectQuizStream = (state: RootState) => state.quizStream;
+export const selectGradingStream = (state: RootState) => ({
+  gradingStatus: state.quizStream.gradingStatus,
+  gradedQuestions: state.quizStream.gradedQuestions,
+  gradingError: state.quizStream.gradingError,
+  gradingFinalScore: state.quizStream.gradingFinalScore,
+});
 
 export default quizStreamSlice.reducer;

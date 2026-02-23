@@ -13,6 +13,8 @@ interface UseSSEStreamOptions {
   onError: (message: string) => void;
   onComplete: () => void;
   token: string;
+  /** Optional fetch overrides (e.g. method: 'POST', body: '...'). Headers and signal are managed internally. */
+  fetchInit?: Omit<RequestInit, 'headers' | 'signal'>;
 }
 
 export interface UseSSEStreamResult {
@@ -52,11 +54,13 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
   const onErrorRef = useRef(options.onError);
   const onCompleteRef = useRef(options.onComplete);
   const tokenRef = useRef(options.token);
+  const fetchInitRef = useRef(options.fetchInit);
 
   onEventRef.current = options.onEvent;
   onErrorRef.current = options.onError;
   onCompleteRef.current = options.onComplete;
   tokenRef.current = options.token;
+  fetchInitRef.current = options.fetchInit;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,6 +97,7 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
 
       try {
         const response = await fetch(url, {
+          ...fetchInitRef.current,
           headers: { Authorization: `Bearer ${tokenRef.current}` },
           signal: controller.signal,
         });
