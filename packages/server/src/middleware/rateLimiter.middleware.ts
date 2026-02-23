@@ -1,6 +1,7 @@
 import {
   RATE_LIMIT_QUIZ_GENERATION_PER_HOUR,
   RATE_LIMIT_QUIZ_GENERATION_PER_DAY,
+  RATE_LIMIT_REGRADE_PER_HOUR,
 } from '@skills-trainer/shared';
 
 import rateLimit from 'express-rate-limit';
@@ -52,6 +53,27 @@ export const quizGenerationDailyLimiter = rateLimit({
     error: {
       code: 'RATE_LIMITED',
       message: `Daily quiz generation limit reached. You can generate up to ${RATE_LIMIT_QUIZ_GENERATION_PER_DAY} quizzes per day.`,
+    },
+  },
+});
+
+// Per-quiz-per-user rate limiter for regrade.
+// Keyed on both quiz ID and user ID so an authenticated attacker cannot
+// exhaust another user's regrade budget by sending requests with a known
+// quiz ID. Auth middleware must run before this limiter so req.user is set.
+const regradeKeyGenerator = (req: Request): string =>
+  `regrade:${req.params.id ?? 'unknown'}:${req.user?.userId ?? 'unknown'}`;
+
+export const regradeRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: RATE_LIMIT_REGRADE_PER_HOUR,
+  keyGenerator: regradeKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'RATE_LIMITED',
+      message: `Regrade limit reached. You can regrade up to ${RATE_LIMIT_REGRADE_PER_HOUR} times per hour.`,
     },
   },
 });

@@ -74,6 +74,7 @@ export type MaterialResponse = z.infer<typeof materialResponseSchema>;
 import type {
   generateQuizQuerySchema,
   saveAnswersSchema,
+  submitQuizBodySchema,
   quizParamsSchema,
   quizSessionParamsSchema,
   questionSchema,
@@ -96,6 +97,7 @@ import type {
 
 export type GenerateQuizQuery = z.infer<typeof generateQuizQuerySchema>;
 export type SaveAnswersRequest = z.infer<typeof saveAnswersSchema>;
+export type SubmitQuizBody = z.infer<typeof submitQuizBodySchema>;
 export type QuizParams = z.infer<typeof quizParamsSchema>;
 export type QuizSessionParams = z.infer<typeof quizSessionParamsSchema>;
 export type Question = z.infer<typeof questionSchema>;
