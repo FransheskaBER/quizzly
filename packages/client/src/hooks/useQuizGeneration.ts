@@ -47,6 +47,9 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
 
   const questionBufferRef = useRef<Question[]>([]);
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Set to true when a 'complete' or SSE 'error' event is received. Checked in
+  // onComplete to detect unexpected stream closure (done=true with no terminal event).
+  const terminalEventReceivedRef = useRef(false);
 
   const stopFlushInterval = (): void => {
     if (flushIntervalRef.current) {
@@ -77,6 +80,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
 
     if (event.type === 'complete' && typeof event.data === 'object' && event.data !== null) {
       const { quizAttemptId } = event.data as { quizAttemptId: string };
+      terminalEventReceivedRef.current = true;
       flushBuffer();
       stopFlushInterval();
       dispatch(generationCompleted(quizAttemptId));
@@ -86,6 +90,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
     }
 
     if (event.type === 'error' && typeof event.message === 'string') {
+      terminalEventReceivedRef.current = true;
       flushBuffer();
       stopFlushInterval();
       dispatch(generationFailed(event.message));
@@ -97,10 +102,14 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
     dispatch(generationFailed(message));
   };
 
-  // Stream closure (done = true) without a 'complete' event means the connection
-  // dropped unexpectedly. Clean up the flush interval.
+  // Stream closure (done = true) without a prior terminal SSE event means the
+  // connection dropped unexpectedly. Move to error state so the user can retry.
   const onComplete = (): void => {
     stopFlushInterval();
+    if (!terminalEventReceivedRef.current) {
+      flushBuffer();
+      dispatch(generationFailed('Connection closed unexpectedly. Please try again.'));
+    }
   };
 
   const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token });
@@ -121,6 +130,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
 
   const generate = (preferences: GenerateQuizQuery): void => {
     questionBufferRef.current = [];
+    terminalEventReceivedRef.current = false;
     stopFlushInterval();
     setProgressMessage(null);
     dispatch(generationStarted(preferences.count));
