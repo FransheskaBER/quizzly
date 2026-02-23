@@ -125,8 +125,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 ## 8. Current Sprint
 
 Sprint 4: LLM & Quiz Generation (Week 5)
-Current task: 020 — Quiz gen backend
-Next task: 021 — Quiz gen frontend
+Current task: 021 — Quiz gen frontend
+Next task: 022 — Quiz gen tests
 
 ## 9. Task Reference
 
