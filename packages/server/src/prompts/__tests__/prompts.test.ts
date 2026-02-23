@@ -4,11 +4,13 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { SYSTEM_MARKER } from '../constants.js';
 import { buildGenerationSystemPrompt } from '../generation/system.prompt.js';
+import { buildGenerationUserMessage } from '../generation/user.prompt.js';
 import { getEasyDifficultyPrompt } from '../generation/easy.prompt.js';
 import { getMediumDifficultyPrompt } from '../generation/medium.prompt.js';
 import { getHardDifficultyPrompt } from '../generation/hard.prompt.js';
 import { buildGradingSystemPrompt } from '../grading/system.prompt.js';
 import { buildGradingUserPrompt } from '../grading/freetext.prompt.js';
+import { QuizDifficulty, AnswerFormat } from '@skills-trainer/shared';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -198,6 +200,57 @@ describe('buildGradingUserPrompt', () => {
       ],
     });
     expect(output).toContain('[No answer provided]');
+  });
+});
+
+// ── Generation user message (user.prompt.ts) ──────────────────────────────────
+
+describe('buildGenerationUserMessage', () => {
+  const BASE_PARAMS = {
+    subject: 'React Hooks',
+    goal: 'Understand the useState API',
+    difficulty: QuizDifficulty.EASY,
+    answerFormat: AnswerFormat.MCQ,
+    questionCount: 3,
+    materialsText: null,
+  };
+
+  it('includes subject and goal in the output', () => {
+    const output = buildGenerationUserMessage(BASE_PARAMS);
+    expect(output).toContain('React Hooks');
+    expect(output).toContain('Understand the useState API');
+  });
+
+  it('includes difficulty, answerFormat, and questionCount in the output', () => {
+    const output = buildGenerationUserMessage(BASE_PARAMS);
+    expect(output).toContain(QuizDifficulty.EASY);
+    expect(output).toContain(AnswerFormat.MCQ);
+    expect(output).toContain('3');
+  });
+
+  it('wraps user-supplied content in XML delimiter tags', () => {
+    const output = buildGenerationUserMessage(BASE_PARAMS);
+    expect(output).toContain('<subject>');
+    expect(output).toContain('</subject>');
+    expect(output).toContain('<goal>');
+    expect(output).toContain('</goal>');
+    expect(output).toContain('<materials>');
+    expect(output).toContain('</materials>');
+  });
+
+  it('uses "No materials provided." placeholder and sets materials_provided to false when materialsText is null', () => {
+    const output = buildGenerationUserMessage({ ...BASE_PARAMS, materialsText: null });
+    expect(output).toContain('No materials provided.');
+    expect(output).toContain('<materials_provided>false</materials_provided>');
+  });
+
+  it('includes the materials text and sets materials_provided to true when materialsText is provided', () => {
+    const output = buildGenerationUserMessage({
+      ...BASE_PARAMS,
+      materialsText: 'Hooks let you use state in functional components.',
+    });
+    expect(output).toContain('Hooks let you use state in functional components.');
+    expect(output).toContain('<materials_provided>true</materials_provided>');
   });
 });
 
