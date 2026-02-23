@@ -1,7 +1,11 @@
 import {
   generateQuizQuerySchema,
   quizSessionParamsSchema,
+  quizParamsSchema,
+  saveAnswersSchema,
   type GenerateQuizQuery,
+  type QuizParams,
+  type SaveAnswersRequest,
 } from '@skills-trainer/shared';
 
 import pino from 'pino';
@@ -72,4 +76,33 @@ router.get(
   }),
 );
 
-export { router as quizRouter };
+const takingRouter = Router();
+
+// GET /api/quizzes/:id
+takingRouter.get(
+  '/:id',
+  auth,
+  validate({ params: quizParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+    const { id } = req.params as unknown as QuizParams;
+    const result = await quizService.getQuiz(id, req.user.userId);
+    res.status(200).json(result);
+  }),
+);
+
+// PATCH /api/quizzes/:id/answers
+takingRouter.patch(
+  '/:id/answers',
+  auth,
+  validate({ params: quizParamsSchema, body: saveAnswersSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+    const { id } = req.params as unknown as QuizParams;
+    const { answers } = req.body as SaveAnswersRequest;
+    const result = await quizService.saveAnswers(id, req.user.userId, answers);
+    res.status(200).json(result);
+  }),
+);
+
+export { router as quizRouter, takingRouter as quizTakingRouter };

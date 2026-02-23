@@ -4,6 +4,8 @@ import {
   SSE_SERVER_TIMEOUT_MS,
   type QuizDifficulty,
   type AnswerFormat,
+  type QuestionType,
+  type QuizAttemptResponse,
 } from '@skills-trainer/shared';
 
 import pino from 'pino';
@@ -206,4 +208,88 @@ export const executeGeneration = async (
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+/**
+ * Returns a quiz attempt with its questions and answers, stripping all fields
+ * that must not be revealed to the client while the quiz is in progress
+ * (correctAnswer, explanation, difficulty, tags on questions; isCorrect, score,
+ * feedback, gradedAt on answers).
+ */
+export const getQuiz = async (
+  quizAttemptId: string,
+  userId: string,
+): Promise<QuizAttemptResponse> => {
+  const attempt = await prisma.quizAttempt.findUnique({
+    where: { id: quizAttemptId },
+    include: {
+      questions: { orderBy: { questionNumber: 'asc' } },
+      answers: true,
+    },
+  });
+
+  if (!attempt) throw new NotFoundError('Quiz attempt not found');
+  assertOwnership(attempt.userId, userId);
+
+  return {
+    id: attempt.id,
+    sessionId: attempt.sessionId,
+    difficulty: attempt.difficulty as QuizDifficulty,
+    answerFormat: attempt.answerFormat as AnswerFormat,
+    questionCount: attempt.questionCount,
+    status: attempt.status as QuizStatus,
+    materialsUsed: attempt.materialsUsed,
+    createdAt: attempt.createdAt.toISOString(),
+    questions: attempt.questions.map((q) => ({
+      id: q.id,
+      questionNumber: q.questionNumber,
+      questionType: q.questionType as QuestionType,
+      questionText: q.questionText,
+      options: q.options as string[] | null,
+    })),
+    answers: attempt.answers.map((a) => ({
+      id: a.id,
+      questionId: a.questionId,
+      userAnswer: a.userAnswer,
+      answeredAt: a.answeredAt?.toISOString() ?? null,
+    })),
+  };
+};
+
+/**
+ * Saves student answers for a quiz in progress.
+ * Only updates answers whose questionId belongs to this attempt.
+ * Returns the count of records actually updated.
+ */
+export const saveAnswers = async (
+  quizAttemptId: string,
+  userId: string,
+  answers: Array<{ questionId: string; answer: string }>,
+): Promise<{ saved: number }> => {
+  const attempt = await prisma.quizAttempt.findUnique({
+    where: { id: quizAttemptId },
+    include: { answers: { select: { questionId: true } } },
+  });
+
+  if (!attempt) throw new NotFoundError('Quiz attempt not found');
+  assertOwnership(attempt.userId, userId);
+
+  if (attempt.status !== QuizStatus.IN_PROGRESS) {
+    throw new ConflictError('Quiz is not in progress');
+  }
+
+  const validQuestionIds = new Set(attempt.answers.map((a) => a.questionId));
+  const validAnswers = answers.filter((a) => validQuestionIds.has(a.questionId));
+
+  const now = new Date();
+  await prisma.$transaction(
+    validAnswers.map((a) =>
+      prisma.answer.update({
+        where: { questionId: a.questionId },
+        data: { userAnswer: a.answer, answeredAt: now },
+      }),
+    ),
+  );
+
+  return { saved: validAnswers.length };
 };
