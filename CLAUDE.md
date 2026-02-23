@@ -125,8 +125,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 ## 8. Current Sprint
 
 Sprint 5: Quiz Taking & Grading (Week 6)
-Current task: 023 — Quiz taking backend
-Next task: 024 — Quiz taking frontend
+Current task: 024 — Quiz taking frontend
+Next task: 025 — Grading backend
 
 ## 9. Task Reference
 
