@@ -61,6 +61,17 @@ const QuizResultsPage = () => {
     }
   }, [gradingStatus]);
 
+  // Redirect to taking page when the quiz hasn't been submitted yet.
+  // Done in useEffect to avoid calling navigate() during render.
+  useEffect(() => {
+    if (
+      quiz &&
+      (quiz.status === QuizStatus.GENERATING || quiz.status === QuizStatus.IN_PROGRESS)
+    ) {
+      navigate(`/quiz/${id}`, { replace: true });
+    }
+  }, [quiz, id, navigate]);
+
   // ---------------------------------------------------------------------------
   // Loading / error states
   // ---------------------------------------------------------------------------
@@ -86,14 +97,13 @@ const QuizResultsPage = () => {
   const sessionId = quiz.sessionId;
 
   // ---------------------------------------------------------------------------
-  // Status: generating or in_progress — shouldn't be on results page yet
+  // Status: generating or in_progress — redirect handled by useEffect above
   // ---------------------------------------------------------------------------
 
   if (
     quiz.status === QuizStatus.GENERATING ||
     quiz.status === QuizStatus.IN_PROGRESS
   ) {
-    navigate(`/quiz/${id}`, { replace: true });
     return null;
   }
 
@@ -118,6 +128,19 @@ const QuizResultsPage = () => {
   // ---------------------------------------------------------------------------
 
   if (quiz.status === QuizStatus.SUBMITTED_UNGRADED) {
+    // Regrade SSE finished but the poll hasn't updated quiz.status to COMPLETED yet.
+    // Show a loading state so the user sees progress rather than a stale error prompt.
+    if (gradingStatus === 'complete') {
+      return (
+        <div className={styles.page}>
+          <div className={styles.stateBox}>
+            <LoadingSpinner />
+            <p className={styles.gradingMsg}>Loading results…</p>
+          </div>
+        </div>
+      );
+    }
+
     if (gradingStatus === 'connecting' || gradingStatus === 'grading') {
       return (
         <div className={styles.page}>

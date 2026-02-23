@@ -75,7 +75,12 @@ const QuestionResultInner = ({ result }: QuestionResultProps) => {
       </div>
 
       <details className={styles.explanation}>
-        <summary className={styles.explanationToggle}>Explanation</summary>
+        <summary
+          className={styles.explanationToggle}
+          aria-label={`Explanation for question ${result.questionNumber}`}
+        >
+          Explanation
+        </summary>
         <div className={styles.explanationText}>
           <ReactMarkdown>{result.explanation}</ReactMarkdown>
         </div>
@@ -103,3 +108,4 @@ const QuestionResultWithBoundary = ({ result }: QuestionResultProps) => (
  * Wrapped in an ErrorBoundary so a crash in one card doesn't break the whole list.
  */
 export const QuestionResult = memo(QuestionResultWithBoundary);
+QuestionResult.displayName = 'QuestionResult';
