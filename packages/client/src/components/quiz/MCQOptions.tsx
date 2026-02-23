@@ -9,27 +9,31 @@ interface MCQOptionsProps {
 }
 
 export const MCQOptions = ({ options, selectedOption, onSelect }: MCQOptionsProps) => (
-  <div className={styles.options} role="radiogroup">
+  <div className={styles.options}>
     {options.map((option, index) => {
       const isSelected = option === selectedOption;
       const label = String.fromCharCode(65 + index);
+      const inputId = `option-${option}`;
       return (
-        <button
-          key={index}
-          type="button"
-          role="radio"
-          aria-checked={isSelected}
-          aria-label={`Option ${label}: ${option}`}
+        <label
+          key={option}
+          htmlFor={inputId}
           className={`${styles.option} ${isSelected ? styles.selected : ''}`}
-          onClick={() => {
-            if (!isSelected) onSelect(option);
-          }}
         >
+          <input
+            id={inputId}
+            type="radio"
+            name="mcq-option"
+            value={option}
+            checked={isSelected}
+            onChange={() => onSelect(option)}
+            className={styles.radioInput}
+          />
           <span className={styles.optionLabel}>{label}.</span>
           <span className={styles.optionText}>
             <ReactMarkdown>{option}</ReactMarkdown>
           </span>
-        </button>
+        </label>
       );
     })}
   </div>

@@ -38,22 +38,37 @@ const QuizTakingPage = () => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveRef = useRef(saveAnswers);
   const idRef = useRef(id);
+  const isMountedRef = useRef(true);
   saveRef.current = saveAnswers;
   idRef.current = id;
 
   // Sends all current dirty answers to the server. Returns a promise so the
   // submit flow can await it before triggering grading.
+  // On success: removes the sent entries from dirty (new edits made while in-flight are kept).
   const doSave = useCallback((): Promise<void> => {
     const entries = Object.entries(dirtyRef.current);
     if (!entries.length) return Promise.resolve();
+    const sentKeys = new Set(entries.map(([key]) => key));
     return saveRef
       .current({
         id: idRef.current,
         answers: entries.map(([questionId, answer]) => ({ questionId, answer })),
       })
       .unwrap()
-      .then(() => setSaveError(null))
-      .catch((err: unknown) => setSaveError(parseApiError(err).message));
+      .then(() => {
+        // Remove only the keys that were sent — edits made while in-flight are preserved
+        const remaining = Object.fromEntries(
+          Object.entries(dirtyRef.current).filter(([k]) => !sentKeys.has(k)),
+        );
+        dirtyRef.current = remaining;
+        if (isMountedRef.current) {
+          setDirtyAnswers(remaining);
+          setSaveError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (isMountedRef.current) setSaveError(parseApiError(err).message);
+      });
   }, []);
 
   const handleAnswerChange = useCallback(
@@ -71,7 +86,9 @@ const QuizTakingPage = () => {
 
   // Flush any pending debounced save when the user navigates away
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       void doSave();
     };
@@ -97,14 +114,19 @@ const QuizTakingPage = () => {
       await submitQuiz({ id, answers: finalAnswers }).unwrap();
       navigate(`/quiz/${id}/results`);
     } catch (err) {
-      // fetchBaseQuery returns status: 'PARSING_ERROR' when the server responds
-      // with a non-JSON body (i.e. the SSE stream started — Task 026 handles it).
-      // That means the submit was accepted; navigate to results.
+      // fetchBaseQuery returns status: 'PARSING_ERROR' when it can't JSON-parse
+      // the response body. For the submit endpoint this means the SSE stream
+      // started (Task 026). Guard with originalStatus 2xx to avoid navigating
+      // on an HTML 404/500 from a proxy or misconfigured server.
+      const fbqErr = err as FetchBaseQueryError;
       const isStreamStarted =
         typeof err === 'object' &&
         err !== null &&
         'status' in err &&
-        (err as FetchBaseQueryError).status === 'PARSING_ERROR';
+        fbqErr.status === 'PARSING_ERROR' &&
+        typeof fbqErr.originalStatus === 'number' &&
+        fbqErr.originalStatus >= 200 &&
+        fbqErr.originalStatus < 300;
 
       if (isStreamStarted) {
         navigate(`/quiz/${id}/results`);
