@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import request from 'supertest';
-import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus, MaterialStatus } from '@skills-trainer/shared';
+import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus, MaterialStatus, MIN_QUESTION_COUNT } from '@skills-trainer/shared';
 import type { LlmGeneratedQuestion } from '@skills-trainer/shared';
 
 // vi.mock calls are hoisted — mock factories run before imports.
@@ -38,8 +38,8 @@ const VALID_LLM_QUESTION: LlmGeneratedQuestion = {
   tags: ['typescript'],
 };
 
-// Query string used in every happy-path test. count=5 is the MIN_QUESTION_COUNT.
-const VALID_QUERY = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.MCQ}&count=5`;
+// Query string used in every happy-path test.
+const VALID_QUERY = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.MCQ}&count=${MIN_QUESTION_COUNT}`;
 
 // ---------------------------------------------------------------------------
 // Helpers — create DB records directly (bypass routes)
@@ -60,7 +60,7 @@ const createMaterial = async (sessionId: string, extractedText = 'TypeScript is 
     data: {
       sessionId,
       fileName: 'notes.pdf',
-      fileType: 'application/pdf',
+      fileType: 'pdf',
       extractedText,
       tokenCount: 10,
       status: MaterialStatus.READY,

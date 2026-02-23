@@ -28,7 +28,7 @@ import { prisma } from '../../config/database.js';
 import { generateQuiz as llmGenerateQuiz } from '../llm.service.js';
 import { prepareGeneration, executeGeneration } from '../quiz.service.js';
 import { NotFoundError, ForbiddenError, ConflictError } from '../../utils/errors.js';
-import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus } from '@skills-trainer/shared';
+import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus, MaterialStatus } from '@skills-trainer/shared';
 import type { LlmGeneratedQuestion } from '@skills-trainer/shared';
 import type { SseEvent } from '../../utils/sse.utils.js';
 
@@ -200,7 +200,7 @@ describe('prepareGeneration', () => {
       expect.objectContaining({
         include: expect.objectContaining({
           materials: expect.objectContaining({
-            where: expect.objectContaining({ status: 'ready' }),
+            where: expect.objectContaining({ status: MaterialStatus.READY }),
           }),
         }),
       }),
