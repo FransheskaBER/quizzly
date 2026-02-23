@@ -1,0 +1,168 @@
+.streamingState,
+.errorState,
+.completeState {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ---- Connecting / generating ---- */
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.statusMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.warning {
+  font-size: var(--font-size-sm);
+  color: var(--color-warning);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(217, 119, 6, 0.08);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-warning);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progressCount {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  min-width: 48px;
+  text-align: right;
+}
+
+.questionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.questionPreview {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.questionNum {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.questionText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Error state ---- */
+
+.errorMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+}
+
+.retryBtn {
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.retryBtn:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* ---- Complete state ---- */
+
+.completeMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.startBtn {
+  align-self: flex-start;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  min-height: 40px;
+}
+
+.startBtn:hover {
+  background: var(--color-primary-hover);
+}
+
+/* ---- ErrorBoundary fallback ---- */
+
+.boundaryError {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.boundaryError p {
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+}
+
+.boundaryError button {
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
