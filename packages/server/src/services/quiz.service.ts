@@ -565,9 +565,25 @@ export const executeGrading = async (
       select: { score: true },
     });
 
+    // If any answer is still ungraded (null score) the LLM returned fewer
+    // results than expected. Treat this as a grading failure so the user
+    // can retry, rather than silently scoring missing questions as 0.
+    const ungradedCount = gradedAnswers.filter((a) => a.score === null).length;
+    if (ungradedCount > 0) {
+      logger.warn(
+        { quizAttemptId, ungradedCount },
+        'Grading incomplete — LLM returned fewer results than expected',
+      );
+      writer({ type: 'error', message: 'Grading failed. You can retry grading.' });
+      await prisma.quizAttempt.update({
+        where: { id: quizAttemptId },
+        data: { status: QuizStatus.SUBMITTED_UNGRADED },
+      });
+      return;
+    }
+
     const totalScore = gradedAnswers.reduce((sum, a) => sum + (a.score?.toNumber() ?? 0), 0);
-    const finalScore =
-      Math.round((totalScore / questions.length) * 100 * 100) / 100;
+    const finalScore = Math.round((totalScore / questions.length) * 100 * 100) / 100;
 
     await prisma.quizAttempt.update({
       where: { id: quizAttemptId },

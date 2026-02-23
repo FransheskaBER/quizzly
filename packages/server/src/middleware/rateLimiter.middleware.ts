@@ -57,10 +57,12 @@ export const quizGenerationDailyLimiter = rateLimit({
   },
 });
 
-// Per-quiz rate limiter for regrade — keyed on quiz ID so a single user
-// cannot hammer regrade for the same quiz and incur excess LLM costs.
+// Per-quiz-per-user rate limiter for regrade.
+// Keyed on both quiz ID and user ID so an authenticated attacker cannot
+// exhaust another user's regrade budget by sending requests with a known
+// quiz ID. Auth middleware must run before this limiter so req.user is set.
 const regradeKeyGenerator = (req: Request): string =>
-  `regrade:${req.params.id ?? 'unknown'}`;
+  `regrade:${req.params.id ?? 'unknown'}:${req.user?.userId ?? 'unknown'}`;
 
 export const regradeRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
