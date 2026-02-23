@@ -17,6 +17,7 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   globalRateLimiter: (_req: never, _res: never, next: () => void) => next(),
   quizGenerationHourlyLimiter: (_req: never, _res: never, next: () => void) => next(),
   quizGenerationDailyLimiter: (_req: never, _res: never, next: () => void) => next(),
+  regradeRateLimiter: (_req: never, _res: never, next: () => void) => next(),
 }));
 
 import { sendPasswordResetEmail } from '../../services/email.service.js';

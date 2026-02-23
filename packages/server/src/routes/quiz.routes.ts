@@ -3,9 +3,11 @@ import {
   quizSessionParamsSchema,
   quizParamsSchema,
   saveAnswersSchema,
+  submitQuizBodySchema,
   type GenerateQuizQuery,
   type QuizParams,
   type SaveAnswersRequest,
+  type SubmitQuizBody,
 } from '@skills-trainer/shared';
 
 import pino from 'pino';
@@ -16,6 +18,7 @@ import { validate } from '../middleware/validate.middleware.js';
 import {
   quizGenerationHourlyLimiter,
   quizGenerationDailyLimiter,
+  regradeRateLimiter,
 } from '../middleware/rateLimiter.middleware.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSSEEvent } from '../utils/sse.utils.js';
@@ -102,6 +105,99 @@ takingRouter.patch(
     const { answers } = req.body as SaveAnswersRequest;
     const result = await quizService.saveAnswers(id, req.user.userId, answers);
     res.status(200).json(result);
+  }),
+);
+
+// POST /api/quizzes/:id/submit
+// Pre-stream: validates status, saves final answers, checks all questions answered.
+// On success: opens SSE stream, grades MCQ instantly, grades free-text via LLM.
+takingRouter.post(
+  '/:id/submit',
+  auth,
+  validate({ params: quizParamsSchema, body: submitQuizBodySchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+    const { id } = req.params as unknown as QuizParams;
+    const { answers } = req.body as SubmitQuizBody;
+
+    // Phase 1: pre-stream checks (ownership, status, save answers, all-answered)
+    const context = await quizService.prepareGrading(id, req.user.userId, answers);
+
+    // Phase 2: open SSE stream
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    let clientConnected = true;
+    req.on('close', () => {
+      clientConnected = false;
+      logger.info({ quizAttemptId: id }, 'SSE client disconnected during grading');
+    });
+
+    const writer = (event: { type: string; data?: unknown; message?: string }) => {
+      if (clientConnected) sendSSEEvent(res, event);
+    };
+
+    // Phase 3: stream grading — executeGrading never throws
+    await quizService.executeGrading(context, writer);
+
+    res.end();
+  }),
+);
+
+// GET /api/quizzes/:id/results
+// Returns the completed quiz with all answers revealed (correctAnswer, explanation,
+// score, feedback). Only available after status is 'completed'.
+takingRouter.get(
+  '/:id/results',
+  auth,
+  validate({ params: quizParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+    const { id } = req.params as unknown as QuizParams;
+    const result = await quizService.getResults(id, req.user.userId);
+    res.status(200).json(result);
+  }),
+);
+
+// POST /api/quizzes/:id/regrade
+// Retries grading for quizzes stuck in submitted_ungraded. Rate-limited to
+// 3 attempts per quiz per hour to prevent LLM cost abuse.
+takingRouter.post(
+  '/:id/regrade',
+  auth,
+  regradeRateLimiter,
+  validate({ params: quizParamsSchema }),
+  asyncHandler(async (req, res) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+    const { id } = req.params as unknown as QuizParams;
+
+    // Phase 1: pre-stream check (ownership, status must be submitted_ungraded)
+    const context = await quizService.prepareRegrade(id, req.user.userId);
+
+    // Phase 2: open SSE stream
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    let clientConnected = true;
+    req.on('close', () => {
+      clientConnected = false;
+      logger.info({ quizAttemptId: id }, 'SSE client disconnected during regrade');
+    });
+
+    const writer = (event: { type: string; data?: unknown; message?: string }) => {
+      if (clientConnected) sendSSEEvent(res, event);
+    };
+
+    // Phase 3: stream grading — executeGrading never throws
+    await quizService.executeGrading(context, writer);
+
+    res.end();
   }),
 );
 

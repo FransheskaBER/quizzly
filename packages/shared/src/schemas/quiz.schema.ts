@@ -22,6 +22,19 @@ export const saveAnswersSchema = z.object({
     .min(1),
 });
 
+// Submit body allows an empty answers array — answers may already be saved
+// via the auto-save endpoint before the user clicks submit.
+export const submitQuizBodySchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().uuid(),
+        answer: z.string(),
+      }),
+    )
+    .default([]),
+});
+
 export const quizParamsSchema = z.object({
   id: uuidSchema,
 });

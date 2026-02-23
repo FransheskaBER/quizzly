@@ -93,6 +93,7 @@ export {
 export {
   generateQuizQuerySchema,
   saveAnswersSchema,
+  submitQuizBodySchema,
   quizParamsSchema,
   quizSessionParamsSchema,
   questionSchema,
@@ -153,6 +154,7 @@ export type {
   MaterialResponse,
   GenerateQuizQuery,
   SaveAnswersRequest,
+  SubmitQuizBody,
   QuizParams,
   QuizSessionParams,
   Question,
