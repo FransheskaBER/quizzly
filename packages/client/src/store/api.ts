@@ -28,6 +28,6 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithAuth,
-  tagTypes: ['Session', 'Dashboard'],
+  tagTypes: ['Session', 'Dashboard', 'Quiz'],
   endpoints: () => ({}),
 });
