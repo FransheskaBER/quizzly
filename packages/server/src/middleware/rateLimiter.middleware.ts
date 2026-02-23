@@ -1,4 +1,10 @@
+import {
+  RATE_LIMIT_QUIZ_GENERATION_PER_HOUR,
+  RATE_LIMIT_QUIZ_GENERATION_PER_DAY,
+} from '@skills-trainer/shared';
+
 import rateLimit from 'express-rate-limit';
+import type { Request } from 'express';
 
 export const createRateLimiter = (windowMs: number, max: number) => {
   return rateLimit({
@@ -16,3 +22,36 @@ export const createRateLimiter = (windowMs: number, max: number) => {
 };
 
 export const globalRateLimiter = createRateLimiter(60 * 1000, 100);
+
+// Per-authenticated-user rate limiters for quiz generation.
+// Auth middleware must run before these so req.user is populated.
+const quizGenKeyGenerator = (req: Request): string =>
+  req.user?.userId ?? req.socket.remoteAddress ?? 'unknown';
+
+export const quizGenerationHourlyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: RATE_LIMIT_QUIZ_GENERATION_PER_HOUR,
+  keyGenerator: quizGenKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'RATE_LIMITED',
+      message: `Quiz generation limit reached. You can generate up to ${RATE_LIMIT_QUIZ_GENERATION_PER_HOUR} quizzes per hour.`,
+    },
+  },
+});
+
+export const quizGenerationDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: RATE_LIMIT_QUIZ_GENERATION_PER_DAY,
+  keyGenerator: quizGenKeyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'RATE_LIMITED',
+      message: `Daily quiz generation limit reached. You can generate up to ${RATE_LIMIT_QUIZ_GENERATION_PER_DAY} quizzes per day.`,
+    },
+  },
+});
