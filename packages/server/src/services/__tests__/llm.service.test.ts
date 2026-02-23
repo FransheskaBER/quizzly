@@ -281,3 +281,80 @@ describe('gradeAnswers', () => {
     expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
   });
 });
+
+// --- generateQuiz — prompt assembly ---
+
+describe('generateQuiz — prompt assembly', () => {
+  it('includes subject and goal in the assembled user message', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userContent = (call.messages[0] as { content: string }).content;
+    expect(userContent).toContain('React Hooks');
+    expect(userContent).toContain('Understand the useState API');
+  });
+
+  it('includes difficulty, format, and count in the assembled user message', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userContent = (call.messages[0] as { content: string }).content;
+    expect(userContent).toContain(QuizDifficulty.EASY);
+    expect(userContent).toContain(AnswerFormat.MCQ);
+    expect(userContent).toContain('1');
+  });
+
+  it('includes materials text in the user message when materialsText is provided', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(
+      { ...DEFAULT_GENERATE_PARAMS, materialsText: 'Hooks let you use state in functional components.' },
+      vi.fn(),
+    );
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userContent = (call.messages[0] as { content: string }).content;
+    expect(userContent).toContain('Hooks let you use state in functional components.');
+    expect(userContent).toContain('<materials_provided>true</materials_provided>');
+  });
+
+  it('uses "No materials provided." placeholder when materialsText is null', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz({ ...DEFAULT_GENERATE_PARAMS, materialsText: null }, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userContent = (call.messages[0] as { content: string }).content;
+    expect(userContent).toContain('No materials provided.');
+    expect(userContent).toContain('<materials_provided>false</materials_provided>');
+  });
+
+  it('wraps user-supplied content in XML delimiter tags', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userContent = (call.messages[0] as { content: string }).content;
+    expect(userContent).toContain('<subject>');
+    expect(userContent).toContain('</subject>');
+    expect(userContent).toContain('<goal>');
+    expect(userContent).toContain('</goal>');
+    expect(userContent).toContain('<materials>');
+    expect(userContent).toContain('</materials>');
+  });
+});
