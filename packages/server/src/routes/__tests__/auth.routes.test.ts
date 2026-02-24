@@ -180,7 +180,7 @@ describe('POST /api/auth/login', () => {
 // POST /api/auth/verify-email
 // ---------------------------------------------------------------------------
 describe('POST /api/auth/verify-email', () => {
-  it('200 — verifies email and clears the token in DB', async () => {
+  it('200 — verifies email and sets emailVerified=true in DB', async () => {
     const { verificationToken } = await createUnverifiedUser();
 
     const res = await request(app)
@@ -191,7 +191,8 @@ describe('POST /api/auth/verify-email', () => {
 
     const user = await prisma.user.findUnique({ where: { email: 'unverified@example.com' } });
     expect(user!.emailVerified).toBe(true);
-    expect(user!.verificationToken).toBeNull();
+    // Token is kept so re-clicks return "already verified" rather than "invalid link"
+    expect(user!.verificationToken).not.toBeNull();
   });
 
   it('400 — invalid token (not in DB)', async () => {
@@ -214,19 +215,18 @@ describe('POST /api/auth/verify-email', () => {
     expect(res.body.error.message).toMatch(/expired/i);
   });
 
-  it('409 — already verified user', async () => {
-    // Create verified user, then try to verify again using a fresh token
-    // We do this by creating an unverified user, verifying them, then trying again
+  it('409 — already verified user (re-click returns CONFLICT, not invalid link)', async () => {
     const { verificationToken } = await createUnverifiedUser();
     await request(app).post('/api/auth/verify-email').send({ token: verificationToken });
 
-    // Second verify with same token — user is now verified
+    // Second verify with same token — token is kept in DB so the user is found,
+    // but emailVerified=true so we return 409 CONFLICT instead of 400.
     const res = await request(app)
       .post('/api/auth/verify-email')
       .send({ token: verificationToken });
 
-    // Token was cleared on first verify, so second attempt is "invalid"
-    expect(res.status).toBe(400); // BadRequest (token not found anymore)
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT');
   });
 });
 

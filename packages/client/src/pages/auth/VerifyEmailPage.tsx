@@ -5,7 +5,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import styles from './VerifyEmailPage.module.css';
 
-type VerifyState = 'loading' | 'success' | 'error' | 'no-token';
+type VerifyState = 'loading' | 'success' | 'already-verified' | 'error' | 'no-token';
 
 const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
@@ -32,9 +32,13 @@ const VerifyEmailPage = () => {
         if (!cancelled) setState('success');
       } catch (err) {
         if (!cancelled) {
-          const { message } = parseApiError(err);
-          setErrorMessage(message);
-          setState('error');
+          const { code, message } = parseApiError(err);
+          if (code === 'CONFLICT') {
+            setState('already-verified');
+          } else {
+            setErrorMessage(message);
+            setState('error');
+          }
         }
       }
     };
@@ -80,6 +84,19 @@ const VerifyEmailPage = () => {
             This link is missing a token. Check your email for the correct verification link.
           </p>
           <Link to="/login">Back to sign in</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'already-verified') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <span className={styles.icon}>✅</span>
+          <h1 className={styles.title}>Already verified</h1>
+          <p className={styles.text}>Your email is already verified. You can sign in now.</p>
+          <Link to="/login">Go to sign in</Link>
         </div>
       </div>
     );

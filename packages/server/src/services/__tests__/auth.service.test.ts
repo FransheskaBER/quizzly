@@ -236,16 +236,18 @@ describe('verifyEmail', () => {
     verificationTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
   };
 
-  it('sets emailVerified=true and clears token for a valid token', async () => {
+  it('sets emailVerified=true and keeps token in DB for a valid token', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(verifiableUser);
     vi.mocked(prisma.user.update).mockResolvedValue({ ...verifiableUser, emailVerified: true });
 
     const result = await authService.verifyEmail({ token: 'raw_token' });
 
     expect(result.message).toMatch(/verified/i);
+    // Token is NOT cleared — keeping it lets re-clicks find the user and return
+    // "already verified" (CONFLICT) instead of "invalid link" (BAD_REQUEST).
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: verifiableUser.id },
-      data: { emailVerified: true, verificationToken: null, verificationTokenExpiresAt: null },
+      data: { emailVerified: true },
     });
   });
 
