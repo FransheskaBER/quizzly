@@ -112,7 +112,7 @@ const QuizTakingPage = () => {
 
     try {
       await submitQuiz({ id, answers: finalAnswers }).unwrap();
-      navigate(`/quiz/${id}/results`);
+      navigate(`/sessions/${quiz.sessionId}`);
     } catch (err) {
       // fetchBaseQuery returns status: 'PARSING_ERROR' when it can't JSON-parse
       // the response body. For the submit endpoint this means the SSE stream
@@ -129,7 +129,7 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus < 300;
 
       if (isStreamStarted) {
-        navigate(`/quiz/${id}/results`);
+        navigate(`/sessions/${quiz.sessionId}`);
       } else {
         setSubmitError(parseApiError(err).message);
       }
