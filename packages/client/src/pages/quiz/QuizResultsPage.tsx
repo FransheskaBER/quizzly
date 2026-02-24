@@ -205,6 +205,15 @@ const QuizResultsPage = () => {
     return <LoadingSpinner fullPage />;
   }
 
+  const scoreTitle =
+    results.score === 100
+      ? 'Perfect score'
+      : results.score !== null && results.score >= 70
+        ? 'Great effort'
+        : results.score !== null && results.score < 50
+          ? 'Keep practicing'
+          : 'Quiz Results';
+
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
@@ -212,7 +221,7 @@ const QuizResultsPage = () => {
           ← Back to session
         </Link>
 
-        <h1 className={styles.title}>Quiz Results</h1>
+        <h1 className={styles.title}>{scoreTitle}</h1>
 
         <ResultSummary
           score={results.score}

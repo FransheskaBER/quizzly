@@ -39,27 +39,27 @@ export const SessionForm = ({
       <FormField
         label="Session name"
         type="text"
-        placeholder="e.g. TypeScript Deep Dive"
+        placeholder="e.g., React Fundamentals"
         error={errors.name?.message}
         {...register('name')}
       />
 
       <FormField
-        label="Subject"
+        label="Subject area"
         type="text"
-        placeholder="e.g. TypeScript, System Design"
+        placeholder="e.g., Frontend Development"
         error={errors.subject?.message}
         {...register('subject')}
       />
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor="session-goal">
-          Goal
+          Study goal
         </label>
         <textarea
           id="session-goal"
           className={`${styles.textarea} ${errors.goal ? styles.textareaError : ''}`}
-          placeholder="What do you want to learn or improve?"
+          placeholder="What do you want to achieve?"
           rows={4}
           {...register('goal')}
         />

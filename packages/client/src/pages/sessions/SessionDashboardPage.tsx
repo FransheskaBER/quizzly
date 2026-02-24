@@ -189,12 +189,12 @@ const SessionDashboardPage = () => {
       {/* Delete confirmation modal */}
       <Modal
         isOpen={showDeleteModal}
-        title="Delete Session"
+        title="Delete this session?"
         onClose={() => setShowDeleteModal(false)}
       >
         <p className={styles.deleteWarning}>
-          Are you sure you want to delete <strong>{session.name}</strong>? This will permanently
-          remove all materials and quiz attempts in this session.
+          This session and all its generated quizzes will be permanently removed. You cannot undo
+          this action.
         </p>
         <div className={styles.modalActions}>
           <button

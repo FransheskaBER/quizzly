@@ -64,7 +64,7 @@ const QuizProgressInner = ({
     <div className={styles.streamingState}>
       <div className={styles.statusRow}>
         <LoadingSpinner />
-        <span className={styles.statusMessage}>{progressMessage ?? 'Connecting…'}</span>
+        <span className={styles.statusMessage}>{progressMessage ?? 'Generating your quiz. This usually takes a few moments.'}</span>
       </div>
 
       {warning && <p className={styles.warning}>{warning}</p>}
