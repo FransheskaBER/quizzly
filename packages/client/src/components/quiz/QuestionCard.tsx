@@ -57,6 +57,7 @@ const QuestionCardInner = ({
         <MCQOptions
           options={question.options}
           selectedOption={currentAnswer}
+          groupName={question.id}
           onSelect={(answer) => onAnswerChange(question.id, answer)}
         />
       ) : (
