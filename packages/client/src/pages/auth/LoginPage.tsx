@@ -14,7 +14,7 @@ const LoginPage = () => {
   const { login, resendVerification } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/dashboard';
 
   const [formError, setFormError] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
