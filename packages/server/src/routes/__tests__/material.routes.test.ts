@@ -20,7 +20,10 @@ vi.mock('../../services/s3.service.js', () => ({
   deleteObject: vi.fn(),
 }));
 
-vi.mock('pdf-parse', () => ({ default: vi.fn() }));
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+  GlobalWorkerOptions: { workerSrc: '' },
+  getDocument: vi.fn(),
+}));
 vi.mock('mammoth', () => ({ default: { extractRawText: vi.fn() } }));
 // jsdom + @mozilla/readability are pure computation — not mocked; real HTML is supplied via fetch mock.
 
@@ -28,7 +31,7 @@ import { createApp } from '../../app.js';
 import { prisma, cleanDatabase, closeDatabase } from '../../__tests__/helpers/db.helper.js';
 import { createTestUser, getAuthToken } from '../../__tests__/helpers/auth.helper.js';
 import * as s3Service from '../../services/s3.service.js';
-import pdfParse from 'pdf-parse';
+import * as pdfjsMock from 'pdfjs-dist/legacy/build/pdf.mjs';
 import mammoth from 'mammoth';
 
 const app = createApp();
@@ -36,6 +39,16 @@ const app = createApp();
 // A text long enough to pass MIN_EXTRACTED_TEXT_LENGTH (50) and produce ~55 tokens
 const EXTRACTED_TEXT = 'x'.repeat(200);
 const FAKE_UPLOAD_URL = 'https://fake-s3.example.com/presigned-upload';
+
+/** Build a fake pdfjs-dist document that yields `text` across one page. */
+const makePdfDoc = (text: string) => ({
+  numPages: 1,
+  getPage: vi.fn().mockResolvedValue({
+    getTextContent: vi.fn().mockResolvedValue({ items: [{ str: text, hasEOL: false }] }),
+    cleanup: vi.fn(),
+  }),
+  destroy: vi.fn().mockResolvedValue(undefined),
+});
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -55,14 +68,7 @@ beforeEach(() => {
   (s3Service.deleteObject as Mock).mockResolvedValue(undefined);
 
   // Default extraction mocks
-  (pdfParse as unknown as Mock).mockResolvedValue({
-    text: EXTRACTED_TEXT,
-    numpages: 1,
-    numrender: 1,
-    info: {},
-    metadata: null,
-    version: '',
-  });
+  (pdfjsMock.getDocument as Mock).mockReturnValue({ promise: Promise.resolve(makePdfDoc(EXTRACTED_TEXT)) });
   (mammoth.extractRawText as Mock).mockResolvedValue({ value: EXTRACTED_TEXT });
 
   // jsdom and Readability run for real against the HTML returned by the mocked fetch.
@@ -276,10 +282,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
     const material = await createMaterial(session.id);
 
     // Return text shorter than MIN_EXTRACTED_TEXT_LENGTH (50)
-    (pdfParse as unknown as Mock).mockResolvedValueOnce({
-      text: 'Too short',
-      numpages: 1, numrender: 1, info: {}, metadata: null, version: '',
-    });
+    (pdfjsMock.getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(makePdfDoc('Too short')) });
 
     const res = await request(app)
       .post(`/api/sessions/${session.id}/materials/${material.id}/process`)
@@ -301,10 +304,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
     const material = await createMaterial(session.id);
 
     // This text has 4000 chars → ~1100 tokens → total > 150 000
-    (pdfParse as unknown as Mock).mockResolvedValueOnce({
-      text: 'x'.repeat(4_000),
-      numpages: 1, numrender: 1, info: {}, metadata: null, version: '',
-    });
+    (pdfjsMock.getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(makePdfDoc('x'.repeat(4_000))) });
 
     const res = await request(app)
       .post(`/api/sessions/${session.id}/materials/${material.id}/process`)
