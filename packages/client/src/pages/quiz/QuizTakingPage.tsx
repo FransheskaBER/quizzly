@@ -197,7 +197,7 @@ const QuizTakingPage = () => {
             onClick={() => void handleSubmit()}
             title={!allAnswered ? 'Answer all questions to submit' : undefined}
           >
-            {isSubmitting ? 'Submitting…' : 'Submit Quiz'}
+            {isSubmitting ? 'Submitting…' : 'Complete Quiz'}
           </button>
 
           {!allAnswered && (

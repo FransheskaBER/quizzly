@@ -59,9 +59,9 @@ const SessionListPage = () => {
 
         {allSessions.length === 0 ? (
           <div className={styles.empty}>
-            <p className={styles.emptyText}>No sessions yet.</p>
+            <p className={styles.emptyText}>No active sessions</p>
             <Link to="/sessions/new" className={styles.emptyLink}>
-              Create your first session →
+              Create New Session
             </Link>
           </div>
         ) : (

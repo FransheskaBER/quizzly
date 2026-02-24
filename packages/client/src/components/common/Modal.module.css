@@ -1,24 +1,25 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--modal-overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: var(--modal-overlay-z-index);
   padding: var(--spacing-md);
 }
 
 .dialog {
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
+  background: var(--modal-bg);
+  border-radius: var(--modal-radius);
   border: 1px solid var(--color-border);
+  box-shadow: var(--modal-shadow);
   width: 100%;
-  max-width: 420px;
+  max-width: var(--modal-width);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  padding: var(--spacing-xl);
+  padding: var(--modal-padding);
 }
 
 .header {
