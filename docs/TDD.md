@@ -20,6 +20,7 @@
 9. [Infrastructure & Deployment](#9-infrastructure--deployment)
 10. [Task Breakdown & Implementation Plan](#10-task-breakdown--implementation-plan)
 11. [Open Questions & Technical Risks](#11-open-questions--technical-risks)
+12. [Implementation Deviations](#12-implementation-deviations)
 
 ---
 
@@ -33,7 +34,7 @@
 | 2 | **"Reasonable time" for quiz generation is vague.** PRD says "target under 30 seconds" but generating 20 hard-difficulty questions could take 60-90s. | Hidden complexity | **Stream the response via SSE.** Show questions appearing progressively. User perceives speed even if total is 45-60s. Hard timeout at 90s. | Users stare at spinner for over a minute and assume it's broken. |
 | 3 | **Free-text partial credit scoring has no rubric.** What's the scoring scale? | Ambiguity | **3-tier per-question score: 0 (incorrect), 0.5 (partial), 1 (correct).** LLM returns one of three values plus explanation. Final quiz score = sum / total × 100%. | Inconsistent grading. Users argue with scoring. |
 | 4 | **"Quiz attempt saved" + "progress saved mid-quiz" implies two persistence states.** | Hidden complexity | Single `quiz_attempt` record with `status` field: `in_progress` or `completed`. In-progress saves answers on each change (debounced). Submission flips to `completed` and triggers grading. | Lost mid-quiz progress or accidentally graded incomplete quizzes. |
-| 5 | **File processing pipeline undefined.** | Hidden complexity | **Extract plain text only.** `pdf-parse` for PDFs, `mammoth` for DOCX, raw read for TXT. Strip images. Store extracted text in DB alongside S3 file reference. | Over-engineered document parsing spending days on edge cases. |
+| 5 | **File processing pipeline undefined.** | Hidden complexity | **Extract plain text only.** `pdfjs-dist` for PDFs (see §12), `mammoth` for DOCX, raw read for TXT. Strip images. Store extracted text in DB alongside S3 file reference. | Over-engineered document parsing spending days on edge cases. |
 | 6 | **Materials exceeding context window.** What if user uploads 200 pages? | Critical design decision | **Send all extracted text to LLM. Hard cap at ~150K tokens total per session. 10-file limit retained. Reject uploads that exceed budget.** Validate on upload, not at generation time. | Either stuff context window and get poor quality, or arbitrarily truncate. |
 | 7 | **MCQ answer generation quality.** Plausible-but-wrong distractors are hard to generate. | Hidden complexity | Mitigate in prompt spec: generate correct answer first, distractors must be plausible but specifically wrong, include per-distractor explanation. Validation step: retry on malformed MCQ. | Users get MCQs where "wrong" answer is actually correct. |
 | 8 | **Email verification blocks account usage.** High friction for 30-user MVP. | Design challenge | Keep as-is. Use Resend for near-instant delivery. Show clear "check email" screen with resend button. Verification validates users are real — important when burning LLM API credits. | Acceptable trade-off. Switch to "verified = full, unverified = limited" in v2 if activation drops. |
@@ -163,7 +164,7 @@ BACKEND
 │   works with Neon Postgres. Shared types via monorepo.
 ├── Validation: Zod — Schemas shared between frontend and backend via shared package.
 ├── File Processing:
-│   ├── PDF: pdf-parse
+│   ├── PDF: pdfjs-dist (legacy build) — see §12 for why pdf-parse was replaced
 │   ├── DOCX: mammoth
 │   ├── TXT: Native fs
 │   └── URL: Mozilla Readability + jsdom
@@ -333,7 +334,7 @@ DEVOPS & INFRASTRUCTURE
 5. [Response] Returns presigned URL + material ID
 6. [Frontend] Uploads file directly to S3 via presigned URL
 7. [Frontend] On S3 complete → calls POST /api/sessions/:sid/materials/:id/process
-8. [Material Service] Downloads from S3, extracts text (pdf-parse/mammoth/fs)
+8. [Material Service] Downloads from S3, extracts text (pdfjs-dist/mammoth/fs)
 9. [Material Service] Counts tokens. Checks session total ≤ 150K. If exceeded → reject.
 10. [Material Service] Stores extracted_text in DB, updates status to 'ready'
 11. [Response] Returns material metadata (name, size, status, token count)
@@ -608,7 +609,7 @@ Merge to main → Render auto-deploys.
 | username | VARCHAR(50) | NOT NULL | Display name. No uniqueness constraint. |
 | password_hash | VARCHAR(255) | NOT NULL | bcrypt output |
 | email_verified | BOOLEAN | NOT NULL, DEFAULT false | Blocks access until true |
-| verification_token | VARCHAR(255) | NULLABLE, UNIQUE | Nulled after verification |
+| verification_token | VARCHAR(255) | NULLABLE, UNIQUE | Kept after verification (see §12) |
 | verification_token_expires_at | TIMESTAMPTZ | NULLABLE | 24 hour expiry |
 | auth_provider | VARCHAR(20) | NOT NULL, DEFAULT 'email' | Future: 'google' |
 | google_id | VARCHAR(255) | NULLABLE, UNIQUE | Future: BL-004 |
@@ -1724,6 +1725,56 @@ All validated on startup via Zod. Server refuses to start with missing vars.
 | Render cold starts (if free tier) | High | Medium | Recommend $7/mo paid. Frontend loading state if free. |
 | Token counting approximation inaccurate | Medium | Low | Conservative overcount (+10%). Buffer in 150K budget. |
 | Single LLM provider dependency | Low | High | Acceptable for MVP. Add fallback only if recurring outages. |
+
+---
+
+## 12. Implementation Deviations
+
+Decisions made during implementation that differ from what this document originally specified. Recorded here so the document stays honest and the reasoning is not lost.
+
+---
+
+### 12.1 Email verification token kept in DB after verification
+
+**Original spec (§4.2, Table: users):** `verification_token — Nulled after verification`
+
+**What was built:** After a successful verification the `email_verified` flag is set to `true`, but `verification_token` and `verification_token_expires_at` are left as-is in the database.
+
+**Why it changed:** Clearing the token was the original intent, but it produces bad UX. If a user clicks the verification link a second time (e.g. they double-clicked, or opened the email later), the token is gone so the server can't find their record and returns 400 "Invalid or expired verification link" — which looks like an error even though everything is fine. By keeping the token, the server still finds the user, sees `email_verified = true`, and returns 409 CONFLICT. The frontend maps CONFLICT to a friendly "Already verified — go to sign in" page instead of an error screen.
+
+**Side effects:** The `verification_token` column is no longer guaranteed to be null for verified users. Any future code that uses `verification_token IS NULL` as a proxy for "email verified" would be wrong — always use `email_verified = true` instead.
+
+**Error table (§7, Account Creation & Verification):** The row "Double-click verification → First: 200. Second: 409 'Already verified'" already described the intended behavior correctly. The schema note was the inconsistency; this deviation brings the implementation into line with the error table.
+
+---
+
+### 12.2 PDF text extraction: pdfjs-dist replaces pdf-parse
+
+**Original spec (§1.1 issue 5, §2 File Processing, §3 Flow 1 step 8):** `pdf-parse` for PDF text extraction.
+
+**What was built:** `pdfjs-dist@5.4.296` (legacy Node.js build), dynamically imported inside `extractPdfText` in `material.service.ts`.
+
+**Why it changed:** `pdf-parse` bundles an old version of pdf.js that cannot resolve CMaps (character encoding tables) used by Google Docs-exported PDFs. When a CMap is missing, characters cannot be decoded and the extracted text is empty or garbled — it falls below the 50-character minimum and the upload fails with "cannot read text". DOCX exports of the same document work fine because `mammoth` handles the encoding directly.
+
+`pdfjs-dist` is the upstream library that `pdf-parse` was wrapping. It ships with all standard CMaps as binary files (`cmaps/*.bcmap`) and uses `NodeCMapReaderFactory` automatically in Node.js environments. The package was already installed as a transitive dependency.
+
+**Implementation notes:**
+- The `legacy/build/pdf.mjs` build is required in Node.js; the default build assumes browser globals (`DOMMatrix` etc.) and logs a warning.
+- `GlobalWorkerOptions.workerSrc = ''` disables the Web Worker; pdfjs falls back to synchronous main-thread execution, which is fine for single-document processing.
+- `cMapUrl` and `standardFontDataUrl` are resolved at runtime using `createRequire` + `path.dirname(require.resolve('pdfjs-dist/package.json'))` so the paths are correct regardless of how npm arranges `node_modules`.
+- Tests mock `pdfjs-dist/legacy/build/pdf.mjs` (replacing the former `pdf-parse` mock) with a fake document that returns configurable text per page.
+
+---
+
+### 12.3 Post-submit navigation goes to session page, not results page
+
+**Original spec (§3 Flow 3 step 7, §8.3 E2E test 3):** After clicking Submit Quiz the frontend navigates to the quiz results page (`/quiz/:id/results`) where grading progress is shown via SSE, then results are displayed.
+
+**What was built:** `QuizTakingPage` navigates to `/sessions/:sessionId` immediately after the submit request fires (both on a clean 2xx response and on the expected `PARSING_ERROR` that signals the SSE stream has started).
+
+**Why it changed:** Sending the user straight to the results page means they are blocked on the grading SSE stream with no natural exit point. The session page is a better landing destination — grading runs in the background on the server, and the user can start another quiz, review other materials, or come back to results later from the session's quiz history. The results page remains accessible; it just isn't the forced next step.
+
+**Side effects:** The E2E test description "submit, see results" will need updating when Playwright tests are written (task 030). The `QuizResultsPage` is still fully functional and reachable from the session page.
 
 ---
 
