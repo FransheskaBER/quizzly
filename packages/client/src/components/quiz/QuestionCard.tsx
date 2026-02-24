@@ -71,7 +71,7 @@ const QuestionCardInner = ({
 );
 
 export const QuestionCard = memo((props: QuestionCardProps) => (
-  <ErrorBoundary
+  <ErrorBoundary level="component"
     fallback={
       <div className={styles.errorFallback}>
         <p>Something went wrong displaying this question. Please try navigating to another question.</p>

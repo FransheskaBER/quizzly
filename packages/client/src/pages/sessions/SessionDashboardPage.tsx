@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { MaterialUploader } from '@/components/session/MaterialUploader';
+import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Modal } from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
@@ -122,26 +123,30 @@ const SessionDashboardPage = () => {
           <h2 className={styles.sectionTitle}>
             Materials <span className={styles.count}>({session.materials.length})</span>
           </h2>
-          <MaterialUploader sessionId={session.id} materials={session.materials} />
+          <ComponentErrorBoundary>
+            <MaterialUploader sessionId={session.id} materials={session.materials} />
+          </ComponentErrorBoundary>
         </div>
 
         {/* Generate quiz */}
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Generate Quiz</h2>
-          {generationStatus === 'idle' ? (
-            <QuizPreferences onGenerate={generate} isDisabled={false} error={null} />
-          ) : (
-            <QuizProgress
-              status={generationStatus}
-              questions={questions}
-              totalExpected={totalExpected}
-              progressMessage={progressMessage}
-              warning={warning}
-              error={generationError}
-              quizAttemptId={quizAttemptId}
-              onReset={resetGeneration}
-            />
-          )}
+          <ComponentErrorBoundary>
+            {generationStatus === 'idle' ? (
+              <QuizPreferences onGenerate={generate} isDisabled={false} error={null} />
+            ) : (
+              <QuizProgress
+                status={generationStatus}
+                questions={questions}
+                totalExpected={totalExpected}
+                progressMessage={progressMessage}
+                warning={warning}
+                error={generationError}
+                quizAttemptId={quizAttemptId}
+                onReset={resetGeneration}
+              />
+            )}
+          </ComponentErrorBoundary>
         </div>
 
         {/* Quiz attempts */}

@@ -104,7 +104,7 @@ const QuizProgressInner = ({
  * with a reset button rather than crashing the whole session page.
  */
 export const QuizProgress = (props: QuizProgressProps) => (
-  <ErrorBoundary
+  <ErrorBoundary level="component"
     fallback={
       <div className={styles.boundaryError}>
         <p>Something went wrong displaying the quiz progress.</p>

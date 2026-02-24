@@ -13,6 +13,7 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@reduxjs/toolkit": "^2.5.0",
+    "@sentry/react": "^10.40.0",
     "@skills-trainer/shared": "*",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

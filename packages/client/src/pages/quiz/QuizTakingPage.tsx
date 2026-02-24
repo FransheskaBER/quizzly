@@ -5,6 +5,7 @@ import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } from '@/api/quizzes.api';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuestionNav } from '@/components/quiz/QuestionNav';
 import styles from './QuizTakingPage.module.css';
@@ -211,12 +212,14 @@ const QuizTakingPage = () => {
 
       <main className={styles.main}>
         {currentQuestion && (
-          <QuestionCard
-            question={currentQuestion}
-            currentAnswer={currentAnswer}
-            onAnswerChange={handleAnswerChange}
-            totalQuestions={quiz.questions.length}
-          />
+          <ComponentErrorBoundary>
+            <QuestionCard
+              question={currentQuestion}
+              currentAnswer={currentAnswer}
+              onAnswerChange={handleAnswerChange}
+              totalQuestions={quiz.questions.length}
+            />
+          </ComponentErrorBoundary>
         )}
       </main>
     </div>

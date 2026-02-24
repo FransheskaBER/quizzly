@@ -90,7 +90,7 @@ const QuestionResultInner = ({ result }: QuestionResultProps) => {
 };
 
 const QuestionResultWithBoundary = ({ result }: QuestionResultProps) => (
-  <ErrorBoundary
+  <ErrorBoundary level="component"
     fallback={
       <div className={styles.boundaryError}>
         <p>Failed to render question {result.questionNumber}.</p>
