@@ -193,8 +193,8 @@ const SessionDashboardPage = () => {
         onClose={() => setShowDeleteModal(false)}
       >
         <p className={styles.deleteWarning}>
-          This session and all its generated quizzes will be permanently removed. You cannot undo
-          this action.
+          &ldquo;{session.name}&rdquo; and all its generated quizzes will be permanently removed.
+          You cannot undo this action.
         </p>
         <div className={styles.modalActions}>
           <button

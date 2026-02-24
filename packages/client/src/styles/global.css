@@ -156,13 +156,3 @@ a:hover {
   text-decoration: underline;
 }
 
-.codeBlock {
-  font-family: var(--font-family-mono);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  overflow-x: auto;
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
-}

@@ -210,9 +210,11 @@ const QuizResultsPage = () => {
       ? 'Perfect score'
       : results.score !== null && results.score >= 70
         ? 'Great effort'
-        : results.score !== null && results.score < 50
-          ? 'Keep practicing'
-          : 'Quiz Results';
+        : results.score !== null && results.score >= 50
+          ? 'Good progress'
+          : results.score !== null
+            ? 'Keep practicing'
+            : 'Quiz Results';
 
   return (
     <div className={styles.page}>
