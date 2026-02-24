@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import pdfParse from 'pdf-parse';
+import { createRequire } from 'module';
+import path from 'path';
 import mammoth from 'mammoth';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
@@ -76,12 +77,66 @@ const toMaterialResponse = (m: {
 });
 
 // ---------------------------------------------------------------------------
+// PDF extraction setup (pdfjs-dist legacy build — handles Google Docs CMaps)
+// ---------------------------------------------------------------------------
+
+// Resolve pdfjs-dist install path so we can point it to the CMap files it
+// needs for fonts that Google Docs PDFs use. createRequire lets us use
+// require.resolve in an ESM module.
+const _require = createRequire(import.meta.url);
+const pdfJsDistDir = path.dirname(_require.resolve('pdfjs-dist/package.json'));
+const CMAP_URL = `${pdfJsDistDir}/cmaps/`;
+const STANDARD_FONT_URL = `${pdfJsDistDir}/standard_fonts/`;
+
+// ---------------------------------------------------------------------------
 // Text extractors
 // ---------------------------------------------------------------------------
 
 const extractPdfText = async (buffer: Buffer): Promise<string> => {
-  const data = await pdfParse(buffer);
-  return data.text;
+  // Dynamic import of the legacy build — it includes DOM polyfills that the
+  // regular build expects from a browser environment.
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+  // Disable the Web Worker — not available in Node.js. pdfjs runs on the
+  // main thread instead, which is fine for our single-document use case.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+  const pdf = await pdfjsLib
+    .getDocument({
+      data: new Uint8Array(buffer),
+      cMapUrl: CMAP_URL,      // path to *.bcmap files (packed binary CMaps)
+      cMapPacked: true,
+      standardFontDataUrl: STANDARD_FONT_URL,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: false,
+    })
+    .promise;
+
+  const pages: string[] = [];
+
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      try {
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .filter(item => 'str' in item)
+          .map(item => {
+            const t = item as { str: string; hasEOL: boolean };
+            return t.str + (t.hasEOL ? '\n' : '');
+          })
+          .join('');
+        pages.push(pageText);
+      } finally {
+        page.cleanup();
+      }
+    }
+  } finally {
+    await pdf.destroy();
+  }
+
+  return pages.join('\n\n');
 };
 
 const extractDocxText = async (buffer: Buffer): Promise<string> => {

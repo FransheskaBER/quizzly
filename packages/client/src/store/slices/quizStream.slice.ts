@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
 import type { RootState } from '../store';
@@ -114,11 +114,21 @@ export const {
 } = quizStreamSlice.actions;
 
 export const selectQuizStream = (state: RootState) => state.quizStream;
-export const selectGradingStream = (state: RootState) => ({
-  gradingStatus: state.quizStream.gradingStatus,
-  gradedQuestions: state.quizStream.gradedQuestions,
-  gradingError: state.quizStream.gradingError,
-  gradingFinalScore: state.quizStream.gradingFinalScore,
-});
+
+// Memoized so React-Redux gets a stable object reference when grading state
+// fields haven't changed — plain object literals create a new reference every
+// call, triggering unnecessary re-renders on every Redux state update.
+export const selectGradingStream = createSelector(
+  (state: RootState) => state.quizStream.gradingStatus,
+  (state: RootState) => state.quizStream.gradedQuestions,
+  (state: RootState) => state.quizStream.gradingError,
+  (state: RootState) => state.quizStream.gradingFinalScore,
+  (gradingStatus, gradedQuestions, gradingError, gradingFinalScore) => ({
+    gradingStatus,
+    gradedQuestions,
+    gradingError,
+    gradingFinalScore,
+  }),
+);
 
 export default quizStreamSlice.reducer;

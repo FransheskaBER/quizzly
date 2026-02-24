@@ -5,15 +5,16 @@ import styles from './MCQOptions.module.css';
 interface MCQOptionsProps {
   options: string[];
   selectedOption: string | null;
+  groupName: string;
   onSelect: (option: string) => void;
 }
 
-export const MCQOptions = ({ options, selectedOption, onSelect }: MCQOptionsProps) => (
+export const MCQOptions = ({ options, selectedOption, groupName, onSelect }: MCQOptionsProps) => (
   <div className={styles.options}>
     {options.map((option, index) => {
       const isSelected = option === selectedOption;
       const label = String.fromCharCode(65 + index);
-      const inputId = `option-${option}`;
+      const inputId = `${groupName}-option-${index}`;
       return (
         <label
           key={option}
@@ -23,7 +24,7 @@ export const MCQOptions = ({ options, selectedOption, onSelect }: MCQOptionsProp
           <input
             id={inputId}
             type="radio"
-            name="mcq-option"
+            name={groupName}
             value={option}
             checked={isSelected}
             onChange={() => onSelect(option)}

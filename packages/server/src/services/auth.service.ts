@@ -94,21 +94,20 @@ export const verifyEmail = async (data: VerifyEmailRequest): Promise<MessageResp
     throw new BadRequestError('Invalid or expired verification link');
   }
 
-  if (!user.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
-    throw new BadRequestError('Verification link has expired');
-  }
-
+  // Check already-verified before expiry so a re-click always gets the right message.
   if (user.emailVerified) {
     throw new ConflictError('Email already verified');
   }
 
+  if (!user.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
+    throw new BadRequestError('Verification link has expired');
+  }
+
+  // Keep the token in the DB so future re-clicks can still find this user and
+  // return the "already verified" ConflictError above instead of "invalid link".
   await prisma.user.update({
     where: { id: user.id },
-    data: {
-      emailVerified: true,
-      verificationToken: null,
-      verificationTokenExpiresAt: null,
-    },
+    data: { emailVerified: true },
   });
 
   return { message: 'Email verified successfully.' };
