@@ -115,23 +115,27 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
 
   const pages: string[] = [];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-
-    const pageText = textContent.items
-      .filter(item => 'str' in item)
-      .map(item => {
-        const t = item as { str: string; hasEOL: boolean };
-        return t.str + (t.hasEOL ? '\n' : '');
-      })
-      .join('');
-
-    pages.push(pageText);
-    page.cleanup();
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      try {
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .filter(item => 'str' in item)
+          .map(item => {
+            const t = item as { str: string; hasEOL: boolean };
+            return t.str + (t.hasEOL ? '\n' : '');
+          })
+          .join('');
+        pages.push(pageText);
+      } finally {
+        page.cleanup();
+      }
+    }
+  } finally {
+    await pdf.destroy();
   }
 
-  await pdf.destroy();
   return pages.join('\n\n');
 };
 
