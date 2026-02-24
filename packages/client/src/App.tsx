@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { RootErrorBoundary } from '@/components/common/ErrorBoundary';
+
+import { RootErrorBoundary, RouteErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '@/store/store';
@@ -51,6 +52,12 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
+// Wraps a page element in RouteErrorBoundary so each route's errors are caught
+// within the layout rather than bubbling to the RootErrorBoundary.
+const withRouteBoundary = (element: ReactNode) => (
+  <RouteErrorBoundary>{element}</RouteErrorBoundary>
+);
+
 export const App = () => {
   return (
     <RootErrorBoundary>
@@ -58,20 +65,20 @@ export const App = () => {
         <Suspense fallback={<LoadingSpinner fullPage />}>
           <Routes>
             {/* Public routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/login" element={withRouteBoundary(<LoginPage />)} />
+            <Route path="/signup" element={withRouteBoundary(<SignupPage />)} />
+            <Route path="/verify-email" element={withRouteBoundary(<VerifyEmailPage />)} />
+            <Route path="/forgot-password" element={withRouteBoundary(<ForgotPasswordPage />)} />
+            <Route path="/reset-password" element={withRouteBoundary(<ResetPasswordPage />)} />
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<HomeDashboardPage />} />
-              <Route path="/sessions" element={<SessionListPage />} />
-              <Route path="/sessions/new" element={<CreateSessionPage />} />
-              <Route path="/sessions/:id" element={<SessionDashboardPage />} />
-              <Route path="/quiz/:id" element={<QuizTakingPage />} />
-              <Route path="/quiz/:id/results" element={<QuizResultsPage />} />
+              <Route path="/" element={withRouteBoundary(<HomeDashboardPage />)} />
+              <Route path="/sessions" element={withRouteBoundary(<SessionListPage />)} />
+              <Route path="/sessions/new" element={withRouteBoundary(<CreateSessionPage />)} />
+              <Route path="/sessions/:id" element={withRouteBoundary(<SessionDashboardPage />)} />
+              <Route path="/quiz/:id" element={withRouteBoundary(<QuizTakingPage />)} />
+              <Route path="/quiz/:id/results" element={withRouteBoundary(<QuizResultsPage />)} />
             </Route>
 
             {/* Catch-all */}

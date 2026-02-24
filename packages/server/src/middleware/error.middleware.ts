@@ -2,17 +2,20 @@ import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import pino from 'pino';
+
+import { Sentry } from '../config/sentry.js';
 import { AppError } from '../utils/errors.js';
 
 const logger = pino({ name: 'error-handler' });
 
 export const errorHandler = (
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ) => {
+  // 4xx — expected business errors. Do not report to Sentry.
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: {
@@ -24,6 +27,7 @@ export const errorHandler = (
     return;
   }
 
+  // 400 — validation errors. Do not report to Sentry.
   if (err instanceof ZodError) {
     res.status(400).json({
       error: {
@@ -38,6 +42,7 @@ export const errorHandler = (
     return;
   }
 
+  // Known Prisma errors that map to 4xx — do not report to Sentry.
   if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       res.status(409).json({
@@ -59,7 +64,21 @@ export const errorHandler = (
     }
   }
 
-  logger.error({ err }, 'Unhandled error');
+  // 5xx — unexpected error. Log and report to Sentry with request context.
+  const requestId = req.requestId;
+  const userId = req.user?.userId;
+
+  logger.error({ err, requestId, userId }, 'Unhandled error');
+
+  Sentry.captureException(err, {
+    extra: {
+      requestId,
+      userId,
+      method: req.method,
+      path: req.path,
+    },
+  });
+
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
