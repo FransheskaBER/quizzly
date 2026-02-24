@@ -1,4 +1,4 @@
-# Technical Design Document: AI-Era Engineering Skills Trainer
+# Technical Design Document: Quizzly
 
 **Version:** 1.0
 **Date:** February 18, 2026
