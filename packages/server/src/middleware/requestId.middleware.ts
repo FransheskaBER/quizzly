@@ -1,19 +1,17 @@
 import { randomUUID } from 'crypto';
 
-import pino from 'pino';
 import type { Request, Response, NextFunction } from 'express';
 
-const rootLogger = pino({ name: 'server' });
-
-// Attaches a unique request ID to every incoming request:
-//   - req.requestId  — used for Sentry context and response header
-//   - req.log        — child pino logger with requestId bound, use in place
-//                      of the root logger inside request-scoped code
-//   - X-Request-Id   — response header so clients can correlate errors
+// Runs first in the middleware chain — before express.json() or anything that
+// can throw — so req.requestId is guaranteed to be set when errorHandler runs.
+//
+// req.log is set here as a fallback for the narrow window before pinoHttp runs.
+// pinoHttp (registered immediately after) calls genReqId to read req.requestId
+// and binds it into its own child logger, which then overwrites req.log. Any
+// code running after pinoHttp (routes, services, errorHandler) gets a logger
+// that has both pino-http's request context AND the requestId.
 export const requestIdMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  const requestId = randomUUID();
-  req.requestId = requestId;
-  req.log = rootLogger.child({ requestId });
-  res.setHeader('X-Request-Id', requestId);
+  req.requestId = randomUUID();
+  res.setHeader('X-Request-Id', req.requestId);
   next();
 };
