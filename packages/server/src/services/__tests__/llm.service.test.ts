@@ -280,6 +280,42 @@ describe('gradeAnswers', () => {
     await expect(gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn())).rejects.toThrow(BadRequestError);
     expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
   });
+
+  // Boundary conditions for clampScore: < 0.25 → 0, < 0.75 → 0.5, >= 0.75 → 1
+
+  it('clamps raw score 0.25 (lower boundary) to 0.5', async () => {
+    const response = `<evaluation>Boundary.</evaluation>
+<results>${JSON.stringify([{ ...VALID_GRADED_ANSWER, score: 0.25, isCorrect: false }])}</results>`;
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(response) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const [result] = await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+    expect(result.score).toBe(0.5);
+  });
+
+  it('clamps raw score 0.74 (just below upper boundary) to 0.5', async () => {
+    const response = `<evaluation>Boundary.</evaluation>
+<results>${JSON.stringify([{ ...VALID_GRADED_ANSWER, score: 0.74, isCorrect: false }])}</results>`;
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(response) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const [result] = await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+    expect(result.score).toBe(0.5);
+  });
+
+  it('clamps raw score 0.75 (upper boundary) to 1', async () => {
+    const response = `<evaluation>Boundary.</evaluation>
+<results>${JSON.stringify([{ ...VALID_GRADED_ANSWER, score: 0.75, isCorrect: true }])}</results>`;
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(response) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const [result] = await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+    expect(result.score).toBe(1);
+  });
+
 });
 
 // --- generateQuiz — prompt assembly ---
