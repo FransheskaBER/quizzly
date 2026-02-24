@@ -9,6 +9,7 @@ import { useAppSelector, useAppDispatch } from '@/store/store';
 import { selectIsAuthenticated, selectCurrentUser, logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
 
+const LandingPage = lazy(() => import('@/pages/landing/LandingPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('@/pages/auth/SignupPage'));
 const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmailPage'));
@@ -65,6 +66,7 @@ export const App = () => {
         <Suspense fallback={<LoadingSpinner fullPage />}>
           <Routes>
             {/* Public routes */}
+            <Route path="/" element={withRouteBoundary(<LandingPage />)} />
             <Route path="/login" element={withRouteBoundary(<LoginPage />)} />
             <Route path="/signup" element={withRouteBoundary(<SignupPage />)} />
             <Route path="/verify-email" element={withRouteBoundary(<VerifyEmailPage />)} />
@@ -73,7 +75,7 @@ export const App = () => {
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={withRouteBoundary(<HomeDashboardPage />)} />
+              <Route path="/dashboard" element={withRouteBoundary(<HomeDashboardPage />)} />
               <Route path="/sessions" element={withRouteBoundary(<SessionListPage />)} />
               <Route path="/sessions/new" element={withRouteBoundary(<CreateSessionPage />)} />
               <Route path="/sessions/:id" element={withRouteBoundary(<SessionDashboardPage />)} />
@@ -82,7 +84,7 @@ export const App = () => {
             </Route>
 
             {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Suspense>
       </AuthGate>
