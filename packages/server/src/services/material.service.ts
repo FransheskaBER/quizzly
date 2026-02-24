@@ -95,11 +95,10 @@ const STANDARD_FONT_URL = `${pdfJsDistDir}/standard_fonts/`;
 const extractPdfText = async (buffer: Buffer): Promise<string> => {
   // Dynamic import of the legacy build — it includes DOM polyfills that the
   // regular build expects from a browser environment.
+  // In v5, pdfjs-dist detects Node.js automatically: it sets #isWorkerDisabled=true
+  // and defaults workerSrc to "./pdf.worker.mjs" (relative to the package).
+  // Do NOT override workerSrc — setting it to '' breaks the fake-worker setup.
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-  // Disable the Web Worker — not available in Node.js. pdfjs runs on the
-  // main thread instead, which is fine for our single-document use case.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
   const pdf = await pdfjsLib
     .getDocument({
