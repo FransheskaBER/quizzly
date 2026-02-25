@@ -141,9 +141,13 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Local testing docs (not for repo)
+# Task 030 — E2E: local docs + generated artifacts
 packages/client/e2e/TESTING-DOCS.md
-
-# Playwright
 packages/client/playwright-report/
 packages/client/test-results/
+
+# Task 031 — Prompt iteration: evaluation output
+packages/server/scripts/output/
+
+# Task 032 — Launch: personal checklist (until finalized)
+docs/LAUNCH-CHECKLIST*.md

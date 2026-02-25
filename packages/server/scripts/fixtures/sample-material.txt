@@ -1,0 +1,21 @@
+Sorting Algorithms and Time Complexity Analysis
+
+This document covers common sorting algorithms, their time and space complexity characteristics, and trade-offs between different approaches. Understanding these fundamentals is essential for technical interviews and production system design.
+
+Bubble Sort
+Bubble sort repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order. The pass through the list is repeated until the list is sorted. Best-case time complexity is O(n) when the array is already sorted, but worst-case and average-case are O(n²). Space complexity is O(1). Bubble sort is rarely used in practice due to its poor performance on large datasets, but it serves as an educational introduction to sorting concepts.
+
+Insertion Sort
+Insertion sort builds the final sorted array one item at a time. It takes each element and inserts it into its correct position among the previously sorted elements. Best-case O(n) when nearly sorted; worst-case O(n²) when reverse sorted. Space complexity is O(1). Insertion sort excels when the input is small or nearly sorted. Many hybrid algorithms use insertion sort for small subarrays because it has low overhead and performs well on nearly ordered data.
+
+Merge Sort
+Merge sort is a divide-and-conquer algorithm that divides the array into halves, recursively sorts them, and merges the sorted halves. It guarantees O(n log n) time complexity in all cases—best, average, and worst. Space complexity is O(n) for the auxiliary array used during merging. Merge sort is stable (preserves relative order of equal elements) and predictable, making it suitable when consistent performance matters. The trade-off is the additional memory requirement.
+
+Quick Sort
+Quicksort selects a pivot element and partitions the array so that elements smaller than the pivot go left and larger elements go right, then recursively sorts the partitions. Average-case is O(n log n), but worst-case degrades to O(n²) when the pivot selection is poor (e.g., always smallest or largest). Randomized pivot selection makes worst-case extremely rare in practice. Space complexity is O(log n) for the recursion stack on average. Quicksort is often faster than merge sort in practice due to better cache locality, despite the same asymptotic average complexity.
+
+Data Structure Trade-offs
+Arrays provide O(1) random access by index but O(n) insertion and deletion in the middle. Linked lists offer O(1) insertion and deletion at known positions but O(n) random access. Hash tables provide O(1) average lookup, insert, and delete but have no ordering and can degrade with poor hash functions. Binary search trees offer O(log n) operations when balanced, with ordered traversal. B-trees optimize for disk-based storage by reducing tree height. Choosing the right structure depends on access patterns: read-heavy vs write-heavy, need for ordering, and memory constraints.
+
+REST APIs and HTTP Semantics
+REST (Representational State Transfer) uses HTTP methods: GET for retrieval (idempotent, cacheable), POST for creation (non-idempotent), PUT for full replacement (idempotent), and DELETE for removal (idempotent). Statelessness means each request carries all context; the server stores no session between requests. Resources are identified by URLs. Status codes convey outcome: 2xx success, 4xx client error, 5xx server error. REST trades simplicity and scalability for flexibility—GraphQL or RPC may suit different needs.

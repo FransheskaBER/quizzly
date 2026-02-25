@@ -125,8 +125,8 @@ Generation: server reads extracted_text from Neon → sends to LLM (S3 never tou
 ## 8. Current Sprint
 
 Sprint 6: Polish & Deploy (Week 6-7)
-Current task: 029 — Render deployment (backend + frontend, env vars, health check)
-Next task: 030 — E2E tests (5 Playwright tests)
+Current task: 031 — LLM prompt iteration (50+ questions, grading validation)
+Next task: 032 — Launch checklist (security review, performance, README)
 
 ## 9. Task Reference
 
