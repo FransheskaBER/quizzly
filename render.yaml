@@ -4,7 +4,7 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    buildCommand: npm ci && npx prisma generate --schema=packages/server/prisma/schema.prisma && npm run build --workspace=packages/shared && npm run build --workspace=packages/server
+    buildCommand: npm ci --include=dev && npx prisma generate --schema=packages/server/prisma/schema.prisma && npm run build --workspace=packages/shared && npm run build --workspace=packages/server
     startCommand: node packages/server/dist/index.js
     healthCheckPath: /api/health
     envVars:
@@ -40,7 +40,7 @@ services:
   - type: web
     name: quizzly-client
     runtime: static
-    buildCommand: npm ci && npm run build --workspace=packages/shared && npm run build --workspace=packages/client
+    buildCommand: npm ci --include=dev && npm run build --workspace=packages/shared && npm run build --workspace=packages/client
     staticPublishPath: packages/client/dist
     headers:
       - path: /*
