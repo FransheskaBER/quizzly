@@ -10,6 +10,9 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuestionNav } from '@/components/quiz/QuestionNav';
+import { api } from '@/store/api';
+import { useAppDispatch } from '@/store/store';
+import { submitFailureReported } from '@/store/slices/quizSubmit.slice';
 import styles from './QuizTakingPage.module.css';
 
 const AUTOSAVE_DELAY_MS = 1000;
@@ -21,6 +24,7 @@ const AUTOSAVE_DELAY_MS = 1000;
 const QuizTakingPage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
   const { data: quiz, isLoading, error: fetchError } = useGetQuizQuery(id, { skip: !id });
   const [saveAnswers] = useSaveAnswersMutation();
@@ -34,7 +38,6 @@ const QuizTakingPage = () => {
   const [dirtyAnswers, setDirtyAnswers] = useState<Record<string, string>>({});
 
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Refs for stable access from callbacks and cleanup — avoid stale closures
   const dirtyRef = useRef<Record<string, string>>({});
@@ -120,14 +123,12 @@ const QuizTakingPage = () => {
       answer: dirtyRef.current[a.questionId] ?? a.userAnswer ?? '',
     }));
 
-    try {
-      await submitQuiz({ id, answers: finalAnswers }).unwrap();
-      navigate(`/quiz/${id}/results`, { replace: true });
-    } catch (err) {
-      // fetchBaseQuery returns status: 'PARSING_ERROR' when it can't JSON-parse
-      // the response body. For the submit endpoint this means the SSE stream
-      // started (Task 026). Guard with originalStatus 2xx to avoid navigating
-      // on an HTML 404/500 from a proxy or misconfigured server.
+    // Submit starts a grading SSE stream on the server. Do not await here:
+    // we want to return users to the session page immediately.
+    const submitPromise = submitQuiz({ id, answers: finalAnswers }).unwrap();
+    void submitPromise.catch((err: unknown) => {
+      // Keep this as a non-blocking best-effort submission. If it fails, the
+      // session poll will keep the user informed via attempt status.
       const fbqErr = err as FetchBaseQueryError;
       const isStreamStarted =
         typeof err === 'object' &&
@@ -138,12 +139,22 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus >= 200 &&
         fbqErr.originalStatus < 300;
 
-      if (isStreamStarted) {
-        navigate(`/quiz/${id}/results`, { replace: true });
-      } else {
-        setSubmitError(parseApiError(err).message);
+      if (!isStreamStarted) {
+        dispatch(
+          submitFailureReported({
+          quizAttemptId: id,
+          sessionId: quiz.sessionId,
+          message: parseApiError(err).message,
+          createdAt: new Date().toISOString(),
+          }),
+        );
+        dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
       }
-    }
+    });
+
+    // Force a session refresh so the just-submitted attempt shows grading status.
+    dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
+    navigate(`/sessions/${quiz.sessionId}`, { replace: true });
   };
 
   // ---------------------------------------------------------------------------
@@ -223,7 +234,6 @@ const QuizTakingPage = () => {
             </p>
           )}
 
-          {submitError && <p className={styles.submitError}>{submitError}</p>}
         </div>
       </aside>
 

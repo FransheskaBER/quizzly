@@ -4,12 +4,14 @@ import type { TypedUseSelectorHook } from 'react-redux';
 
 import { api } from './api';
 import authReducer from './slices/auth.slice';
+import quizSubmitReducer from './slices/quizSubmit.slice';
 import quizStreamReducer from './slices/quizStream.slice';
 
 export const store = configureStore({
   reducer: {
     [api.reducerPath]: api.reducer,
     auth: authReducer,
+    quizSubmit: quizSubmitReducer,
     quizStream: quizStreamReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
