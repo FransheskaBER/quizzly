@@ -165,7 +165,7 @@ describe('getObjectBuffer', () => {
     const chunk2 = Buffer.from('world');
 
     const fakeStream = {
-      on: vi.fn().mockImplementation(function (this: any, event: string, handler: any) {
+      on: vi.fn().mockImplementation((event: string, handler: (arg?: Buffer) => void) => {
         if (event === 'data') {
           handler(chunk1);
           handler(chunk2);
@@ -173,7 +173,7 @@ describe('getObjectBuffer', () => {
         if (event === 'end') {
           handler();
         }
-        return this;
+        return fakeStream;
       }),
       destroy: vi.fn(),
     };
@@ -194,11 +194,11 @@ describe('getObjectBuffer', () => {
     const chunk = Buffer.alloc(MAX_FILE_SIZE_BYTES + 1, 'a');
 
     const fakeStream = {
-      on: vi.fn().mockImplementation(function (this: any, event: string, handler: any) {
+      on: vi.fn().mockImplementation((event: string, handler: (arg?: Buffer) => void) => {
         if (event === 'data') {
           handler(chunk);
         }
-        return this;
+        return fakeStream;
       }),
       destroy: vi.fn(),
     };
