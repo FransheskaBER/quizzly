@@ -52,6 +52,7 @@ export const quizAttemptSummarySchema = z.object({
   status: z.nativeEnum(QuizStatus),
   score: z.number().nullable(),
   materialsUsed: z.boolean(),
+  startedAt: z.string().datetime().nullable(),
   completedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
 });

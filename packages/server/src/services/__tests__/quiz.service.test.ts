@@ -410,7 +410,7 @@ describe('executeGeneration', () => {
         data: expect.objectContaining({
           status: QuizStatus.IN_PROGRESS,
           questionCount: 1,
-          startedAt: expect.any(Date),
+          startedAt: null,
         }),
       }),
     );
@@ -556,6 +556,34 @@ describe('getQuiz', () => {
     } as never);
 
     await expect(getQuiz(ATTEMPT_ID, USER_ID)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('stamps startedAt when the quiz is in_progress and startedAt is null', async () => {
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue({
+      ...mockAttemptWithQA,
+      startedAt: null,
+    } as never);
+    vi.mocked(prisma.quizAttempt.update).mockResolvedValue({ id: ATTEMPT_ID } as never);
+
+    await getQuiz(ATTEMPT_ID, USER_ID);
+
+    // Fire-and-forget update — give the micro-task queue a tick to settle.
+    await Promise.resolve();
+
+    expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ATTEMPT_ID },
+        data: expect.objectContaining({ startedAt: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it('does not stamp startedAt when startedAt is already set', async () => {
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(mockAttemptWithQA as never);
+
+    await getQuiz(ATTEMPT_ID, USER_ID);
+
+    expect(prisma.quizAttempt.update).not.toHaveBeenCalled();
   });
 });
 

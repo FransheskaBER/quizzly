@@ -219,8 +219,8 @@ export const getMe = async (userId: string): Promise<UserResponse> => {
 };
 
 /**
- * TEST ONLY: Verify email by address. Used by E2E tests to bypass email flow.
- * Only call when NODE_ENV=test. Not exposed in production.
+ * Verify email by address without using the email link. Used by E2E (NODE_ENV=test)
+ * and by the development-only route (NODE_ENV=development). Not exposed in production.
  */
 export const verifyEmailByAddress = async (email: string): Promise<void> => {
   const user = await prisma.user.findUnique({ where: { email } });
