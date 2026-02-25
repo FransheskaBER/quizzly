@@ -14,6 +14,7 @@ import {
 import { uploadToS3 } from '@/utils/uploadToS3';
 import { MaterialListItem } from './MaterialListItem';
 import { parseApiError } from '@/hooks/useApiError';
+import { Button } from '@/components/common/Button';
 import styles from './MaterialUploader.module.css';
 
 interface UploadEntry {
@@ -229,13 +230,13 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
                   className={styles.urlInput}
                   disabled={isExtractingUrl}
                 />
-                <button
+                <Button
                   type="submit"
-                  className={styles.urlSubmitBtn}
+                  variant="primary"
                   disabled={isExtractingUrl || !urlInput.trim()}
                 >
                   {isExtractingUrl ? 'Adding…' : 'Add'}
-                </button>
+                </Button>
               </div>
               {urlError && <p className={styles.urlError}>{urlError}</p>}
             </form>

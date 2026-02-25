@@ -6,6 +6,7 @@ import { QuizStatus } from '@skills-trainer/shared';
 import { useGetQuizQuery, useGetResultsQuery } from '@/api/quizzes.api';
 import { useQuizGrading } from '@/hooks/useQuizGrading';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Button } from '@/components/common/Button';
 import { ResultSummary } from '@/components/quiz/ResultSummary';
 import { QuestionResult } from '@/components/quiz/QuestionResult';
 import { parseApiError } from '@/hooks/useApiError';
@@ -84,9 +85,9 @@ const QuizResultsPage = () => {
       <div className={styles.page}>
         <div className={styles.stateBox}>
           <p className={styles.errorMsg}>{message}</p>
-          <button className={styles.backBtn} onClick={() => navigate(-1)}>
+          <Button variant="secondary" onClick={() => navigate(-1)}>
             Go back
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -162,15 +163,15 @@ const QuizResultsPage = () => {
             <p className={styles.errorMsg}>
               {gradingError ?? 'Regrading failed. Please try again.'}
             </p>
-            <button
-              className={styles.primaryBtn}
+            <Button
+              variant="primary"
               onClick={() => {
                 resetGrading();
                 regrade();
               }}
             >
               Retry Regrade
-            </button>
+            </Button>
             <Link to={`/sessions/${sessionId}`} className={styles.backLink}>
               ← Back to session
             </Link>
@@ -186,9 +187,9 @@ const QuizResultsPage = () => {
             Grading could not be completed. This can happen when the AI service is temporarily
             unavailable.
           </p>
-          <button className={styles.primaryBtn} onClick={regrade}>
+          <Button variant="primary" onClick={regrade}>
             Regrade Quiz
-          </button>
+          </Button>
           <Link to={`/sessions/${sessionId}`} className={styles.backLink}>
             ← Back to session
           </Link>

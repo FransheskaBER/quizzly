@@ -4,6 +4,7 @@ import { useGetSessionsQuery } from '@/api/sessions.api';
 import { SessionCard } from '@/components/session/SessionCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import type { SessionListItem } from '@skills-trainer/shared';
 import styles from './SessionListPage.module.css';
@@ -94,16 +95,16 @@ const SessionListPage = () => {
             {isFetching ? (
               <LoadingSpinner />
             ) : (
-              <button
-                className={styles.loadMoreBtn}
-                onClick={() => {
-                  isLoadMoreRef.current = true;
-                  setCursor(nextCursor);
-                }}
-                disabled={isFetching}
-              >
-                Load More
-              </button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                isLoadMoreRef.current = true;
+                setCursor(nextCursor);
+              }}
+              disabled={isFetching}
+            >
+              Load More
+            </Button>
             )}
           </div>
         )}

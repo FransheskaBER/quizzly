@@ -1,0 +1,97 @@
+/* =========================================
+   Base Button (.btn)
+   ========================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-none);
+  border-radius: var(--radius-pill); /* Using pill shape from tokens */
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  
+  /* Default Medium Size (md) */
+  min-height: 40px;
+  padding: var(--padding-button-md); /* 8px 16px */
+  border: 1px solid transparent;
+}
+
+/* Focus State (Global) */
+.btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Disabled State (Global) */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================================
+   Sizes
+   ========================================= */
+
+/* Small Size (sm) */
+.btnSm {
+  min-height: 34px;
+  padding: var(--padding-button-sm); /* 6px 12px */
+  font-size: var(--font-size-sm);
+}
+
+/* =========================================
+   Variants
+   ========================================= */
+
+/* Primary Variant (Main CTA) */
+.btnPrimary {
+  background-color: var(--color-primary); /* #1A1915 */
+  color: var(--color-primary-text); /* #FFFFFF */
+  border-color: var(--color-primary);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover); /* #2B2A24 */
+  border-color: var(--color-primary-hover);
+}
+
+/* Secondary Variant (Outlined, neutral) */
+.btnSecondary {
+  background-color: transparent;
+  color: var(--color-text-primary); /* #1A1915 */
+  border-color: var(--color-border); /* #E6E4DD */
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background-color: var(--color-surface-hover); /* #FAF9F5 */
+}
+
+/* Destructive Variant (Filled red, irreversible action) */
+.btnDestructive {
+  background-color: var(--color-destructive); /* #BA3632 */
+  color: var(--gray-000); /* #FFFFFF */
+  border-color: var(--color-destructive);
+}
+
+.btnDestructive:hover:not(:disabled) {
+  background-color: var(--color-destructive-hover); /* #A02B27 */
+  border-color: var(--color-destructive-hover);
+}
+
+/* Ghost Variant (No border, text-only) */
+.btnGhost {
+  background-color: transparent;
+  color: var(--color-text-secondary); /* #73716A */
+  border-color: transparent;
+}
+
+.btnGhost:hover:not(:disabled) {
+  background-color: var(--color-surface-hover); /* #FAF9F5 */
+  color: var(--color-text-primary); /* #1A1915 */
+}

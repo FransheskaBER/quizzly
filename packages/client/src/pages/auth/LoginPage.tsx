@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './LoginPage.module.css';
 
 const LoginPage = () => {
@@ -108,9 +109,9 @@ const LoginPage = () => {
             <Link to="/forgot-password">Forgot your password?</Link>
           </div>
 
-          <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </button>
+          </Button>
         </form>
 
         <p className={styles.footer}>

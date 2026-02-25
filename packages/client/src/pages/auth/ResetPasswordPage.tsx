@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './ResetPasswordPage.module.css';
 
 // Client-side schema: password + confirmPassword (token comes from URL, not the form)
@@ -111,9 +112,9 @@ const ResetPasswordPage = () => {
             {...register('confirmPassword')}
           />
 
-          <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? 'Resetting…' : 'Reset password'}
-          </button>
+          </Button>
         </form>
 
         <p className={styles.footer}>

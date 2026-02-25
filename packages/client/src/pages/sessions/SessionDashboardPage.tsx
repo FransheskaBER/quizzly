@@ -10,6 +10,7 @@ import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Modal } from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import { useQuizGeneration } from '@/hooks/useQuizGeneration';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
@@ -30,7 +31,7 @@ const isFetchError = (err: unknown): err is { status: number } =>
 
 const SESSION_POLL_INTERVAL_MS = 3000;
 const FEEDBACK_VIEWED_STORAGE_KEY = 'quiz-feedback-viewed-ids';
-const LOCKED_RESULTS_STATUSES: QuizStatus[] = [QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED];
+const POLLING_STATUSES: QuizStatus[] = [QuizStatus.GRADING];
 
 const readViewedFeedbackIds = (): string[] => {
   try {
@@ -80,9 +81,7 @@ const SessionDashboardPage = () => {
 
   useEffect(() => {
     if (!session) return;
-    const hasPendingGrading = session.quizAttempts.some((q) =>
-      LOCKED_RESULTS_STATUSES.includes(q.status),
-    );
+    const hasPendingGrading = session.quizAttempts.some((q) => POLLING_STATUSES.includes(q.status));
     setPollingActive(hasPendingGrading);
   }, [session]);
 
@@ -209,12 +208,12 @@ const SessionDashboardPage = () => {
               <p className={styles.sessionGoal}>{session.goal}</p>
               <p className={styles.sessionDate}>Created {formatDate(session.createdAt)}</p>
               <div className={styles.headerActions}>
-                <button className={styles.editBtn} onClick={() => setIsEditing(true)}>
+                <Button variant="secondary" size="sm" onClick={() => setIsEditing(true)}>
                   Edit
-                </button>
-                <button className={styles.deleteBtn} onClick={() => setShowDeleteModal(true)}>
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setShowDeleteModal(true)}>
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -278,11 +277,12 @@ const SessionDashboardPage = () => {
           ) : (
             <div className={styles.quizList}>
               {session.quizAttempts.map((q: QuizAttemptSummary) => {
-                const isFeedbackPending = LOCKED_RESULTS_STATUSES.includes(q.status);
+                const isGrading = q.status === QuizStatus.GRADING;
+                const isSubmittedUngraded = q.status === QuizStatus.SUBMITTED_UNGRADED;
                 const showViewFeedbackPrompt =
                   q.status === QuizStatus.COMPLETED && !viewedFeedbackIds.includes(q.id);
 
-                if (isFeedbackPending) {
+                if (isGrading) {
                   return (
                     <div key={q.id} className={`${styles.quizRow} ${styles.quizRowDisabled}`}>
                       <div className={styles.quizInfo}>
@@ -298,6 +298,34 @@ const SessionDashboardPage = () => {
                         </span>
                       </div>
                       <div className={styles.quizRight}>
+                        <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
+                          {q.status.replace('_', ' ')}
+                        </span>
+                        <span className={styles.quizDate}>{formatDate(q.createdAt)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isSubmittedUngraded) {
+                  return (
+                    <div key={q.id} className={styles.quizRow}>
+                      <div className={styles.quizInfo}>
+                        <span className={styles.quizDifficulty}>
+                          {q.difficulty} · {q.answerFormat}
+                        </span>
+                        <span className={styles.quizMeta}>
+                          {q.questionCount} questions
+                          {q.score != null && ` · ${formatScore(q.score)}`}
+                        </span>
+                        <span className={styles.quizStalledMessage}>
+                          Grading stalled. Please retry grading to view feedback.
+                        </span>
+                      </div>
+                      <div className={styles.quizRight}>
+                        <Link to={`/quiz/${q.id}/results`} className={styles.quizStalledLink}>
+                          Open Regrade
+                        </Link>
                         <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
                           {q.status.replace('_', ' ')}
                         </span>
@@ -355,16 +383,16 @@ const SessionDashboardPage = () => {
           You cannot undo this action.
         </p>
         <div className={styles.modalActions}>
-          <button
-            className={styles.cancelBtn}
+          <Button
+            variant="secondary"
             onClick={() => setShowDeleteModal(false)}
             disabled={isDeleting}
           >
             Cancel
-          </button>
-          <button className={styles.confirmDeleteBtn} onClick={handleDelete} disabled={isDeleting}>
+          </Button>
+          <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
             {isDeleting ? 'Deleting…' : 'Delete Session'}
-          </button>
+          </Button>
         </div>
       </Modal>
     </div>

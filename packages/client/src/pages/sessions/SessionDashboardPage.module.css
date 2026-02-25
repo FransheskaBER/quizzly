@@ -65,8 +65,8 @@
   gap: var(--spacing-md);
   flex-wrap: wrap;
   padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid rgba(220, 38, 38, 0.2);
-  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid var(--color-error-alpha-20);
+  background: var(--color-error-alpha-06);
   border-radius: var(--radius-sm);
 }
 
@@ -120,7 +120,7 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--color-primary);
-  background: rgba(37, 99, 235, 0.08);
+  background: var(--color-primary-alpha-08);
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);
 }
@@ -141,39 +141,6 @@
   gap: var(--spacing-sm);
   flex-wrap: wrap;
   padding-top: var(--spacing-xs);
-}
-
-.editBtn {
-  padding: var(--spacing-xs) var(--spacing-md);
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: border-color 0.15s;
-  min-height: 34px;
-}
-
-.editBtn:hover {
-  border-color: var(--color-text-secondary);
-}
-
-.deleteBtn {
-  padding: var(--spacing-xs) var(--spacing-md);
-  background: transparent;
-  color: var(--color-error);
-  border: 1px solid var(--color-error);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  min-height: 34px;
-}
-
-.deleteBtn:hover {
-  background: var(--color-error);
-  color: #fff;
 }
 
 /* ---- Quiz attempts ---- */
@@ -233,11 +200,27 @@
   color: var(--color-warning);
 }
 
+.quizStalledMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+}
+
 .quizRight {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   flex-shrink: 0;
+}
+
+.quizStalledLink {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-error);
+  text-decoration: none;
+}
+
+.quizStalledLink:hover {
+  text-decoration: underline;
 }
 
 .feedbackCta {
@@ -266,23 +249,23 @@
 
 .status_ready,
 .status_completed {
-  background: rgba(22, 163, 74, 0.08);
+  background: var(--color-success-alpha-08);
   color: var(--color-success);
-  border-color: rgba(22, 163, 74, 0.2);
+  border-color: var(--color-success-alpha-20);
 }
 
 .status_processing,
 .status_generating,
 .status_grading {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-warning-alpha-08);
   color: var(--color-warning);
-  border-color: rgba(217, 119, 6, 0.2);
+  border-color: var(--color-warning-alpha-20);
 }
 
 .status_error {
-  background: rgba(220, 38, 38, 0.08);
+  background: var(--color-error-alpha-08);
   color: var(--color-error);
-  border-color: rgba(220, 38, 38, 0.2);
+  border-color: var(--color-error-alpha-20);
 }
 
 /* ---- Delete modal ---- */
@@ -296,47 +279,4 @@
   display: flex;
   gap: var(--spacing-sm);
   justify-content: flex-end;
-}
-
-.cancelBtn {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-base);
-  cursor: pointer;
-  min-height: 40px;
-}
-
-.cancelBtn:hover:not(:disabled) {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text);
-}
-
-.cancelBtn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.confirmDeleteBtn {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: var(--color-error);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  min-height: 40px;
-}
-
-.confirmDeleteBtn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.confirmDeleteBtn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
 }

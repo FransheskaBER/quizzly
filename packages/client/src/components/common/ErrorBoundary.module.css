@@ -22,21 +22,6 @@
   margin: 0;
 }
 
-.rootReloadBtn {
-  padding: 10px 24px;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.rootReloadBtn:hover {
-  opacity: 0.9;
-}
-
 /* Tier 2 — Route: within layout */
 .routeFallback {
   display: flex;
@@ -78,19 +63,4 @@
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   margin: 0;
-}
-
-.componentRetryBtn {
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.8125rem;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-}
-
-.componentRetryBtn:hover {
-  background: var(--color-surface-hover);
 }

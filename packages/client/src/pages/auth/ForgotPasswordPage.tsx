@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './ForgotPasswordPage.module.css';
 
 const ForgotPasswordPage = () => {
@@ -76,9 +77,9 @@ const ForgotPasswordPage = () => {
             {...register('email')}
           />
 
-          <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? 'Sending…' : 'Send reset link'}
-          </button>
+          </Button>
         </form>
 
         <p className={styles.footer}>

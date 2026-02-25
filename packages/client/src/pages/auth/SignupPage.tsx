@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './SignupPage.module.css';
 
 const SignupPage = () => {
@@ -102,9 +103,9 @@ const SignupPage = () => {
             {...register('password')}
           />
 
-          <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account…' : 'Create account'}
-          </button>
+          </Button>
         </form>
 
         <p className={styles.footer}>
