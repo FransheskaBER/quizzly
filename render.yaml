@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: quizzly-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm ci && npx prisma generate --schema=packages/server/prisma/schema.prisma && npm run build --workspace=packages/shared && npm run build --workspace=packages/server
+    startCommand: node packages/server/dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: CLIENT_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "7d"
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: web
+    name: quizzly-client
+    runtime: static
+    buildCommand: npm ci && npm run build --workspace=packages/shared && npm run build --workspace=packages/client
+    staticPublishPath: packages/client/dist
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false

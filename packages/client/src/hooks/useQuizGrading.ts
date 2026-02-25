@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 
-import { api } from '@/store/api';
+import { api, API_BASE_URL } from '@/store/api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import {
   gradingStarted,
@@ -133,7 +133,7 @@ export function useQuizGrading(quizAttemptId: string): UseQuizGradingResult {
       flushBuffer();
     }, 300);
 
-    start(`/api/quizzes/${quizAttemptId}/regrade`);
+    start(`${API_BASE_URL}/quizzes/${quizAttemptId}/regrade`);
   };
 
   const reset = (): void => {

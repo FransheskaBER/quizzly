@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
+    "build:production": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/client",
     "dev": "npm run dev --workspaces --if-present",
     "lint": "eslint 'packages/*/src/**/*.{ts,tsx}'",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx}'",

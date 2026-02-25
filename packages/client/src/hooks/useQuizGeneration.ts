@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 
 import type { GenerateQuizQuery, Question } from '@skills-trainer/shared';
 
-import { api } from '@/store/api';
+import { api, API_BASE_URL } from '@/store/api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import {
   generationStarted,
@@ -144,7 +144,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
       format: preferences.format,
       count: String(preferences.count),
     });
-    start(`/api/sessions/${sessionId}/quizzes/generate?${params.toString()}`);
+    start(`${API_BASE_URL}/sessions/${sessionId}/quizzes/generate?${params.toString()}`);
   };
 
   const reset = (): void => {
