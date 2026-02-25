@@ -1,6 +1,6 @@
 import type { QuizDifficulty, AnswerFormat } from '@skills-trainer/shared';
 
-interface GenerationUserPromptParams {
+export interface GenerationUserPromptParams {
   subject: string;
   goal: string;
   difficulty: QuizDifficulty;
@@ -12,13 +12,29 @@ interface GenerationUserPromptParams {
 export const buildGenerationUserMessage = (params: GenerationUserPromptParams): string => {
   const { subject, goal, difficulty, answerFormat, questionCount, materialsText } = params;
 
-  return `<subject>${subject}</subject>
-<goal>${goal}</goal>
-<difficulty>${difficulty}</difficulty>
-<answer_format>${answerFormat}</answer_format>
-<question_count>${questionCount}</question_count>
-<materials_provided>${materialsText !== null}</materials_provided>
-<materials>${materialsText ?? 'No materials provided.'}</materials>
+  return `<subject>
+${subject}
+</subject>
 
-Generate ${questionCount} ${difficulty} difficulty quiz question(s) in ${answerFormat} format based on the subject and goal above.`.trim();
+<goal>
+${goal}
+</goal>
+
+<difficulty>
+${difficulty}
+</difficulty>
+
+<answer_format>
+${answerFormat}
+</answer_format>
+
+<question_count>
+${questionCount}
+</question_count>
+
+<study_materials>
+${materialsText ?? 'No materials provided.'}
+</study_materials>
+
+Please generate the exercises based on the provided system instructions and inputs.`.trim();
 };

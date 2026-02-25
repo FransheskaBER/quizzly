@@ -1,11 +1,11 @@
-interface QAEntry {
+export interface QAEntry {
   questionNumber: number;
   questionText: string;
   correctAnswer: string;
   userAnswer: string;
 }
 
-interface GradingUserPromptParams {
+export interface GradingUserPromptParams {
   subject: string;
   questionsAndAnswers: QAEntry[];
 }
@@ -13,26 +13,39 @@ interface GradingUserPromptParams {
 /**
  * Builds the user-role message for a grading API call.
  * Called by gradeAnswers() in llm.service.ts.
- *
- * Wraps user content in XML delimiters (Layer 2 injection defense).
- * Empty or whitespace-only answers are replaced with "[No answer provided]"
- * to prevent the LLM from hallucinating an answer and awarding partial credit.
  */
 export const buildGradingUserMessage = (params: GradingUserPromptParams): string => {
   const { subject, questionsAndAnswers } = params;
 
-  const formattedQuestions = questionsAndAnswers
-    .map(({ questionNumber, questionText, correctAnswer, userAnswer }) => {
-      const answer = userAnswer?.trim() ? userAnswer : '[No answer provided]';
-      return `Question ${questionNumber}:\nQuestion: ${questionText}\nCorrect Answer: ${correctAnswer}\nStudent Answer: ${answer}`;
+  const formattedQuestionsAndAnswers = questionsAndAnswers
+    .map(({ questionNumber, questionText, correctAnswer }) => {
+      return `Question ${questionNumber}:\nQuestion: ${questionText}\nCorrect Answer: ${correctAnswer}`;
     })
     .join('\n\n');
 
-  return `<subject>${subject}</subject>
+  const formattedStudentAnswers = questionsAndAnswers
+    .map(({ questionNumber, userAnswer }) => {
+      const answer = userAnswer?.trim() ? userAnswer : '[No answer provided]';
+      const sanitizedAnswer = answer.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `Question ${questionNumber}:\nStudent Answer: ${sanitizedAnswer}`;
+    })
+    .join('\n\n');
 
-Grade the following ${questionsAndAnswers.length} answer(s). For each question, compare the student's answer to the correct answer and assign a score of 0, 0.5, or 1 per the rubric.
+  return `<subject>
+${subject}
+</subject>
 
-<questions_to_grade>
-${formattedQuestions}
-</questions_to_grade>`.trim();
+Here are the questions with their correct answers:
+
+<questions_and_answers>
+${formattedQuestionsAndAnswers}
+</questions_and_answers>
+
+Here are the student's submitted answers:
+
+<student_answers>
+${formattedStudentAnswers}
+</student_answers>
+
+Please grade the exercises based on the provided system instructions and inputs.`.trim();
 };

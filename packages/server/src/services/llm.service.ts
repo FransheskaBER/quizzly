@@ -179,13 +179,14 @@ export const generateQuiz = async (
   logSuspiciousPatterns(goal, 'goal');
   if (materialsText !== null) logSuspiciousPatterns(materialsText, 'materials');
 
-  const systemPrompt = buildGenerationSystemPrompt();
-  const userMessage = buildGenerationUserMessage({
+  const promptParams = {
     ...params,
     subject,
     goal,
     materialsText,
-  });
+  };
+  const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
+  const userMessage = buildGenerationUserMessage(promptParams);
 
   const questions = await runWithRetry<LlmGeneratedQuestion[]>(
     systemPrompt,

@@ -34,7 +34,6 @@ const PROMPT_FILES = [
   'generation/medium.prompt.ts',
   'generation/hard.prompt.ts',
   'grading/system.prompt.ts',
-  'grading/freetext.prompt.ts',
 ] as const;
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;

@@ -1,6 +1,8 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import pino from 'pino';
+import type { Readable } from 'stream';
+import { MAX_FILE_SIZE_BYTES } from '@skills-trainer/shared';
 import { s3Client, bucketName } from '../config/s3.js';
 
 const logger = pino({ name: 's3-service' });
@@ -62,7 +64,43 @@ export const getObjectBuffer = async (key: string): Promise<Buffer> => {
     throw new Error(`No body returned from S3 for key: ${key}`);
   }
 
+  // To prevent OOM from oversized files, stream the body and limit the size.
+  // Using MAX_FILE_SIZE_BYTES from shared constants.
+  const MAX_SIZE = MAX_FILE_SIZE_BYTES;
+  
+  // Create a custom stream consumer that enforces the limit
+  const chunks: Buffer[] = [];
+  let totalLength = 0;
+  
+  // Node.js readable stream
+  if ('on' in response.Body && typeof (response.Body as unknown as Record<string, unknown>).on === 'function') {
+    return new Promise((resolve, reject) => {
+      const stream = response.Body as Readable;
+      
+      stream.on('error', reject);
+      
+      stream.on('data', (chunk: Buffer) => {
+        totalLength += chunk.length;
+        if (totalLength > MAX_SIZE) {
+          const err = new Error(`File size exceeds maximum allowed size of ${MAX_SIZE} bytes`);
+          reject(err);
+          stream.destroy(err);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      
+      stream.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+    });
+  }
+  
+  // Fallback for non-stream bodies (e.g. if transformToByteArray is the only option)
   const bytes = await response.Body.transformToByteArray();
+  if (bytes.length > MAX_SIZE) {
+    throw new Error(`File size exceeds maximum allowed size of ${MAX_SIZE} bytes`);
+  }
   return Buffer.from(bytes);
 };
 
