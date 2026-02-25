@@ -58,6 +58,34 @@
   color: var(--color-text-secondary);
 }
 
+.submitFailureNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: rgba(220, 38, 38, 0.06);
+  border-radius: var(--radius-sm);
+}
+
+.submitFailureText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.submitFailureLink {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-error);
+}
+
+.submitFailureLink:hover {
+  text-decoration: underline;
+}
+
 /* ---- Session header ---- */
 .sessionHeader {
   display: flex;

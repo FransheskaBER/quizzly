@@ -21,6 +21,7 @@ const isFetchError = (err: unknown): err is { status: number } =>
 
 const SESSION_POLL_INTERVAL_MS = 3000;
 const FEEDBACK_VIEWED_STORAGE_KEY = 'quiz-feedback-viewed-ids';
+const QUIZ_SUBMIT_FAILURES_STORAGE_KEY = 'quiz-submit-failures';
 const LOCKED_RESULTS_STATUSES: QuizStatus[] = [QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED];
 
 const readViewedFeedbackIds = (): string[] => {
@@ -38,6 +39,41 @@ const persistViewedFeedbackIds = (ids: string[]): void => {
   localStorage.setItem(FEEDBACK_VIEWED_STORAGE_KEY, JSON.stringify(ids));
 };
 
+interface QuizSubmitFailureRecord {
+  quizAttemptId: string;
+  sessionId: string;
+  message: string;
+  createdAt: string;
+}
+
+const readSubmitFailureRecords = (): QuizSubmitFailureRecord[] => {
+  try {
+    const raw = localStorage.getItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is QuizSubmitFailureRecord => {
+      if (typeof item !== 'object' || item === null) return false;
+      return (
+        'quizAttemptId' in item &&
+        typeof item.quizAttemptId === 'string' &&
+        'sessionId' in item &&
+        typeof item.sessionId === 'string' &&
+        'message' in item &&
+        typeof item.message === 'string' &&
+        'createdAt' in item &&
+        typeof item.createdAt === 'string'
+      );
+    });
+  } catch {
+    return [];
+  }
+};
+
+const writeSubmitFailureRecords = (records: QuizSubmitFailureRecord[]): void => {
+  localStorage.setItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY, JSON.stringify(records));
+};
+
 const SessionDashboardPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -46,6 +82,9 @@ const SessionDashboardPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pollingActive, setPollingActive] = useState(true);
   const [viewedFeedbackIds, setViewedFeedbackIds] = useState<string[]>(() => readViewedFeedbackIds());
+  const [submitFailures, setSubmitFailures] = useState<QuizSubmitFailureRecord[]>(() =>
+    readSubmitFailureRecords(),
+  );
 
   const { data: session, isLoading, error } = useGetSessionQuery(id ?? '', {
     skip: !id,
@@ -73,6 +112,22 @@ const SessionDashboardPage = () => {
     );
     setPollingActive(hasPendingGrading);
   }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+
+    // Keep only failures that are still relevant: same session and still in_progress.
+    const currentStatusById = new Map(session.quizAttempts.map((q) => [q.id, q.status]));
+    const nextFailures = submitFailures.filter((failure) => {
+      if (failure.sessionId !== session.id) return true;
+      return currentStatusById.get(failure.quizAttemptId) === QuizStatus.IN_PROGRESS;
+    });
+
+    if (nextFailures.length !== submitFailures.length) {
+      setSubmitFailures(nextFailures);
+      writeSubmitFailureRecords(nextFailures);
+    }
+  }, [session, submitFailures]);
 
   if (isLoading) return <LoadingSpinner fullPage />;
 
@@ -103,6 +158,8 @@ const SessionDashboardPage = () => {
     setViewedFeedbackIds(next);
     persistViewedFeedbackIds(next);
   };
+
+  const sessionSubmitFailure = submitFailures.find((failure) => failure.sessionId === session.id);
 
   const handleUpdate = async (data: CreateSessionRequest) => {
     await updateSession({ id: session.id, data }).unwrap();
@@ -193,6 +250,16 @@ const SessionDashboardPage = () => {
           <h2 className={styles.sectionTitle}>
             Quiz Attempts <span className={styles.count}>({session.quizAttempts.length})</span>
           </h2>
+          {sessionSubmitFailure && (
+            <div className={styles.submitFailureNotice}>
+              <p className={styles.submitFailureText}>
+                We couldn&apos;t submit your quiz. Please open it and click Complete Quiz again.
+              </p>
+              <Link to={`/quiz/${sessionSubmitFailure.quizAttemptId}`} className={styles.submitFailureLink}>
+                Retry Submission
+              </Link>
+            </div>
+          )}
           {session.quizAttempts.length === 0 ? (
             <p className={styles.emptyText}>No quizzes yet. Generate a quiz to get started.</p>
           ) : (
