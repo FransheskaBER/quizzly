@@ -1,6 +1,7 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import pino from 'pino';
+import type { Readable } from 'stream';
 import { s3Client, bucketName } from '../config/s3.js';
 
 const logger = pino({ name: 's3-service' });
@@ -72,9 +73,9 @@ export const getObjectBuffer = async (key: string): Promise<Buffer> => {
   let totalLength = 0;
   
   // Node.js readable stream
-  if (typeof (response.Body as any).on === 'function') {
+  if ('on' in response.Body && typeof (response.Body as unknown as Record<string, unknown>).on === 'function') {
     return new Promise((resolve, reject) => {
-      const stream = response.Body as import('stream').Readable;
+      const stream = response.Body as Readable;
       
       stream.on('data', (chunk: Buffer) => {
         totalLength += chunk.length;
