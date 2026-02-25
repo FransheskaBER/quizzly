@@ -62,6 +62,15 @@ export const errorHandler = (
       });
       return;
     }
+    if (err.code === 'P2003') {
+      res.status(400).json({
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Related record not found',
+        },
+      });
+      return;
+    }
   }
 
   // 5xx — unexpected error. Log and report to Sentry with request context.

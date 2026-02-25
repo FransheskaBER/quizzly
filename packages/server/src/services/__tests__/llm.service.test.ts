@@ -173,6 +173,17 @@ describe('generateQuiz', () => {
     expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
   });
 
+  it('propagates the error when the Anthropic SDK itself throws (e.g. RateLimitError)', async () => {
+    const apiError = Object.assign(new Error('Rate limit exceeded'), { name: 'RateLimitError', status: 429 });
+    vi.mocked(anthropic.messages.stream).mockReturnValue({
+      finalText: vi.fn().mockRejectedValue(apiError),
+    } as unknown as ReturnType<typeof anthropic.messages.stream>);
+
+    await expect(generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn())).rejects.toThrow('Rate limit exceeded');
+    // SDK error propagates on first attempt — no retry since it is not a parse failure
+    expect(anthropic.messages.stream).toHaveBeenCalledTimes(1);
+  });
+
   it('throws BadRequestError when response contains the system marker', async () => {
     const exfiltrationResponse = `<questions>[] [SYSTEM_MARKER_DO_NOT_REPEAT]</questions>`;
     vi.mocked(anthropic.messages.stream).mockReturnValue(

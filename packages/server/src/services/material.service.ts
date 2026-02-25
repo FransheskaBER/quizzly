@@ -138,8 +138,11 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
   return pages.join('\n\n');
 };
 
-const extractDocxText = async (buffer: Buffer): Promise<string> => {
+const extractDocxText = async (buffer: Buffer, materialId?: string): Promise<string> => {
   const result = await mammoth.extractRawText({ buffer });
+  if (result.messages.length > 0) {
+    logger.warn({ messages: result.messages, materialId }, 'mammoth DOCX conversion warnings');
+  }
   return result.value;
 };
 
@@ -150,7 +153,17 @@ const fetchAndExtractUrl = async (url: string): Promise<string> => {
   const timer = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TypeError')) {
+        logger.warn({ err, url }, 'URL fetch failed — network error or timeout');
+        throw new BadRequestError('Could not reach this URL. Check that it is publicly accessible.');
+      }
+      logger.error({ err, url }, 'Unexpected error fetching URL');
+      throw err;
+    }
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('text/html')) {
@@ -252,25 +265,36 @@ export const processMaterial = async (
   if (!material) throw new NotFoundError('Material not found');
   if (!material.s3Key) throw new BadRequestError('Material has no associated S3 file');
 
-  let extractedText: string;
-
+  // Block 1: S3 download — distinct from extraction so logs and DB messages are accurate
+  let buffer: Buffer;
   try {
-    const buffer = await getObjectBuffer(material.s3Key);
+    buffer = await getObjectBuffer(material.s3Key);
+  } catch (err) {
+    logger.error({ err, materialId, s3Key: material.s3Key }, 'Failed to download material from S3');
+    await prisma.material.update({
+      where: { id: materialId },
+      data: { status: MaterialStatus.FAILED, errorMessage: 'Failed to download file from storage' },
+    });
+    throw new BadRequestError('Failed to download file from storage');
+  }
 
+  // Block 2: text extraction
+  let extractedText: string;
+  try {
     if (material.fileType === 'pdf') {
       extractedText = await extractPdfText(buffer);
     } else if (material.fileType === 'docx') {
-      extractedText = await extractDocxText(buffer);
+      extractedText = await extractDocxText(buffer, materialId);
     } else {
       extractedText = extractTxtText(buffer);
     }
   } catch (err) {
     const message = err instanceof BadRequestError ? err.message : 'Failed to extract text from file';
+    logger.warn({ err, materialId }, 'Text extraction failed');
     await prisma.material.update({
       where: { id: materialId },
       data: { status: MaterialStatus.FAILED, errorMessage: message },
     });
-    logger.warn({ materialId, err }, 'Text extraction failed');
     throw new BadRequestError(message);
   }
 
