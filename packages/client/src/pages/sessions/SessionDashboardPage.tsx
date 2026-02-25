@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
@@ -19,14 +19,38 @@ import styles from './SessionDashboardPage.module.css';
 const isFetchError = (err: unknown): err is { status: number } =>
   typeof err === 'object' && err !== null && 'status' in err;
 
+const SESSION_POLL_INTERVAL_MS = 3000;
+const FEEDBACK_VIEWED_STORAGE_KEY = 'quiz-feedback-viewed-ids';
+const LOCKED_RESULTS_STATUSES: QuizStatus[] = [QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED];
+
+const readViewedFeedbackIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem(FEEDBACK_VIEWED_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistViewedFeedbackIds = (ids: string[]): void => {
+  localStorage.setItem(FEEDBACK_VIEWED_STORAGE_KEY, JSON.stringify(ids));
+};
+
 const SessionDashboardPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pollingActive, setPollingActive] = useState(true);
+  const [viewedFeedbackIds, setViewedFeedbackIds] = useState<string[]>(() => readViewedFeedbackIds());
 
-  const { data: session, isLoading, error } = useGetSessionQuery(id ?? '');
+  const { data: session, isLoading, error } = useGetSessionQuery(id ?? '', {
+    skip: !id,
+    pollingInterval: pollingActive ? SESSION_POLL_INTERVAL_MS : 0,
+  });
   const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
 
@@ -41,6 +65,14 @@ const SessionDashboardPage = () => {
     progressMessage,
     reset: resetGeneration,
   } = useQuizGeneration(id ?? '');
+
+  useEffect(() => {
+    if (!session) return;
+    const hasPendingGrading = session.quizAttempts.some((q) =>
+      LOCKED_RESULTS_STATUSES.includes(q.status),
+    );
+    setPollingActive(hasPendingGrading);
+  }, [session]);
 
   if (isLoading) return <LoadingSpinner fullPage />;
 
@@ -64,6 +96,13 @@ const SessionDashboardPage = () => {
   }
 
   if (!session) return null;
+
+  const markFeedbackViewed = (quizAttemptId: string): void => {
+    if (viewedFeedbackIds.includes(quizAttemptId)) return;
+    const next = [...viewedFeedbackIds, quizAttemptId];
+    setViewedFeedbackIds(next);
+    persistViewedFeedbackIds(next);
+  };
 
   const handleUpdate = async (data: CreateSessionRequest) => {
     await updateSession({ id: session.id, data }).unwrap();
@@ -158,29 +197,68 @@ const SessionDashboardPage = () => {
             <p className={styles.emptyText}>No quizzes yet. Generate a quiz to get started.</p>
           ) : (
             <div className={styles.quizList}>
-              {session.quizAttempts.map((q: QuizAttemptSummary) => (
-                <Link
-                  key={q.id}
-                  to={[QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED, QuizStatus.COMPLETED].includes(q.status) ? `/quiz/${q.id}/results` : `/quiz/${q.id}`}
-                  className={styles.quizRow}
-                >
-                  <div className={styles.quizInfo}>
-                    <span className={styles.quizDifficulty}>
-                      {q.difficulty} · {q.answerFormat}
-                    </span>
-                    <span className={styles.quizMeta}>
-                      {q.questionCount} questions
-                      {q.score != null && ` · ${formatScore(q.score)}`}
-                    </span>
-                  </div>
-                  <div className={styles.quizRight}>
-                    <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
-                      {q.status.replace('_', ' ')}
-                    </span>
-                    <span className={styles.quizDate}>{formatDate(q.createdAt)}</span>
-                  </div>
-                </Link>
-              ))}
+              {session.quizAttempts.map((q: QuizAttemptSummary) => {
+                const isFeedbackPending = LOCKED_RESULTS_STATUSES.includes(q.status);
+                const showViewFeedbackPrompt =
+                  q.status === QuizStatus.COMPLETED && !viewedFeedbackIds.includes(q.id);
+
+                if (isFeedbackPending) {
+                  return (
+                    <div key={q.id} className={`${styles.quizRow} ${styles.quizRowDisabled}`}>
+                      <div className={styles.quizInfo}>
+                        <span className={styles.quizDifficulty}>
+                          {q.difficulty} · {q.answerFormat}
+                        </span>
+                        <span className={styles.quizMeta}>
+                          {q.questionCount} questions
+                          {q.score != null && ` · ${formatScore(q.score)}`}
+                        </span>
+                        <span className={styles.quizWaitingMessage}>
+                          Your feedback will be available in a few minutes.
+                        </span>
+                      </div>
+                      <div className={styles.quizRight}>
+                        <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
+                          {q.status.replace('_', ' ')}
+                        </span>
+                        <span className={styles.quizDate}>{formatDate(q.createdAt)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={q.id}
+                    to={q.status === QuizStatus.COMPLETED ? `/quiz/${q.id}/results` : `/quiz/${q.id}`}
+                    className={styles.quizRow}
+                    onClick={() => {
+                      if (showViewFeedbackPrompt) {
+                        markFeedbackViewed(q.id);
+                      }
+                    }}
+                  >
+                    <div className={styles.quizInfo}>
+                      <span className={styles.quizDifficulty}>
+                        {q.difficulty} · {q.answerFormat}
+                      </span>
+                      <span className={styles.quizMeta}>
+                        {q.questionCount} questions
+                        {q.score != null && ` · ${formatScore(q.score)}`}
+                      </span>
+                    </div>
+                    <div className={styles.quizRight}>
+                      {showViewFeedbackPrompt && (
+                        <span className={styles.feedbackCta}>View Feedback</span>
+                      )}
+                      <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
+                        {q.status.replace('_', ' ')}
+                      </span>
+                      <span className={styles.quizDate}>{formatDate(q.createdAt)}</span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

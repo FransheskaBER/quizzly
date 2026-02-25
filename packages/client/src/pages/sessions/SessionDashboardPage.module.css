@@ -164,6 +164,14 @@
   text-decoration: none;
 }
 
+.quizRowDisabled {
+  cursor: not-allowed;
+}
+
+.quizRowDisabled:hover {
+  background: var(--color-bg-secondary);
+}
+
 .quizInfo {
   display: flex;
   flex-direction: column;
@@ -182,11 +190,23 @@
   color: var(--color-text-secondary);
 }
 
+.quizWaitingMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-warning);
+}
+
 .quizRight {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   flex-shrink: 0;
+}
+
+.feedbackCta {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: none;
 }
 
 .quizDate {
