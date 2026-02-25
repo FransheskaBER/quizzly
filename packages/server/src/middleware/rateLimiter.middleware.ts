@@ -22,6 +22,28 @@ export const createRateLimiter = (windowMs: number, max: number) => {
   });
 };
 
+/** Rate limiter keyed by email from req.body. Use after validate() so body is parsed. */
+export const createRateLimiterByEmail = (
+  windowMs: number,
+  max: number,
+  fallbackMessage = 'Too many requests, please try again later',
+) =>
+  rateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req: Request) => {
+      const email = (req.body as { email?: string })?.email;
+      return typeof email === 'string' && email.length > 0
+        ? `email:${email.toLowerCase()}`
+        : (req.ip ?? 'unknown');
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: { code: 'RATE_LIMITED', message: fallbackMessage },
+    },
+  });
+
 export const globalRateLimiter = createRateLimiter(60 * 1000, 100);
 
 // Per-authenticated-user rate limiters for quiz generation.
