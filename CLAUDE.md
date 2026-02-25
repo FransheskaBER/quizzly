@@ -9,7 +9,7 @@ Web app that generates quiz questions from user-uploaded study materials for tec
 - **Monorepo:** npm workspaces — `packages/shared`, `packages/server`, `packages/client`
 - **Shared:** Zod schemas (single source of truth for validation + types), TypeScript types via `z.infer<>`, enums, constants
 - **Frontend:** React 18 + Vite, Redux Toolkit + RTK Query, React Router DOM v6, CSS Modules, React Hook Form + Zod
-- **Backend:** Node.js 20 LTS, Express.js, Prisma ORM, Zod validation, pino logger
+- **Backend:** Node.js 22 LTS, Express.js, Prisma ORM, Zod validation, pino logger
 - **Database:** PostgreSQL 17 (Docker local, Neon production). All PKs UUID. All timestamps UTC.
 - **Storage:** AWS S3 (original files) + Neon `materials.extracted_text` (plain text for LLM). Quiz generation reads from Neon only — never S3.
 - **LLM:** Anthropic Claude Sonnet 4 via `@anthropic-ai/sdk`. Streaming via SSE.
@@ -17,7 +17,7 @@ Web app that generates quiz questions from user-uploaded study materials for tec
 - **Email:** Resend. **Hosting:** Render (backend $7/mo, frontend free static site)
 
 Do not add new dependencies without explicit approval. Use what's listed.
-Pin to the versions specified: Node.js 20 LTS, React 18, PostgreSQL 17, Prisma (latest stable).
+Pin to the versions specified: Node.js 22 LTS, React 18, PostgreSQL 17, Prisma (latest stable).
 If a task requires a library not listed here, stop and ask before proceeding.
 
 ## 3. Architecture Rules
