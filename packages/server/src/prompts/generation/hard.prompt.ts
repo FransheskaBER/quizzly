@@ -54,16 +54,7 @@
  *
  * MANUAL TESTING (Anthropic Console):
  * Paste the output of buildGenerationSystemPrompt() into the System Prompt field.
- * In the User message, paste:
- *
- *   <subject>Node.js API Design</subject>
- *   <goal>Senior-level backend interview preparation — system design and trade-offs</goal>
- *   <difficulty>hard</difficulty>
- *   <answer_format>free_text</answer_format>
- *   <question_count>2</question_count>
- *   <materials_provided>false</materials_provided>
- *   <materials>No materials provided.</materials>
- *   Generate 2 hard difficulty quiz question(s) in free_text format based on the subject and goal above.
+ * In the User message, paste: "Please generate the exercises based on the provided system instructions and inputs."
  *
  * Verify: at least one question is AI-COLLABORATION (instruct the student to
  * use Claude or Cursor, then evaluate the output). At least one is
@@ -77,12 +68,14 @@
 
 export const getHardDifficultyPrompt = (): string =>
   `HARD difficulty calibration:
-- Primary exercise types: ARCHITECTURAL TRADE-OFF and AI-COLLABORATION. These must make up the majority of hard exercises. EVALUATE AI OUTPUT is also valid when the code has complex, multi-faceted issues that require synthesis to identify.
-- ARCHITECTURAL TRADE-OFF: present a system design scenario with explicit constraints (scale, latency, consistency requirements, team size). There is no single correct answer — the student must reason about trade-offs given those constraints and justify their decisions. MCQ options must all be defensible to a junior developer; the correct answer is only clearly best given the stated constraints.
-- AI-COLLABORATION: instruct the student to use an AI tool (Claude, Cursor, ChatGPT) to solve a specific, realistic engineering problem. Then ask them to critically evaluate the output: Is it correct? Does it handle edge cases? Is it optimal for the given constraints? What would you change before shipping it? These are always free_text. The question must specify exactly what to build or generate, not just "use AI to solve X."
-- Questions require combining multiple concepts, reasoning about non-obvious implications, or critically evaluating approaches where the right answer depends on context.
-- MCQ distractors at hard: subtle enough that each could seem correct to a developer with 1–2 years of experience. They represent expert-level misconceptions or valid-sounding-but-wrong generalizations. All 4 options must look plausible to someone with foundational knowledge.
-- Free-text answers: expect multi-paragraph responses or multi-part analysis. The correctAnswer field should describe what strong reasoning looks like — synthesis, design rationale, explicit trade-off analysis — not state a single correct fact.
-- Success signal: challenges practitioners with real experience. A correct answer requires genuine architectural reasoning, not just remembering facts or patterns.
-- Do NOT make exercises that are merely long or verbose. Hard means conceptually deep — a short question requiring substantial thought is better than a long question with an obvious answer.
-- Do NOT use "explain in depth" or "discuss the trade-offs" as a substitute for genuine question depth. The scenario itself must force synthesis.`.trim();
+- General Requirement: Exercise MUST require combining multiple concepts or reasoning about non-obvious implications. Challenge practitioners with real experience, not just beginners. Focus on depth over length - a short question requiring substantial thought is better than a verbose question with an obvious answer.
+- ARCHITECTURAL TRADE-OFF: Scenario must have explicit constraints (scale, latency, consistency requirements, team size, budget, etc.). There is NO single objectively correct answer. Student must reason about trade-offs given constraints.
+- AI-COLLABORATION: Specify exactly what to build. Ask student to critically evaluate output for correctness, edge cases, and optimality.
+- PROMPT CONSTRUCTION: Scenario must involve system-level concerns (API design, error propagation, concurrency). Student must anticipate SDK-specific behavior, failure modes, and architectural constraints.
+- PREDICT THE FAILURE: Code must look clean but contain a subtle failure (e.g., promises resolving with errors, inaccurate mocks, silent database filters). Student must identify the specific contract violation/assumption gap and explain production impact.
+- EVALUATE AI OUTPUT: Issues should be complex and multi-faceted, requiring synthesis to identify.
+- CODE_REVIEW: Issues should be subtle and require understanding of how systems behave in production.
+- CONCEPT_APPLICATION / SPOT THE BUG / COMPARE APPROACHES / CHOOSE THE RIGHT TOOL: Issues must be subtle and require understanding of how systems behave in production. Test understanding through application, not just recall.
+- Multiple Choice Questions (if applicable): All four options must look plausible to someone with 1-2 years of experience. Distractors represent expert-level misconceptions or valid-sounding-but-wrong generalizations.
+- Free-text answers: Expect multi-paragraph responses demonstrating synthesis, design rationale, or explicit trade-off analysis. The correctAnswer describes what strong reasoning looks like, not a single fact.
+- Quality Checks: In your <analysis> block, explicitly verify that the exercise requires genuine synthesis/architectural reasoning and that the distractors/evaluation criteria are appropriate for the hard level.`.trim();

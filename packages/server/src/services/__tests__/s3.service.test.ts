@@ -35,6 +35,7 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 import { s3Client } from '../../config/s3.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { MAX_FILE_SIZE_BYTES } from '@skills-trainer/shared';
 import * as s3Service from '../s3.service.js';
 
 beforeEach(() => {
@@ -146,6 +147,70 @@ describe('getObjectBuffer', () => {
 
     expect(result).toBeInstanceOf(Buffer);
     expect(Array.from(result)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('throws an error if transformToByteArray returns bytes exceeding MAX_FILE_SIZE_BYTES', async () => {
+    const oversizedBytes = new Uint8Array(MAX_FILE_SIZE_BYTES + 1);
+    (s3Client.send as Mock).mockResolvedValue({
+      Body: { transformToByteArray: vi.fn().mockResolvedValue(oversizedBytes) },
+    });
+
+    await expect(s3Service.getObjectBuffer('sessions/abc/oversized.pdf')).rejects.toThrow(
+      `File size exceeds maximum allowed size of ${MAX_FILE_SIZE_BYTES} bytes`
+    );
+  });
+
+  it('streams the object body and returns a concatenated Buffer', async () => {
+    const chunk1 = Buffer.from('hello ');
+    const chunk2 = Buffer.from('world');
+
+    const fakeStream = {
+      on: vi.fn().mockImplementation((event: string, handler: (arg?: Buffer) => void) => {
+        if (event === 'data') {
+          handler(chunk1);
+          handler(chunk2);
+        }
+        if (event === 'end') {
+          handler();
+        }
+        return fakeStream;
+      }),
+      destroy: vi.fn(),
+    };
+
+    (s3Client.send as Mock).mockResolvedValue({
+      Body: fakeStream,
+    });
+
+    const result = await s3Service.getObjectBuffer('sessions/abc/stream.pdf');
+
+    expect(result).toBeInstanceOf(Buffer);
+    expect(result.toString('utf-8')).toBe('hello world');
+    expect(fakeStream.on).toHaveBeenCalledWith('data', expect.any(Function));
+    expect(fakeStream.on).toHaveBeenCalledWith('end', expect.any(Function));
+  });
+
+  it('rejects the promise and destroys the stream if chunks exceed MAX_FILE_SIZE_BYTES', async () => {
+    const chunk = Buffer.alloc(MAX_FILE_SIZE_BYTES + 1, 'a');
+
+    const fakeStream = {
+      on: vi.fn().mockImplementation((event: string, handler: (arg?: Buffer) => void) => {
+        if (event === 'data') {
+          handler(chunk);
+        }
+        return fakeStream;
+      }),
+      destroy: vi.fn(),
+    };
+
+    (s3Client.send as Mock).mockResolvedValue({
+      Body: fakeStream,
+    });
+
+    await expect(s3Service.getObjectBuffer('sessions/abc/toolarge.pdf')).rejects.toThrow(
+      `File size exceeds maximum allowed size of ${MAX_FILE_SIZE_BYTES} bytes`
+    );
+    expect(fakeStream.destroy).toHaveBeenCalledWith(expect.any(Error));
   });
 
   it('throws when S3 returns no Body', async () => {

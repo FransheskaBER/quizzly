@@ -5,7 +5,7 @@ import { auth } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
   createRateLimiter,
-  createRateLimiterByEmail,
+  createRateLimiterByEmailAndIp,
 } from '../middleware/rateLimiter.middleware.js';
 import * as authService from '../services/auth.service.js';
 import {
@@ -25,8 +25,8 @@ const signupLimiter = createRateLimiter(
   process.env.NODE_ENV === 'test' ? 100 : 5,
 ); // 5/IP/hr prod; 100 in test for E2E
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 10);     // 10/IP/15min
-const resendLimiter = createRateLimiterByEmail(60 * 60 * 1000, 3);   // 3/email/hr
-const forgotLimiter = createRateLimiterByEmail(60 * 60 * 1000, 3);   // 3/email/hr
+const resendLimiter = createRateLimiterByEmailAndIp(60 * 60 * 1000, 20, 3);   // 20/IP/hr, 3/email/hr
+const forgotLimiter = createRateLimiterByEmailAndIp(60 * 60 * 1000, 20, 3);   // 20/IP/hr, 3/email/hr
 
 router.post(
   '/signup',
