@@ -28,9 +28,13 @@ export const generateUploadUrl = async (input: {
     ContentType: input.contentType,
   });
 
-  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: UPLOAD_EXPIRES_IN });
-
-  return { uploadUrl, expiresIn: UPLOAD_EXPIRES_IN };
+  try {
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: UPLOAD_EXPIRES_IN });
+    return { uploadUrl, expiresIn: UPLOAD_EXPIRES_IN };
+  } catch (err) {
+    logger.error({ err, key: input.key, bucket: bucketName }, 'Failed to generate upload URL');
+    throw err;
+  }
 };
 
 export const generateDownloadUrl = async (input: {
@@ -41,9 +45,13 @@ export const generateDownloadUrl = async (input: {
     Key: input.key,
   });
 
-  const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn: DOWNLOAD_EXPIRES_IN });
-
-  return { downloadUrl, expiresIn: DOWNLOAD_EXPIRES_IN };
+  try {
+    const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn: DOWNLOAD_EXPIRES_IN });
+    return { downloadUrl, expiresIn: DOWNLOAD_EXPIRES_IN };
+  } catch (err) {
+    logger.error({ err, key: input.key, bucket: bucketName }, 'Failed to generate download URL');
+    throw err;
+  }
 };
 
 export const getObjectBuffer = async (key: string): Promise<Buffer> => {

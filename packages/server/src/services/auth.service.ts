@@ -137,6 +137,7 @@ export const resendVerification = async (
     data: { verificationToken: verificationTokenHash, verificationTokenExpiresAt },
   });
 
+  // Fire-and-forget — sendVerificationEmail catches, logs, and reports to Sentry internally
   void sendVerificationEmail(user.email, verificationToken);
 
   return genericResponse;
@@ -164,6 +165,7 @@ export const forgotPassword = async (data: ForgotPasswordRequest): Promise<Messa
     },
   });
 
+  // Fire-and-forget — sendPasswordResetEmail catches, logs, and reports to Sentry internally
   void sendPasswordResetEmail(user.email, token);
 
   return genericResponse;

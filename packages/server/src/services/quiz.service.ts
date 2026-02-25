@@ -13,6 +13,7 @@ import pino from 'pino';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../config/database.js';
+import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../utils/errors.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from './llm.service.js';
@@ -234,6 +235,7 @@ export const executeGeneration = async (
     }
   } catch (err) {
     logger.error({ err, sessionId }, 'Quiz generation failed');
+    Sentry.captureException(err, { extra: { sessionId } });
 
     if (!timedOut) {
       writer({ type: 'error', message: 'Generation failed. Please try again.' });
@@ -593,6 +595,7 @@ export const executeGrading = async (
     writer({ type: 'complete', data: { quizAttemptId, score: finalScore } });
   } catch (err) {
     logger.error({ err, quizAttemptId }, 'Quiz grading failed');
+    Sentry.captureException(err, { extra: { quizAttemptId } });
 
     if (!timedOut) {
       writer({ type: 'error', message: 'Grading failed. You can retry grading.' });

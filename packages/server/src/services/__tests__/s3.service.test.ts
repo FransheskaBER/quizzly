@@ -1,5 +1,22 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 
+const { mockLogger } = vi.hoisted(() => {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    child: vi.fn(function (this: typeof logger) { return this; }),
+    level: 'info',
+    silent: vi.fn(),
+    trace: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+  };
+  return { mockLogger: logger };
+});
+
+vi.mock('pino', () => ({ default: () => mockLogger }));
+
 vi.mock('../../config/s3.js', () => ({
   s3Client: { send: vi.fn() },
   bucketName: 'test-bucket',
@@ -57,6 +74,20 @@ describe('generateUploadUrl', () => {
     );
     expect(getSignedUrl).toHaveBeenCalledWith(s3Client, expect.anything(), { expiresIn: 300 });
   });
+
+  it('logs with key and bucket then rethrows when getSignedUrl throws', async () => {
+    const s3Error = new Error('InvalidAccessKeyId');
+    (getSignedUrl as Mock).mockRejectedValue(s3Error);
+
+    await expect(
+      s3Service.generateUploadUrl({ key: 'sessions/abc/notes.pdf', contentType: 'application/pdf' }),
+    ).rejects.toThrow('InvalidAccessKeyId');
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: s3Error, key: 'sessions/abc/notes.pdf', bucket: 'test-bucket' }),
+      'Failed to generate upload URL',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -84,6 +115,52 @@ describe('generateDownloadUrl', () => {
       }),
     );
     expect(getSignedUrl).toHaveBeenCalledWith(s3Client, expect.anything(), { expiresIn: 900 });
+  });
+
+  it('logs with key and bucket then rethrows when getSignedUrl throws', async () => {
+    const s3Error = new Error('NoSuchBucket');
+    (getSignedUrl as Mock).mockRejectedValue(s3Error);
+
+    await expect(
+      s3Service.generateDownloadUrl({ key: 'sessions/abc/notes.pdf' }),
+    ).rejects.toThrow('NoSuchBucket');
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: s3Error, key: 'sessions/abc/notes.pdf', bucket: 'test-bucket' }),
+      'Failed to generate download URL',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getObjectBuffer
+// ---------------------------------------------------------------------------
+describe('getObjectBuffer', () => {
+  it('returns a Buffer of the object body on success', async () => {
+    const fakeBytes = new Uint8Array([1, 2, 3, 4]);
+    (s3Client.send as Mock).mockResolvedValue({
+      Body: { transformToByteArray: vi.fn().mockResolvedValue(fakeBytes) },
+    });
+
+    const result = await s3Service.getObjectBuffer('sessions/abc/notes.pdf');
+
+    expect(result).toBeInstanceOf(Buffer);
+    expect(Array.from(result)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('throws when S3 returns no Body', async () => {
+    (s3Client.send as Mock).mockResolvedValue({ Body: undefined });
+
+    await expect(s3Service.getObjectBuffer('sessions/abc/notes.pdf')).rejects.toThrow(
+      'No body returned from S3',
+    );
+  });
+
+  it('rethrows when s3Client.send throws', async () => {
+    const s3Error = new Error('AccessDenied');
+    (s3Client.send as Mock).mockRejectedValue(s3Error);
+
+    await expect(s3Service.getObjectBuffer('sessions/abc/notes.pdf')).rejects.toThrow('AccessDenied');
   });
 });
 
