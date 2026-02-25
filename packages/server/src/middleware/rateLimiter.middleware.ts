@@ -5,7 +5,7 @@ import {
 } from '@skills-trainer/shared';
 
 import rateLimit from 'express-rate-limit';
-import type { Request } from 'express';
+import type { Request, RequestHandler } from 'express';
 
 export const createRateLimiter = (windowMs: number, max: number) => {
   return rateLimit({
@@ -23,14 +23,15 @@ export const createRateLimiter = (windowMs: number, max: number) => {
 };
 
 /** Rate limiter keyed by email from req.body and IP. Use after validate() so body is parsed. */
-export const createRateLimiterByEmail = (
+export const createRateLimiterByEmailAndIp = (
   windowMs: number,
-  max: number,
+  ipMax: number,
+  emailMax: number,
   fallbackMessage = 'Too many requests, please try again later',
-) => [
+): RequestHandler[] => [
   rateLimit({
     windowMs,
-    max,
+    max: ipMax,
     keyGenerator: (req: Request) => {
       const ip = req.ip ?? 'unknown';
       return ip;
@@ -43,7 +44,7 @@ export const createRateLimiterByEmail = (
   }),
   rateLimit({
     windowMs,
-    max,
+    max: emailMax,
     keyGenerator: (req: Request) => {
       const email = (req.body as { email?: string })?.email;
       const key = typeof email === 'string' && email.length > 0
