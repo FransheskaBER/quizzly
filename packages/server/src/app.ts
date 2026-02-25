@@ -18,6 +18,14 @@ export const createApp = () => {
   const app = express();
   const logger = pino({ name: 'server' });
 
+  // Render sits behind a load balancer that sets X-Forwarded-For. Trust the
+  // first proxy in production so express-rate-limit reads the real client IP.
+  // Not set in dev/test — no proxy present, and unconditional trust would let
+  // a client spoof X-Forwarded-For and manipulate req.ip.
+  if (env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   // requestIdMiddleware must be first so req.requestId is set before anything
   // can throw (e.g. express.json() on a malformed body), guaranteeing errorHandler
   // always has the requestId available for Sentry context and logging.
