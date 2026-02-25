@@ -207,7 +207,7 @@ All variables from `.env.example` (copy to `packages/server/.env`). Use placehol
 |-----------|---------|---------------|
 | **Unit + integration** | `npm test` (from root) or `npm test -w packages/<name>` | Integration tests require Docker Postgres (`docker-compose up -d`) |
 | **E2E** | `npm run e2e -w packages/client` | Both dev servers running (`npm run dev:e2e` or two terminals with `npm run dev`) |
-| **Eval (Task 031)** | `npm run eval:generation -w packages/server` | `ANTHROPIC_API_KEY` in `packages/server/.env` |
+| **LLM Prompt Evaluation** | `npm run eval:generation -w packages/server` | `ANTHROPIC_API_KEY` in `packages/server/.env` |
 | | `npm run eval:grading -w packages/server` | Run after eval:generation |
 | | `npm run eval:scorecard -w packages/server` | Print scorecard from eval runs |
 
@@ -240,13 +240,3 @@ Users control three inputs that are injected into LLM prompts: session subject, 
 - **Refresh tokens from the start.** A 7-day JWT expiry is an acceptable trade-off for a 30-user MVP, but a user mid-quiz shouldn't get logged out. A short-lived access token + long-lived refresh token is the right default — the complexity is low and it's painful to add later without breaking existing sessions.
 - **Google OAuth from day one.** The schema already has `google_id` and `auth_provider` stubbed for future use. Email verification reduces signup friction, but OAuth reduces it more. The schema decision was right; deferring the implementation was a trade-off I'd reconsider.
 - **Expose the token budget in the UI.** Validating upload token counts at ingest time (rather than at generation time) was the right call — it surfaces the problem early and keeps generation fast. But users who hit the 150K-token limit get an error message with no visual sense of how close they are to the ceiling. A budget meter on the materials panel would eliminate that confusion.
-
----
-
-## Verification
-
-7. **README preserved and extended:**
-   - Existing sections unchanged: "The Problem", "Exercise Types", "Tech Stack", "Architecture", "Getting Started", "Three Key Design Decisions", "What I'd Do Differently" all still present with original content
-   - New sections added: "Available Scripts", "Environment Variables", "Testing"
-   - Every script listed in "Available Scripts" actually exists in the corresponding package.json
-   - Every variable in "Environment Variables" table matches .env.example
