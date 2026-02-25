@@ -11,6 +11,7 @@ import {
 import type { GenerateQuizQuery } from '@skills-trainer/shared';
 
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './QuizPreferences.module.css';
 
 const DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
@@ -93,9 +94,9 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error }: QuizPreferenc
         {errors.count && <p className={styles.errorText}>{errors.count.message}</p>}
       </div>
 
-      <button type="submit" className={styles.generateBtn} disabled={isDisabled}>
+      <Button type="submit" variant="primary" disabled={isDisabled}>
         {isDisabled ? 'Generating…' : 'Generate Quiz'}
-      </button>
+      </Button>
     </form>
   );
 };

@@ -1,3 +1,4 @@
+import { Button } from '@/components/common/Button';
 import styles from './QuestionNav.module.css';
 
 interface QuestionNavProps {
@@ -45,24 +46,28 @@ export const QuestionNav = ({ questions, answers, currentIndex, onNavigate }: Qu
       </div>
 
       <div className={styles.prevNext}>
-        <button
+        <Button
           type="button"
-          className={styles.arrowBtn}
+          variant="secondary"
+          size="sm"
+          style={{ flex: 1 }}
           disabled={!canGoPrev}
           onClick={() => onNavigate(currentIndex - 1)}
           aria-label="Previous question"
         >
           ← Prev
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={styles.arrowBtn}
+          variant="secondary"
+          size="sm"
+          style={{ flex: 1 }}
           disabled={!canGoNext}
           onClick={() => onNavigate(currentIndex + 1)}
           aria-label="Next question"
         >
           Next →
-        </button>
+        </Button>
       </div>
     </nav>
   );

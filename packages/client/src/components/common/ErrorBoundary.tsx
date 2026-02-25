@@ -3,6 +3,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Sentry } from '@/config/sentry';
+import { Button } from '@/components/common/Button';
 import styles from './ErrorBoundary.module.css';
 
 type Level = 'root' | 'route' | 'component';
@@ -71,9 +72,9 @@ export const RootErrorBoundary = ({ children }: { children: ReactNode }) => (
       <div className={styles.rootFallback}>
         <h1 className={styles.rootTitle}>Something went wrong</h1>
         <p className={styles.rootMessage}>An unexpected error occurred.</p>
-        <button className={styles.rootReloadBtn} onClick={() => window.location.reload()}>
+        <Button variant="primary" onClick={() => window.location.reload()}>
           Reload page
-        </button>
+        </Button>
       </div>
     }
   >
@@ -109,9 +110,9 @@ export const ComponentErrorBoundary = ({ children }: { children: ReactNode }) =>
     fallback={(_error, resetError) => (
       <div className={styles.componentFallback}>
         <p className={styles.componentMessage}>Something went wrong.</p>
-        <button className={styles.componentRetryBtn} onClick={resetError}>
+        <Button variant="secondary" size="sm" onClick={resetError}>
           Retry
-        </button>
+        </Button>
       </div>
     )}
   >

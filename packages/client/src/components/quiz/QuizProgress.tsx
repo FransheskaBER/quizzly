@@ -4,6 +4,7 @@ import type { Question } from '@skills-trainer/shared';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Button } from '@/components/common/Button';
 import styles from './QuizProgress.module.css';
 
 const PREVIEW_MAX_CHARS = 80;
@@ -37,9 +38,9 @@ const QuizProgressInner = ({
     return (
       <div className={styles.errorState}>
         <p className={styles.errorMessage}>{error ?? 'Generation failed. Please try again.'}</p>
-        <button className={styles.retryBtn} onClick={onReset}>
+        <Button variant="secondary" onClick={onReset}>
           Try Again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -50,9 +51,9 @@ const QuizProgressInner = ({
         <p className={styles.completeMessage}>
           Quiz ready — {questions.length} question{questions.length !== 1 ? 's' : ''} generated.
         </p>
-        <button className={styles.startBtn} onClick={() => navigate(`/quiz/${quizAttemptId}`)}>
+        <Button variant="primary" onClick={() => navigate(`/quiz/${quizAttemptId}`)}>
           Start Quiz
-        </button>
+        </Button>
       </div>
     );
   }
@@ -108,7 +109,7 @@ export const QuizProgress = (props: QuizProgressProps) => (
     fallback={
       <div className={styles.boundaryError}>
         <p>Something went wrong displaying the quiz progress.</p>
-        <button onClick={props.onReset}>Reset</button>
+        <Button variant="secondary" size="sm" onClick={props.onReset}>Reset</Button>
       </div>
     }
   >

@@ -7,6 +7,7 @@ import { QuizStatus } from '@skills-trainer/shared';
 import { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } from '@/api/quizzes.api';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Button } from '@/components/common/Button';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuestionNav } from '@/components/quiz/QuestionNav';
@@ -170,9 +171,9 @@ const QuizTakingPage = () => {
     return (
       <div className={styles.errorPage}>
         <p className={styles.errorMsg}>{message}</p>
-        <button className={styles.backBtn} onClick={() => navigate(-1)}>
+        <Button variant="secondary" onClick={() => navigate(-1)}>
           Go back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -218,15 +219,15 @@ const QuizTakingPage = () => {
         <div className={styles.submitArea}>
           {saveError && <p className={styles.saveError}>{saveError}</p>}
 
-          <button
+          <Button
             type="button"
-            className={styles.submitBtn}
+            variant="primary"
             disabled={!allAnswered || isSubmitting}
             onClick={() => void handleSubmit()}
             title={!allAnswered ? 'Answer all questions to submit' : undefined}
           >
             {isSubmitting ? 'Submitting…' : 'Complete Quiz'}
-          </button>
+          </Button>
 
           {!allAnswered && (
             <p className={styles.hint}>

@@ -63,26 +63,3 @@
   font-size: var(--font-size-sm);
   color: var(--color-error);
 }
-
-.generateBtn {
-  align-self: flex-start;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-  min-height: 40px;
-}
-
-.generateBtn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.generateBtn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}

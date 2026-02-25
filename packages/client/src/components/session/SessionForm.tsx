@@ -4,6 +4,7 @@ import { createSessionSchema } from '@skills-trainer/shared';
 import type { CreateSessionRequest } from '@skills-trainer/shared';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import styles from './SessionForm.module.css';
 
 interface SessionFormProps {
@@ -68,16 +69,16 @@ export const SessionForm = ({
 
       <div className={styles.actions}>
         {mode === 'edit' && onCancel && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onCancel}
-            className={styles.cancelBtn}
             disabled={isLoading}
           >
             Cancel
-          </button>
+          </Button>
         )}
-        <button type="submit" className={styles.submitBtn} disabled={isLoading}>
+        <Button type="submit" variant="primary" disabled={isLoading}>
           {isLoading
             ? mode === 'create'
               ? 'Creating…'
@@ -85,7 +86,7 @@ export const SessionForm = ({
             : mode === 'create'
               ? 'Create Session'
               : 'Save Changes'}
-        </button>
+        </Button>
       </div>
     </form>
   );

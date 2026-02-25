@@ -30,7 +30,7 @@
   font-size: 0.7rem;
   font-weight: 600;
   padding: 1px 6px;
-  background: rgba(37, 99, 235, 0.08);
+  background: var(--color-primary-alpha-08);
   color: var(--color-primary);
   border-radius: var(--radius-sm);
   text-transform: uppercase;
@@ -105,21 +105,21 @@
 }
 
 .status_ready {
-  background: rgba(22, 163, 74, 0.08);
+  background: var(--color-success-alpha-08);
   color: var(--color-success);
-  border-color: rgba(22, 163, 74, 0.2);
+  border-color: var(--color-success-alpha-20);
 }
 
 .status_processing {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-warning-alpha-08);
   color: var(--color-warning);
-  border-color: rgba(217, 119, 6, 0.2);
+  border-color: var(--color-warning-alpha-20);
 }
 
 .status_failed {
-  background: rgba(220, 38, 38, 0.08);
+  background: var(--color-error-alpha-08);
   color: var(--color-error);
-  border-color: rgba(220, 38, 38, 0.2);
+  border-color: var(--color-error-alpha-20);
 }
 
 /* ---- Delete button ---- */
@@ -140,7 +140,7 @@
 }
 
 .deleteBtn:hover {
-  background: rgba(220, 38, 38, 0.08);
-  border-color: rgba(220, 38, 38, 0.2);
+  background: var(--color-error-alpha-08);
+  border-color: var(--color-error-alpha-20);
   color: var(--color-error);
 }
