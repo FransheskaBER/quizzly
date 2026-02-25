@@ -12,50 +12,10 @@ import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuestionNav } from '@/components/quiz/QuestionNav';
 import { api } from '@/store/api';
 import { useAppDispatch } from '@/store/store';
+import { submitFailureReported } from '@/store/slices/quizSubmit.slice';
 import styles from './QuizTakingPage.module.css';
 
 const AUTOSAVE_DELAY_MS = 1000;
-const QUIZ_SUBMIT_FAILURES_STORAGE_KEY = 'quiz-submit-failures';
-
-interface QuizSubmitFailureRecord {
-  quizAttemptId: string;
-  sessionId: string;
-  message: string;
-  createdAt: string;
-}
-
-const readSubmitFailureRecords = (): QuizSubmitFailureRecord[] => {
-  try {
-    const raw = localStorage.getItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is QuizSubmitFailureRecord => {
-      if (typeof item !== 'object' || item === null) return false;
-      return (
-        'quizAttemptId' in item &&
-        typeof item.quizAttemptId === 'string' &&
-        'sessionId' in item &&
-        typeof item.sessionId === 'string' &&
-        'message' in item &&
-        typeof item.message === 'string' &&
-        'createdAt' in item &&
-        typeof item.createdAt === 'string'
-      );
-    });
-  } catch {
-    return [];
-  }
-};
-
-const writeSubmitFailureRecords = (records: QuizSubmitFailureRecord[]): void => {
-  localStorage.setItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY, JSON.stringify(records));
-};
-
-const persistSubmitFailure = (record: QuizSubmitFailureRecord): void => {
-  const existing = readSubmitFailureRecords().filter((r) => r.quizAttemptId !== record.quizAttemptId);
-  writeSubmitFailureRecords([record, ...existing].slice(0, 20));
-};
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -180,14 +140,14 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus < 300;
 
       if (!isStreamStarted) {
-        // Persist the failure so SessionDashboardPage can show actionable UI
-        // after this component has already navigated away.
-        persistSubmitFailure({
+        dispatch(
+          submitFailureReported({
           quizAttemptId: id,
           sessionId: quiz.sessionId,
           message: parseApiError(err).message,
           createdAt: new Date().toISOString(),
-        });
+          }),
+        );
         dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
       }
     });

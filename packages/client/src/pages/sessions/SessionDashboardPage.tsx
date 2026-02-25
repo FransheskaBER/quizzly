@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
+import { useSubmitQuizMutation } from '@/api/quizzes.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { MaterialUploader } from '@/components/session/MaterialUploader';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -14,6 +16,13 @@ import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { formatDate, formatScore } from '@/utils/formatters';
 import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '@skills-trainer/shared';
+import { api } from '@/store/api';
+import { useAppDispatch, useAppSelector } from '@/store/store';
+import {
+  submitFailureCleared,
+  submitFailureReported,
+  selectSubmitFailuresForSession,
+} from '@/store/slices/quizSubmit.slice';
 import styles from './SessionDashboardPage.module.css';
 
 const isFetchError = (err: unknown): err is { status: number } =>
@@ -21,7 +30,6 @@ const isFetchError = (err: unknown): err is { status: number } =>
 
 const SESSION_POLL_INTERVAL_MS = 3000;
 const FEEDBACK_VIEWED_STORAGE_KEY = 'quiz-feedback-viewed-ids';
-const QUIZ_SUBMIT_FAILURES_STORAGE_KEY = 'quiz-submit-failures';
 const LOCKED_RESULTS_STATUSES: QuizStatus[] = [QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED];
 
 const readViewedFeedbackIds = (): string[] => {
@@ -39,52 +47,16 @@ const persistViewedFeedbackIds = (ids: string[]): void => {
   localStorage.setItem(FEEDBACK_VIEWED_STORAGE_KEY, JSON.stringify(ids));
 };
 
-interface QuizSubmitFailureRecord {
-  quizAttemptId: string;
-  sessionId: string;
-  message: string;
-  createdAt: string;
-}
-
-const readSubmitFailureRecords = (): QuizSubmitFailureRecord[] => {
-  try {
-    const raw = localStorage.getItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is QuizSubmitFailureRecord => {
-      if (typeof item !== 'object' || item === null) return false;
-      return (
-        'quizAttemptId' in item &&
-        typeof item.quizAttemptId === 'string' &&
-        'sessionId' in item &&
-        typeof item.sessionId === 'string' &&
-        'message' in item &&
-        typeof item.message === 'string' &&
-        'createdAt' in item &&
-        typeof item.createdAt === 'string'
-      );
-    });
-  } catch {
-    return [];
-  }
-};
-
-const writeSubmitFailureRecords = (records: QuizSubmitFailureRecord[]): void => {
-  localStorage.setItem(QUIZ_SUBMIT_FAILURES_STORAGE_KEY, JSON.stringify(records));
-};
-
 const SessionDashboardPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pollingActive, setPollingActive] = useState(true);
   const [viewedFeedbackIds, setViewedFeedbackIds] = useState<string[]>(() => readViewedFeedbackIds());
-  const [submitFailures, setSubmitFailures] = useState<QuizSubmitFailureRecord[]>(() =>
-    readSubmitFailureRecords(),
-  );
+  const [retryingQuizAttemptId, setRetryingQuizAttemptId] = useState<string | null>(null);
 
   const { data: session, isLoading, error } = useGetSessionQuery(id ?? '', {
     skip: !id,
@@ -92,6 +64,7 @@ const SessionDashboardPage = () => {
   });
   const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
+  const [submitQuiz] = useSubmitQuizMutation();
 
   const {
     generate,
@@ -113,21 +86,19 @@ const SessionDashboardPage = () => {
     setPollingActive(hasPendingGrading);
   }, [session]);
 
+  const submitFailures = useAppSelector((state) =>
+    session ? selectSubmitFailuresForSession(state, session.id) : [],
+  );
+
   useEffect(() => {
     if (!session) return;
-
-    // Keep only failures that are still relevant: same session and still in_progress.
     const currentStatusById = new Map(session.quizAttempts.map((q) => [q.id, q.status]));
-    const nextFailures = submitFailures.filter((failure) => {
-      if (failure.sessionId !== session.id) return true;
-      return currentStatusById.get(failure.quizAttemptId) === QuizStatus.IN_PROGRESS;
-    });
-
-    if (nextFailures.length !== submitFailures.length) {
-      setSubmitFailures(nextFailures);
-      writeSubmitFailureRecords(nextFailures);
+    for (const failure of submitFailures) {
+      if (currentStatusById.get(failure.quizAttemptId) !== QuizStatus.IN_PROGRESS) {
+        dispatch(submitFailureCleared(failure.quizAttemptId));
+      }
     }
-  }, [session, submitFailures]);
+  }, [session, submitFailures, dispatch]);
 
   if (isLoading) return <LoadingSpinner fullPage />;
 
@@ -159,7 +130,42 @@ const SessionDashboardPage = () => {
     persistViewedFeedbackIds(next);
   };
 
-  const sessionSubmitFailure = submitFailures.find((failure) => failure.sessionId === session.id);
+  const sessionSubmitFailure = submitFailures[0];
+
+  const handleRetrySubmission = async (quizAttemptId: string) => {
+    try {
+      setRetryingQuizAttemptId(quizAttemptId);
+      await submitQuiz({ id: quizAttemptId, answers: [] }).unwrap();
+      dispatch(submitFailureCleared(quizAttemptId));
+      dispatch(api.util.invalidateTags([{ type: 'Session', id: session.id }]));
+    } catch (err) {
+      const fbqErr = err as FetchBaseQueryError;
+      const isStreamStarted =
+        typeof err === 'object' &&
+        err !== null &&
+        'status' in err &&
+        fbqErr.status === 'PARSING_ERROR' &&
+        typeof fbqErr.originalStatus === 'number' &&
+        fbqErr.originalStatus >= 200 &&
+        fbqErr.originalStatus < 300;
+
+      if (isStreamStarted) {
+        dispatch(submitFailureCleared(quizAttemptId));
+        dispatch(api.util.invalidateTags([{ type: 'Session', id: session.id }]));
+      } else {
+        dispatch(
+          submitFailureReported({
+            quizAttemptId,
+            sessionId: session.id,
+            message: parseApiError(err).message,
+            createdAt: new Date().toISOString(),
+          }),
+        );
+      }
+    } finally {
+      setRetryingQuizAttemptId((current) => (current === quizAttemptId ? null : current));
+    }
+  };
 
   const handleUpdate = async (data: CreateSessionRequest) => {
     await updateSession({ id: session.id, data }).unwrap();
@@ -253,11 +259,18 @@ const SessionDashboardPage = () => {
           {sessionSubmitFailure && (
             <div className={styles.submitFailureNotice}>
               <p className={styles.submitFailureText}>
-                We couldn&apos;t submit your quiz. Please open it and click Complete Quiz again.
+                We couldn&apos;t submit your quiz. {sessionSubmitFailure.message}
               </p>
-              <Link to={`/quiz/${sessionSubmitFailure.quizAttemptId}`} className={styles.submitFailureLink}>
-                Retry Submission
-              </Link>
+              <button
+                type="button"
+                className={styles.submitFailureLink}
+                onClick={() => void handleRetrySubmission(sessionSubmitFailure.quizAttemptId)}
+                disabled={retryingQuizAttemptId === sessionSubmitFailure.quizAttemptId}
+              >
+                {retryingQuizAttemptId === sessionSubmitFailure.quizAttemptId
+                  ? 'Retrying…'
+                  : 'Retry Submission'}
+              </button>
             </div>
           )}
           {session.quizAttempts.length === 0 ? (
