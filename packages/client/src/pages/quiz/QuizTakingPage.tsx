@@ -122,7 +122,7 @@ const QuizTakingPage = () => {
 
     try {
       await submitQuiz({ id, answers: finalAnswers }).unwrap();
-      navigate(`/quiz/${id}/results`);
+      navigate(`/quiz/${id}/results`, { replace: true });
     } catch (err) {
       // fetchBaseQuery returns status: 'PARSING_ERROR' when it can't JSON-parse
       // the response body. For the submit endpoint this means the SSE stream
@@ -139,7 +139,7 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus < 300;
 
       if (isStreamStarted) {
-        navigate(`/quiz/${id}/results`);
+        navigate(`/quiz/${id}/results`, { replace: true });
       } else {
         setSubmitError(parseApiError(err).message);
       }
@@ -167,6 +167,14 @@ const QuizTakingPage = () => {
   }
 
   if (!quiz) return null;
+
+  // Prevent flash: if the quiz is already submitted, show a spinner while the
+  // useEffect redirect fires (runs after first paint without this guard).
+  if (
+    [QuizStatus.GRADING, QuizStatus.COMPLETED, QuizStatus.SUBMITTED_UNGRADED].includes(quiz.status)
+  ) {
+    return <LoadingSpinner fullPage />;
+  }
 
   // Merge dirty (pending) answers over cached server answers for display
   const effectiveAnswers = quiz.answers.map((a) => ({

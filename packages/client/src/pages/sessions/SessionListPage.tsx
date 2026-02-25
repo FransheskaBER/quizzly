@@ -20,18 +20,31 @@ const SessionListPage = () => {
   const cursorRef = useRef(cursor);
   cursorRef.current = cursor;
 
+  // Tracks whether the pending data change is an explicit load-more vs a
+  // fresh fetch or cache-invalidation refetch. Without this, a Session:LIST
+  // cache invalidation while the user is on page N > 1 would refetch the
+  // page-N query and append its results, duplicating sessions already shown.
+  const isLoadMoreRef = useRef(false);
+
   const { data, isLoading, isFetching, error } = useGetSessionsQuery({
     cursor,
     limit: PAGE_LIMIT,
   });
 
-  // Accumulate pages: replace on first page / cache invalidation, append on load-more.
+  // Accumulate pages: append on explicit load-more, replace otherwise.
+  // If a cache invalidation fires while we're on page N > 1, reset cursor
+  // to undefined so the list refetches from page 1.
   useEffect(() => {
     if (!data) return;
-    if (cursorRef.current === undefined) {
-      setAllSessions(data.sessions);
-    } else {
+    if (isLoadMoreRef.current) {
+      isLoadMoreRef.current = false;
       setAllSessions((prev) => [...prev, ...data.sessions]);
+    } else if (cursorRef.current !== undefined) {
+      // Cache-invalidation refetch of a non-first page — reset to page 1.
+      setCursor(undefined);
+      return;
+    } else {
+      setAllSessions(data.sessions);
     }
     setNextCursor(data.nextCursor);
   }, [data]);
@@ -83,7 +96,10 @@ const SessionListPage = () => {
             ) : (
               <button
                 className={styles.loadMoreBtn}
-                onClick={() => setCursor(nextCursor)}
+                onClick={() => {
+                  isLoadMoreRef.current = true;
+                  setCursor(nextCursor);
+                }}
                 disabled={isFetching}
               >
                 Load More
