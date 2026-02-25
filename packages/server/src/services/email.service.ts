@@ -35,7 +35,7 @@ export const sendVerificationEmail = async (to: string, token: string): Promise<
     }
     logger.info({ id: data?.id, to }, 'Verification email sent');
   } catch (err) {
-    logger.error({ err, to }, 'Failed to send verification email');
+    logger.error({ err, to, from }, 'Failed to send verification email');
     Sentry.captureException(err, { extra: { to, from } });
   }
 };
@@ -70,7 +70,7 @@ export const sendPasswordResetEmail = async (to: string, token: string): Promise
     }
     logger.info({ id: data?.id, to }, 'Password reset email sent');
   } catch (err) {
-    logger.error({ err, to }, 'Failed to send password reset email');
+    logger.error({ err, to, from }, 'Failed to send password reset email');
     Sentry.captureException(err, { extra: { to, from } });
   }
 };
