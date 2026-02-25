@@ -158,7 +158,7 @@ FRONTEND
 
 ```
 BACKEND
-├── Runtime: Node.js 20 LTS — Developer specified. Stable, good Render support.
+├── Runtime: Node.js 22 LTS — Developer specified. Stable, good Render support.
 ├── Framework: Express.js — Mature ecosystem, handles SSE natively, developer familiarity.
 ├── ORM: Prisma — Type-safe, generates TS types from schema, excellent migration tooling,
 │   works with Neon Postgres. Shared types via monorepo.

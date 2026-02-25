@@ -17,7 +17,7 @@ LeetCode trains code *writing*. Modern technical interviews increasingly test so
 | **Frontend** | React 18 + Vite + RTK Query | SPA behind auth — no SSR benefit. RTK Query handles caching and invalidation without manual fetch boilerplate. |
 | **Styling** | CSS Modules | Plain scoped CSS. No translation layer between design tools and code. |
 | **Forms** | React Hook Form + Zod | Zod resolvers use the same schemas the server validates against. |
-| **Backend** | Node.js 20 + Express | SSE is native. No framework overhead needed for 24 endpoints. |
+| **Backend** | Node.js 22 + Express | SSE is native. No framework overhead needed for 24 endpoints. |
 | **ORM** | Prisma + PostgreSQL 17 | Type-safe queries derived from schema. Strong migration tooling. Neon for serverless prod, Docker for local. |
 | **LLM** | Claude Sonnet 4 via `@anthropic-ai/sdk` | Best quality/speed/cost balance for structured JSON output. Opus is too slow; Haiku lacks multi-step reasoning. |
 | **File Storage** | AWS S3 + presigned URLs | Files go browser → S3 directly. The server never touches file bytes. |
@@ -97,7 +97,7 @@ packages/
 
 ## Getting Started
 
-**Prerequisites:** Node.js 20, Docker
+**Prerequisites:** Node.js 22, Docker
 
 ```bash
 git clone https://github.com/your-username/quizzly.git
