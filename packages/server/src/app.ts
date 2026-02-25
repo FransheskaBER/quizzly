@@ -18,6 +18,11 @@ export const createApp = () => {
   const app = express();
   const logger = pino({ name: 'server' });
 
+  // Render (and most cloud platforms) sit behind a load balancer that sets
+  // X-Forwarded-For. Trust the first proxy so express-rate-limit can read
+  // the real client IP correctly.
+  app.set('trust proxy', 1);
+
   // requestIdMiddleware must be first so req.requestId is set before anything
   // can throw (e.g. express.json() on a malformed body), guaranteeing errorHandler
   // always has the requestId available for Sentry context and logging.
