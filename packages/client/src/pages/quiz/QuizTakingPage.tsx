@@ -153,9 +153,9 @@ const QuizTakingPage = () => {
       }
     });
 
-    // Force a session refresh so the just-submitted attempt shows grading status.
-    dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
-    navigate(`/sessions/${quiz.sessionId}`, { replace: true });
+    // Force session and quiz cache refresh so session list and results page see correct status.
+    dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }, { type: 'Quiz', id }]));
+    navigate(`/sessions/${quiz.sessionId}`, { replace: true, state: { justSubmittedQuizId: id } });
   };
 
   // ---------------------------------------------------------------------------
@@ -235,6 +235,14 @@ const QuizTakingPage = () => {
             </p>
           )}
 
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isSubmitting}
+            onClick={() => navigate(`/sessions/${quiz.sessionId}`)}
+          >
+            Save &amp; Quit
+          </Button>
         </div>
       </aside>
 

@@ -221,12 +221,15 @@ export const executeGeneration = async (
 
     // Update quiz_attempt to in_progress. Always do this even if timed out —
     // questions are saved and the user can still take the quiz.
+    // startedAt is set null here and stamped only when the user first opens the
+    // quiz on the taking page, so the session list can distinguish
+    // "generated but not started" from "started (can continue)".
     await prisma.quizAttempt.update({
       where: { id: quizAttempt.id },
       data: {
         status: QuizStatus.IN_PROGRESS,
         questionCount: questionsGenerated,
-        startedAt: new Date(),
+        startedAt: null,
       },
     });
 
@@ -274,6 +277,14 @@ export const getQuiz = async (
 
   if (!attempt) throw new NotFoundError('Quiz attempt not found');
   assertOwnership(attempt.userId, userId);
+
+  // Stamp startedAt the first time the user opens this quiz for taking.
+  // Fire-and-forget — don't delay the response for a best-effort timestamp.
+  if (attempt.status === QuizStatus.IN_PROGRESS && attempt.startedAt === null) {
+    prisma.quizAttempt
+      .update({ where: { id: quizAttemptId }, data: { startedAt: new Date() } })
+      .catch((err: unknown) => logger.error({ err, quizAttemptId }, 'Failed to set startedAt'));
+  }
 
   return {
     id: attempt.id,

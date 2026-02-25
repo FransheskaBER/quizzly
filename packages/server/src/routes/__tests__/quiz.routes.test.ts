@@ -209,7 +209,8 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
     });
     expect(attempt?.status).toBe(QuizStatus.IN_PROGRESS);
     expect(attempt?.questionCount).toBe(1);
-    expect(attempt?.startedAt).not.toBeNull();
+    // startedAt is null after generation; it is set when the user first opens the quiz.
+    expect(attempt?.startedAt).toBeNull();
   });
 
   it('DB — one question and one answer record exist after successful generation', async () => {
