@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
@@ -32,6 +32,12 @@ const isFetchError = (err: unknown): err is { status: number } =>
 const SESSION_POLL_INTERVAL_MS = 3000;
 const FEEDBACK_VIEWED_STORAGE_KEY = 'quiz-feedback-viewed-ids';
 const POLLING_STATUSES: QuizStatus[] = [QuizStatus.GRADING];
+/** Show in list: submitted (grading/done) and in-progress (started, can continue). Hide only generating. */
+const SUBMITTED_STATUSES: QuizStatus[] = [
+  QuizStatus.GRADING,
+  QuizStatus.SUBMITTED_UNGRADED,
+  QuizStatus.COMPLETED,
+];
 
 const readViewedFeedbackIds = (): string[] => {
   try {
@@ -51,7 +57,9 @@ const persistViewedFeedbackIds = (ids: string[]): void => {
 const SessionDashboardPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
+  const justSubmittedQuizId = (location.state as { justSubmittedQuizId?: string } | null)?.justSubmittedQuizId ?? null;
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -81,9 +89,12 @@ const SessionDashboardPage = () => {
 
   useEffect(() => {
     if (!session) return;
-    const hasPendingGrading = session.quizAttempts.some((q) => POLLING_STATUSES.includes(q.status));
+    const hasPendingGrading =
+      session.quizAttempts.some((q) => POLLING_STATUSES.includes(q.status)) ||
+      (justSubmittedQuizId !== null &&
+        session.quizAttempts.some((q) => q.id === justSubmittedQuizId && q.status === QuizStatus.IN_PROGRESS));
     setPollingActive(hasPendingGrading);
-  }, [session]);
+  }, [session, justSubmittedQuizId]);
 
   const submitFailures = useAppSelector((state) =>
     session ? selectSubmitFailuresForSession(state, session.id) : [],
@@ -98,6 +109,20 @@ const SessionDashboardPage = () => {
       }
     }
   }, [session, submitFailures, dispatch]);
+
+  // Show only attempts that are either:
+  //  (a) submitted (grading / submitted_ungraded / completed), or
+  //  (b) in_progress AND the user has already opened the quiz (startedAt set), or
+  //  (c) the just-submitted quiz while the backend still shows in_progress.
+  const attemptsToShow = session
+    ? session.quizAttempts.filter(
+        (q: QuizAttemptSummary) =>
+          SUBMITTED_STATUSES.includes(q.status) ||
+          (q.status === QuizStatus.IN_PROGRESS &&
+            (q.startedAt != null || q.id === justSubmittedQuizId)),
+      )
+    : [];
+
 
   if (isLoading) return <LoadingSpinner fullPage />;
 
@@ -253,7 +278,7 @@ const SessionDashboardPage = () => {
         {/* Quiz attempts */}
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>
-            Quiz Attempts <span className={styles.count}>({session.quizAttempts.length})</span>
+            Quiz Attempts <span className={styles.count}>({attemptsToShow.length})</span>
           </h2>
           {sessionSubmitFailure && (
             <div className={styles.submitFailureNotice}>
@@ -272,17 +297,23 @@ const SessionDashboardPage = () => {
               </button>
             </div>
           )}
-          {session.quizAttempts.length === 0 ? (
+          {attemptsToShow.length === 0 ? (
             <p className={styles.emptyText}>No quizzes yet. Generate a quiz to get started.</p>
           ) : (
             <div className={styles.quizList}>
-              {session.quizAttempts.map((q: QuizAttemptSummary) => {
-                const isGrading = q.status === QuizStatus.GRADING;
+              {attemptsToShow.map((q: QuizAttemptSummary) => {
+                const isGrading =
+                  q.status === QuizStatus.GRADING ||
+                  (q.status === QuizStatus.IN_PROGRESS && q.id === justSubmittedQuizId);
                 const isSubmittedUngraded = q.status === QuizStatus.SUBMITTED_UNGRADED;
                 const showViewFeedbackPrompt =
                   q.status === QuizStatus.COMPLETED && !viewedFeedbackIds.includes(q.id);
 
                 if (isGrading) {
+                  // When the backend still says in_progress but we know it was just submitted,
+                  // display "grading" as the badge label so the UI matches what's happening.
+                  const gradingBadgeStatus =
+                    q.status === QuizStatus.IN_PROGRESS ? QuizStatus.GRADING : q.status;
                   return (
                     <div key={q.id} className={`${styles.quizRow} ${styles.quizRowDisabled}`}>
                       <div className={styles.quizInfo}>
@@ -298,8 +329,8 @@ const SessionDashboardPage = () => {
                         </span>
                       </div>
                       <div className={styles.quizRight}>
-                        <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
-                          {q.status.replace('_', ' ')}
+                        <span className={`${styles.statusBadge} ${styles[`status_${gradingBadgeStatus}`]}`}>
+                          {gradingBadgeStatus.replace('_', ' ')}
                         </span>
                         <span className={styles.quizDate}>{formatDate(q.createdAt)}</span>
                       </div>
@@ -335,6 +366,8 @@ const SessionDashboardPage = () => {
                   );
                 }
 
+                const isInProgressContinue =
+                  q.status === QuizStatus.IN_PROGRESS && q.id !== justSubmittedQuizId;
                 return (
                   <Link
                     key={q.id}
@@ -356,6 +389,9 @@ const SessionDashboardPage = () => {
                       </span>
                     </div>
                     <div className={styles.quizRight}>
+                      {isInProgressContinue && (
+                        <span className={styles.feedbackCta}>Continue</span>
+                      )}
                       {showViewFeedbackPrompt && (
                         <span className={styles.feedbackCta}>View Feedback</span>
                       )}

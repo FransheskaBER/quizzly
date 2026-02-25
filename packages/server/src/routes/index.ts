@@ -6,11 +6,15 @@ import { dashboardRouter } from './dashboard.routes.js';
 import { materialRouter } from './material.routes.js';
 import { quizRouter, quizTakingRouter } from './quiz.routes.js';
 import { testRouter } from './test.routes.js';
+import { devRouter } from './dev.routes.js';
 
 const router = Router();
 
 if (process.env.NODE_ENV === 'test') {
   router.use('/test', testRouter);
+}
+if (process.env.NODE_ENV === 'development') {
+  router.use('/dev', devRouter);
 }
 router.use(healthRouter);
 router.use('/auth', authRouter);
