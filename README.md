@@ -18,7 +18,7 @@ LeetCode trains code *writing*. Modern technical interviews increasingly test so
 | **Styling** | CSS Modules | Plain scoped CSS. No translation layer between design tools and code. |
 | **Forms** | React Hook Form + Zod | Zod resolvers use the same schemas the server validates against. |
 | **Backend** | Node.js 20 + Express | SSE is native. No framework overhead needed for 24 endpoints. |
-| **ORM** | Prisma + PostgreSQL 16 | Type-safe queries derived from schema. Strong migration tooling. Neon for serverless prod, Docker for local. |
+| **ORM** | Prisma + PostgreSQL 17 | Type-safe queries derived from schema. Strong migration tooling. Neon for serverless prod, Docker for local. |
 | **LLM** | Claude Sonnet 4 via `@anthropic-ai/sdk` | Best quality/speed/cost balance for structured JSON output. Opus is too slow; Haiku lacks multi-step reasoning. |
 | **File Storage** | AWS S3 + presigned URLs | Files go browser → S3 directly. The server never touches file bytes. |
 | **Auth** | Self-managed JWT + bcryptjs | Auth0/Clerk is overkill for an email/password MVP. ~12 lines of code vs. a vendor dependency and SDK surface area. |
