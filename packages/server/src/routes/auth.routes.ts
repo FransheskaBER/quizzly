@@ -3,7 +3,10 @@ import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { auth } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
-import { createRateLimiter } from '../middleware/rateLimiter.middleware.js';
+import {
+  createRateLimiter,
+  createRateLimiterByEmail,
+} from '../middleware/rateLimiter.middleware.js';
 import * as authService from '../services/auth.service.js';
 import {
   signupSchema,
@@ -22,8 +25,8 @@ const signupLimiter = createRateLimiter(
   process.env.NODE_ENV === 'test' ? 100 : 5,
 ); // 5/IP/hr prod; 100 in test for E2E
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 10);     // 10/IP/15min
-const resendLimiter = createRateLimiter(60 * 60 * 1000, 3);     // 3/IP/hr
-const forgotLimiter = createRateLimiter(60 * 60 * 1000, 3);     // 3/IP/hr
+const resendLimiter = createRateLimiterByEmail(60 * 60 * 1000, 3);   // 3/email/hr
+const forgotLimiter = createRateLimiterByEmail(60 * 60 * 1000, 3);   // 3/email/hr
 
 router.post(
   '/signup',
@@ -56,8 +59,8 @@ router.post(
 
 router.post(
   '/resend-verification',
-  resendLimiter,
   validate({ body: resendVerificationSchema }),
+  resendLimiter,
   asyncHandler(async (req, res) => {
     const result = await authService.resendVerification(req.body);
     res.status(200).json(result);
@@ -66,8 +69,8 @@ router.post(
 
 router.post(
   '/forgot-password',
-  forgotLimiter,
   validate({ body: forgotPasswordSchema }),
+  forgotLimiter,
   asyncHandler(async (req, res) => {
     const result = await authService.forgotPassword(req.body);
     res.status(200).json(result);

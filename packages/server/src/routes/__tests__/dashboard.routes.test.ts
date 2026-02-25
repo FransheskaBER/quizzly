@@ -7,6 +7,7 @@ import { createTestUser, getAuthToken } from '../../__tests__/helpers/auth.helpe
 
 vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   createRateLimiter: () => (_req: never, _res: never, next: () => void) => next(),
+  createRateLimiterByEmail: () => (_req: never, _res: never, next: () => void) => next(),
   globalRateLimiter: (_req: never, _res: never, next: () => void) => next(),
   quizGenerationHourlyLimiter: (_req: never, _res: never, next: () => void) => next(),
   quizGenerationDailyLimiter: (_req: never, _res: never, next: () => void) => next(),

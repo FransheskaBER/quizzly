@@ -151,5 +151,8 @@ packages/client/test-results/
 packages/server/scripts/output/
 packages/server/scripts/EVAL-DOCS.md
 
-# Task 032 — Launch: personal checklist (until finalized)
-docs/LAUNCH-CHECKLIST*.md
+# Task 032 — Launch: personal draft checklists in local only
+docs/local/LAUNCH-CHECKLIST*.md
+
+# Local docs: test rerun, personal notes (not committed)
+docs/local/
