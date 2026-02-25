@@ -62,7 +62,42 @@ export const getObjectBuffer = async (key: string): Promise<Buffer> => {
     throw new Error(`No body returned from S3 for key: ${key}`);
   }
 
+  // To prevent OOM from oversized files, stream the body and limit the size.
+  // Using MAX_FILE_SIZE_BYTES from shared constants (or a hardcoded limit).
+  // We'll use 20 * 1024 * 1024 (20MB) as our absolute max limit here to match MAX_FILE_SIZE_BYTES.
+  const MAX_SIZE = 20 * 1024 * 1024;
+  
+  // Create a custom stream consumer that enforces the limit
+  const chunks: Buffer[] = [];
+  let totalLength = 0;
+  
+  // Node.js readable stream
+  if (typeof (response.Body as any).on === 'function') {
+    return new Promise((resolve, reject) => {
+      const stream = response.Body as import('stream').Readable;
+      
+      stream.on('data', (chunk: Buffer) => {
+        totalLength += chunk.length;
+        if (totalLength > MAX_SIZE) {
+          stream.destroy(new Error(`File size exceeds maximum allowed size of ${MAX_SIZE} bytes`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      
+      stream.on('error', reject);
+      
+      stream.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+    });
+  }
+  
+  // Fallback for non-stream bodies (e.g. if transformToByteArray is the only option)
   const bytes = await response.Body.transformToByteArray();
+  if (bytes.length > MAX_SIZE) {
+    throw new Error(`File size exceeds maximum allowed size of ${MAX_SIZE} bytes`);
+  }
   return Buffer.from(bytes);
 };
 

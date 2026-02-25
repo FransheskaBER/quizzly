@@ -22,27 +22,42 @@ export const createRateLimiter = (windowMs: number, max: number) => {
   });
 };
 
-/** Rate limiter keyed by email from req.body. Use after validate() so body is parsed. */
+/** Rate limiter keyed by email from req.body and IP. Use after validate() so body is parsed. */
 export const createRateLimiterByEmail = (
   windowMs: number,
   max: number,
   fallbackMessage = 'Too many requests, please try again later',
-) =>
+) => [
   rateLimit({
     windowMs,
     max,
     keyGenerator: (req: Request) => {
-      const email = (req.body as { email?: string })?.email;
-      return typeof email === 'string' && email.length > 0
-        ? `email:${email.toLowerCase()}`
-        : (req.ip ?? 'unknown');
+      const ip = req.ip ?? 'unknown';
+      return ip;
     },
     standardHeaders: true,
     legacyHeaders: false,
     message: {
       error: { code: 'RATE_LIMITED', message: fallbackMessage },
     },
-  });
+  }),
+  rateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req: Request) => {
+      const email = (req.body as { email?: string })?.email;
+      const key = typeof email === 'string' && email.length > 0
+        ? `email:${email.toLowerCase()}`
+        : 'unknown';
+      return key;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: { code: 'RATE_LIMITED', message: fallbackMessage },
+    },
+  })
+];
 
 export const globalRateLimiter = createRateLimiter(60 * 1000, 100);
 

@@ -46,3 +46,7 @@
   display: flex;
   gap: var(--spacing-sm);
 }
+
+.prevNextBtn {
+  flex: 1;
+}

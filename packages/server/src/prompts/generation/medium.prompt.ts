@@ -53,16 +53,7 @@
  *
  * MANUAL TESTING (Anthropic Console):
  * Paste the output of buildGenerationSystemPrompt() into the System Prompt field.
- * In the User message, paste:
- *
- *   <subject>JavaScript Array Methods</subject>
- *   <goal>Understand when to use map vs forEach vs filter for interviews</goal>
- *   <difficulty>medium</difficulty>
- *   <answer_format>mixed</answer_format>
- *   <question_count>4</question_count>
- *   <materials_provided>false</materials_provided>
- *   <materials>No materials provided.</materials>
- *   Generate 4 medium difficulty quiz question(s) in mixed format based on the subject and goal above.
+ * In the User message, paste: "Please generate the exercises based on the provided system instructions and inputs."
  *
  * Verify: questions require active reasoning about trade-offs or subtle
  * correctness, not just recall or obvious identification. At least one
@@ -76,12 +67,14 @@
 
 export const getMediumDifficultyPrompt = (): string =>
   `MEDIUM difficulty calibration:
-- Primary exercise types: COMPARE APPROACHES and CHOOSE THE RIGHT TOOL. SPOT THE BUG is also valid at medium but must use subtle bugs (see below). EVALUATE AI OUTPUT is valid when the code has a non-obvious flaw requiring understanding, not just recognition.
-- COMPARE APPROACHES: both implementations must look plausible. The correct choice depends on a concrete constraint (time complexity, memory, mutability, use-case context). The student must justify their choice with explicit reasoning — "this is O(n log n) while this is O(n²) for the given input size."
-- CHOOSE THE RIGHT TOOL: present a realistic scenario with a specific constraint. The correct algorithm or data structure is not immediately obvious — the student must reason about the problem's shape (e.g. frequency counting, ordering requirements, lookup speed).
-- SPOT THE BUG at medium: bugs must be subtle — a logical error that looks correct at first glance, an off-by-one that only surfaces under specific conditions, or an edge case the implementation misses. Not a wrong method name or typo.
-- Scenarios may connect 2 related concepts or apply a concept to a context not explicitly covered in the materials — but never 3+ concepts or deep expertise.
-- MCQ distractors: represent mistakes that experienced beginners actually make — wrong but require genuine understanding to distinguish from the correct answer. Not obviously wrong at a glance.
-- Free-text answers: expect explanation and analysis (3–5 sentences). A correct answer demonstrates reasoning about trade-offs, not just recall of what was written.
-- Success signal: cannot be answered by keyword-scanning the material — requires reading carefully and reasoning about the specific scenario.
-- Do NOT make exercises that are simply definitions with longer phrasing (that's easy). Do NOT require 3+ concept synthesis or architectural expertise (that's hard).`.trim();
+- Exercise Type Restrictions: For MEDIUM, prioritize COMPARE APPROACHES, CHOOSE THE RIGHT TOOL, PROMPT CONSTRUCTION, and PREDICT THE FAILURE. SPOT THE BUG is valid but must use subtle bugs. EVALUATE AI OUTPUT is valid when the code has a non-obvious flaw requiring understanding.
+- General Requirement: Must require active reasoning and analysis, not just keyword recall or pattern matching.
+- For COMPARE APPROACHES: Verify both options look plausible and the choice depends on concrete constraints (time/space complexity, mutability, specific use-case requirements).
+- For CHOOSE THE RIGHT TOOL: Verify the scenario has specific constraints that make the correct choice non-obvious.
+- For SPOT THE BUG: Verify the bug is subtle (logical error, edge case, off-by-one under specific conditions) — not a typo or obviously wrong method name.
+- For PROMPT CONSTRUCTION: Verify it requires specifying error handling, input validation, return types, and at least one non-obvious constraint.
+- For PREDICT THE FAILURE: Verify the code looks correct on casual inspection and the bug stems from common patterns (wrong defaults, async issues, missing null checks, boundary conditions, loose test assertions).
+- Multiple Choice Questions (if applicable): Distractors must represent genuine mistakes experienced beginners make. They must require genuine understanding to distinguish from the correct answer (plausibly wrong rather than obviously wrong).
+- Free-text answers: Require 3-5 sentences of explanation/reasoning.
+- Complexity limits: Do NOT require 3+ concept synthesis or deep architectural expertise. Cannot be answered by simply scanning for keywords.
+- Analysis Checks: In your <analysis> block, ensure you explicitly consider whether the exercise requires genuine understanding vs. keyword-scanning, and confirm the MCQ distractors are plausibly wrong.`.trim();

@@ -357,7 +357,7 @@ describe('gradeAnswers', () => {
 // --- generateQuiz — prompt assembly ---
 
 describe('generateQuiz — prompt assembly', () => {
-  it('includes subject and goal in the assembled user message', async () => {
+  it('includes subject and goal in the assembled system message', async () => {
     vi.mocked(anthropic.messages.stream).mockReturnValue(
       mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
     );
@@ -365,12 +365,12 @@ describe('generateQuiz — prompt assembly', () => {
     await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
 
     const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userContent = (call.messages[0] as { content: string }).content;
-    expect(userContent).toContain('React Hooks');
-    expect(userContent).toContain('Understand the useState API');
+    const systemContent = call.system as string;
+    expect(systemContent).toContain('React Hooks');
+    expect(systemContent).toContain('Understand the useState API');
   });
 
-  it('includes difficulty, format, and count in the assembled user message', async () => {
+  it('includes difficulty, format, and count in the assembled system message', async () => {
     vi.mocked(anthropic.messages.stream).mockReturnValue(
       mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
     );
@@ -378,13 +378,13 @@ describe('generateQuiz — prompt assembly', () => {
     await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
 
     const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userContent = (call.messages[0] as { content: string }).content;
-    expect(userContent).toContain(QuizDifficulty.EASY);
-    expect(userContent).toContain(AnswerFormat.MCQ);
-    expect(userContent).toContain('1');
+    const systemContent = call.system as string;
+    expect(systemContent).toContain(QuizDifficulty.EASY);
+    expect(systemContent).toContain(AnswerFormat.MCQ);
+    expect(systemContent).toContain('1');
   });
 
-  it('includes materials text in the user message when materialsText is provided', async () => {
+  it('includes materials text in the system message when materialsText is provided', async () => {
     vi.mocked(anthropic.messages.stream).mockReturnValue(
       mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
     );
@@ -395,9 +395,8 @@ describe('generateQuiz — prompt assembly', () => {
     );
 
     const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userContent = (call.messages[0] as { content: string }).content;
-    expect(userContent).toContain('Hooks let you use state in functional components.');
-    expect(userContent).toContain('<materials_provided>true</materials_provided>');
+    const systemContent = call.system as string;
+    expect(systemContent).toContain('Hooks let you use state in functional components.');
   });
 
   it('uses "No materials provided." placeholder when materialsText is null', async () => {
@@ -408,9 +407,8 @@ describe('generateQuiz — prompt assembly', () => {
     await generateQuiz({ ...DEFAULT_GENERATE_PARAMS, materialsText: null }, vi.fn());
 
     const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userContent = (call.messages[0] as { content: string }).content;
-    expect(userContent).toContain('No materials provided.');
-    expect(userContent).toContain('<materials_provided>false</materials_provided>');
+    const systemContent = call.system as string;
+    expect(systemContent).toContain('No materials provided.');
   });
 
   it('wraps user-supplied content in XML delimiter tags', async () => {
@@ -421,12 +419,41 @@ describe('generateQuiz — prompt assembly', () => {
     await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
 
     const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userContent = (call.messages[0] as { content: string }).content;
-    expect(userContent).toContain('<subject>');
-    expect(userContent).toContain('</subject>');
-    expect(userContent).toContain('<goal>');
-    expect(userContent).toContain('</goal>');
-    expect(userContent).toContain('<materials>');
-    expect(userContent).toContain('</materials>');
+    const systemContent = call.system as string;
+    expect(systemContent).toContain('<subject>');
+    expect(systemContent).toContain('</subject>');
+    expect(systemContent).toContain('<goal>');
+    expect(systemContent).toContain('</goal>');
+    expect(systemContent).toContain('<study_materials>');
+    expect(systemContent).toContain('</study_materials>');
+  });
+});
+
+// --- gradeAnswers — prompt assembly ---
+
+describe('gradeAnswers — prompt assembly', () => {
+  it('includes subject and answers in the assembled system message', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GRADING_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const systemContent = call.system as string;
+    expect(systemContent).toContain('React Hooks');
+    expect(systemContent).toContain(DEFAULT_GRADE_PARAMS.answers[0].userAnswer);
+  });
+
+  it('uses a static trigger for the user message', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GRADING_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const userMessageContent = (call.messages[0] as { content: string }).content;
+    expect(userMessageContent).toBe('Please grade the exercises based on the provided system instructions and inputs.');
   });
 });

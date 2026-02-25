@@ -57,19 +57,8 @@
  *
  * MANUAL TESTING (Anthropic Console):
  * Paste the output of buildGenerationSystemPrompt() into the System Prompt field.
- * In the User message, paste:
- *
- *   <subject>TypeScript Generics</subject>
- *   <goal>Understand how to use generics in function signatures</goal>
- *   <difficulty>easy</difficulty>
- *   <answer_format>mixed</answer_format>
- *   <question_count>4</question_count>
- *   <materials_provided>false</materials_provided>
- *   <materials>No materials provided.</materials>
- *   Generate 4 easy difficulty quiz question(s) in mixed format based on the subject and goal above.
- *
- * Verify: every question is SPOT THE BUG or EVALUATE AI OUTPUT — not
- * "What is a generic?", not "What syntax do you use to define a generic?"
+ * In the User message, paste: "Please generate the exercises based on the provided system instructions and inputs."
+ * Verify: every question is SPOT THE BUG, EVALUATE AI OUTPUT, or PROMPT CONSTRUCTION.
  * Each bug or flaw should be visible from a single read of the code.
  * MCQ distractors represent plausible misreads, not absurd alternatives.
  *
@@ -78,13 +67,31 @@
 
 export const getEasyDifficultyPrompt = (): string =>
   `EASY difficulty calibration:
-- Primary exercise types: SPOT THE BUG and EVALUATE AI OUTPUT. These are the ONLY types to use at easy difficulty unless the goal explicitly calls for something else.
-- Scenarios are contained and single-concept: one function, one algorithm operation, one data structure method. No multi-step reasoning or cross-concept synthesis.
-- SPOT THE BUG: bugs must be identifiable to someone who has studied the subject for 30 minutes. Target: off-by-one errors, wrong method called, incorrect return value, missing null/undefined check, simple logic inversion. Do NOT use subtle bugs that require deep expertise.
-- EVALUATE AI OUTPUT: present a short function or snippet described as AI-generated. It should contain one clear, identifiable flaw — a correctness issue, an unhandled edge case, or a method used incorrectly. Not multiple issues.
-- MCQ distractors: plausible to a complete beginner, clearly wrong to someone who has studied the material. Represent real first-time mistakes, not obviously absurd alternatives. Avoid trick questions.
-- Free-text answers: 1–3 sentences. Identify the specific issue and state what the correct behaviour should be.
-- Do NOT combine multiple concepts in a single exercise.
-- Do NOT require knowledge beyond what is explicitly stated in the materials (if provided).
-- Do NOT generate recall questions ("What does X do?"), definition questions ("Define Y"), or syntax questions ("What is the syntax for Z?") — these are FORBIDDEN at every difficulty level.
-- Target: a student who has studied the material for 30 minutes should correctly identify the issue 80%+ of the time.`.trim();
+- Exercise Type Restrictions: Use ONLY the exercise types specified. For EASY, prioritize SPOT THE BUG, EVALUATE AI OUTPUT, and PROMPT CONSTRUCTION.
+- Scope and Complexity:
+  - Single concept only — one function, one algorithm operation, one data structure method.
+  - No multi-step reasoning or cross-concept synthesis.
+  - Contained scenario that can be understood in 30 seconds.
+  - If learning materials are provided, use ONLY knowledge explicitly stated in them.
+- Bug/Flaw Difficulty (for SPOT THE BUG and EVALUATE AI OUTPUT):
+  - Identifiable to someone who studied the subject for 30 minutes.
+  - Appropriate bugs: off-by-one errors, wrong method called, incorrect return value, missing null/undefined check, simple logic inversion (e.g., < instead of >).
+  - AVOID: subtle bugs requiring deep expertise, race conditions, complex edge cases, performance issues, style issues.
+- For SPOT THE BUG exercises:
+  - Snippet must be short (5-15 lines maximum).
+  - Include exactly ONE bug.
+  - Expected answer length: 1-3 sentences explaining the fix.
+- For EVALUATE AI OUTPUT exercises:
+  - Snippet must be short (5-15 lines maximum).
+  - Include exactly ONE clear flaw: correctness issue, unhandled edge case, or method used incorrectly.
+  - Expected answer length: 1-3 sentences stating correct behavior.
+- For PROMPT CONSTRUCTION exercises:
+  - Present a simple, single-function requirement.
+  - MCQ format: Provide 4 prompt options where one includes critical constraints and others miss at least one key detail.
+  - Free-text format: Ask student to identify 2-3 specific constraints the AI would likely miss (2-4 sentences).
+  - Critical constraints: handle empty input, define ambiguous terms precisely, specify return type on edge cases, clarify expected data format.
+- Multiple Choice Questions (if applicable):
+  - Distractors must be plausible to a complete beginner and represent real first-time mistakes.
+  - Avoid obviously absurd alternatives or trick questions.
+  - Each distractor should have a clear reason why it's wrong in the explanation.
+- Target Success Rate: A student who studied the material for 30 minutes should correctly identify the issue 80%+ of the time.`.trim();

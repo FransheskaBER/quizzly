@@ -50,7 +50,7 @@ export const QuestionNav = ({ questions, answers, currentIndex, onNavigate }: Qu
           type="button"
           variant="secondary"
           size="sm"
-          style={{ flex: 1 }}
+          className={styles.prevNextBtn}
           disabled={!canGoPrev}
           onClick={() => onNavigate(currentIndex - 1)}
           aria-label="Previous question"
@@ -61,7 +61,7 @@ export const QuestionNav = ({ questions, answers, currentIndex, onNavigate }: Qu
           type="button"
           variant="secondary"
           size="sm"
-          style={{ flex: 1 }}
+          className={styles.prevNextBtn}
           disabled={!canGoNext}
           onClick={() => onNavigate(currentIndex + 1)}
           aria-label="Next question"
