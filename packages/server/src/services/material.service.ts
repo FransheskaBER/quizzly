@@ -140,7 +140,7 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
 
 const extractDocxText = async (buffer: Buffer, materialId?: string): Promise<string> => {
   const result = await mammoth.extractRawText({ buffer });
-  if (result.messages.length > 0) {
+  if (result.messages?.length > 0) {
     logger.warn({ messages: result.messages, materialId }, 'mammoth DOCX conversion warnings');
   }
   return result.value;
