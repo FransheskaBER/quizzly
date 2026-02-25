@@ -13,7 +13,7 @@ import { useQuizGeneration } from '@/hooks/useQuizGeneration';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { formatDate, formatScore } from '@/utils/formatters';
-import type { CreateSessionRequest, QuizAttemptSummary } from '@skills-trainer/shared';
+import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '@skills-trainer/shared';
 import styles from './SessionDashboardPage.module.css';
 
 const isFetchError = (err: unknown): err is { status: number } =>
@@ -161,7 +161,7 @@ const SessionDashboardPage = () => {
               {session.quizAttempts.map((q: QuizAttemptSummary) => (
                 <Link
                   key={q.id}
-                  to={q.status === 'completed' ? `/quiz/${q.id}/results` : `/quiz/${q.id}`}
+                  to={[QuizStatus.GRADING, QuizStatus.SUBMITTED_UNGRADED, QuizStatus.COMPLETED].includes(q.status) ? `/quiz/${q.id}/results` : `/quiz/${q.id}`}
                   className={styles.quizRow}
                 >
                   <div className={styles.quizInfo}>

@@ -23,7 +23,9 @@ const HomeDashboardPage = () => {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        <h1 className={styles.greeting}>Welcome back, {data?.username}</h1>
+        <h1 className={styles.greeting}>
+          {data?.totalSessions === 0 ? 'Welcome' : 'Welcome back'}, {data?.username}
+        </h1>
 
         <div className={styles.stats}>
           <div className={styles.statCard}>
