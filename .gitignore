@@ -146,8 +146,10 @@ packages/client/e2e/TESTING-DOCS.md
 packages/client/playwright-report/
 packages/client/test-results/
 
-# Task 031 — Prompt iteration: evaluation output
+# Task 031 — Prompt iteration: eval scripts output + local docs
+# output/: generation-results.json, scorecard.json, grading-results.json, prompt-changelog.md
 packages/server/scripts/output/
+packages/server/scripts/EVAL-DOCS.md
 
 # Task 032 — Launch: personal checklist (until finalized)
 docs/LAUNCH-CHECKLIST*.md
