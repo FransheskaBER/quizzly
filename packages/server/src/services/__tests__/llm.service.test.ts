@@ -16,6 +16,10 @@ vi.mock('../../utils/sanitize.utils.js', () => ({
 }));
 
 import anthropic from '../../config/anthropic.js';
+import {
+  LLM_GENERATION_TEMPERATURE,
+  LLM_GRADING_TEMPERATURE,
+} from '../../prompts/constants.js';
 import { extractBlock, generateQuiz, gradeAnswers } from '../llm.service.js';
 import { BadRequestError } from '../../utils/errors.js';
 import { QuizDifficulty, AnswerFormat, QuestionType } from '@skills-trainer/shared';
@@ -179,6 +183,17 @@ describe('generateQuiz', () => {
     // Exfiltration detected on first call — no retry
     expect(anthropic.messages.stream).toHaveBeenCalledTimes(1);
   });
+
+  it('passes generation temperature to the API', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    expect(call).toMatchObject({ temperature: LLM_GENERATION_TEMPERATURE });
+  });
 });
 
 // --- gradeAnswers ---
@@ -316,6 +331,16 @@ describe('gradeAnswers', () => {
     expect(result.score).toBe(1);
   });
 
+  it('passes grading temperature to the API', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GRADING_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn());
+
+    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    expect(call).toMatchObject({ temperature: LLM_GRADING_TEMPERATURE });
+  });
 });
 
 // --- generateQuiz — prompt assembly ---
