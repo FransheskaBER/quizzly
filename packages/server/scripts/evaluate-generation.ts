@@ -59,7 +59,6 @@ const PROMPT_FILES = [
   'generation/medium.prompt.ts',
   'generation/hard.prompt.ts',
   'grading/system.prompt.ts',
-  'grading/freetext.prompt.ts',
 ] as const;
 
 // --- Env check ---
@@ -148,15 +147,16 @@ async function runGeneration(
   const sanitizedGoal = sanitizeForPrompt(goal);
   const sanitizedMaterials = materialsText !== null ? sanitizeForPrompt(materialsText) : null;
 
-  const systemPrompt = buildGenerationSystemPrompt();
-  const userMessage = buildGenerationUserMessage({
+  const promptParams = {
     subject: sanitizedSubject,
     goal: sanitizedGoal,
     difficulty,
     answerFormat,
     questionCount,
     materialsText: sanitizedMaterials,
-  });
+  };
+  const systemPrompt = buildGenerationSystemPrompt(promptParams);
+  const userMessage = buildGenerationUserMessage();
 
   const firstMessages: MessageParam[] = [{ role: 'user', content: userMessage }];
   let firstResponse: string;

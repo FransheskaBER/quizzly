@@ -9,7 +9,6 @@ import { getEasyDifficultyPrompt } from '../generation/easy.prompt.js';
 import { getMediumDifficultyPrompt } from '../generation/medium.prompt.js';
 import { getHardDifficultyPrompt } from '../generation/hard.prompt.js';
 import { buildGradingSystemPrompt } from '../grading/system.prompt.js';
-import { buildGradingUserPrompt } from '../grading/freetext.prompt.js';
 import { QuizDifficulty, AnswerFormat } from '@skills-trainer/shared';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,7 +21,15 @@ const readPromptSource = (relativePath: string): string =>
 // ── Generation system prompt ─────────────────────────────────────────────────
 
 describe('generation system prompt', () => {
-  const output = buildGenerationSystemPrompt();
+  const BASE_PARAMS = {
+    subject: 'React Hooks',
+    goal: 'Understand the useState API',
+    difficulty: QuizDifficulty.EASY,
+    answerFormat: AnswerFormat.MCQ,
+    questionCount: 3,
+    materialsText: null,
+  };
+  const output = buildGenerationSystemPrompt(BASE_PARAMS);
 
   it('contains the JSON schema field specifications', () => {
     expect(output).toContain('questionNumber');
@@ -78,19 +85,48 @@ describe('difficulty prompts', () => {
     expect(easy).not.toBe(hard);
   });
 
-  it('generation system prompt embeds all three difficulty calibrations', () => {
-    const system = buildGenerationSystemPrompt();
-    // Each difficulty prompt's unique identifier must appear in the assembled system prompt
-    expect(system).toContain('EASY difficulty');
-    expect(system).toContain('MEDIUM difficulty');
-    expect(system).toContain('HARD difficulty');
+  it('generation system prompt dynamically embeds only the requested difficulty calibration', () => {
+    const BASE_PARAMS = {
+      subject: 'React Hooks',
+      goal: 'Understand the useState API',
+      difficulty: QuizDifficulty.EASY,
+      answerFormat: AnswerFormat.MCQ,
+      questionCount: 3,
+      materialsText: null,
+    };
+    
+    const easySystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.EASY });
+    expect(easySystem).toContain('EASY difficulty');
+    expect(easySystem).not.toContain('MEDIUM difficulty');
+    expect(easySystem).not.toContain('HARD difficulty');
+
+    const mediumSystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.MEDIUM });
+    expect(mediumSystem).toContain('MEDIUM difficulty');
+    expect(mediumSystem).not.toContain('EASY difficulty');
+    expect(mediumSystem).not.toContain('HARD difficulty');
+
+    const hardSystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.HARD });
+    expect(hardSystem).toContain('HARD difficulty');
+    expect(hardSystem).not.toContain('EASY difficulty');
+    expect(hardSystem).not.toContain('MEDIUM difficulty');
   });
 });
 
 // ── Grading system prompt ─────────────────────────────────────────────────────
 
 describe('grading system prompt', () => {
-  const output = buildGradingSystemPrompt();
+  const BASE_PARAMS = {
+    subject: 'React Hooks',
+    questionsAndAnswers: [
+      {
+        questionNumber: 1,
+        questionText: 'What does useState return?',
+        correctAnswer: 'A tuple of [state, setter].',
+        userAnswer: 'A state and a setter.',
+      }
+    ],
+  };
+  const output = buildGradingSystemPrompt(BASE_PARAMS);
 
   it('contains the 3-tier scoring rubric values', () => {
     expect(output).toContain('0.5');
@@ -122,90 +158,9 @@ describe('grading system prompt', () => {
   });
 });
 
-// ── Grading user prompt (freetext.prompt.ts) ─────────────────────────────────
-
-describe('buildGradingUserPrompt', () => {
-  const sampleParams = {
-    subject: 'JavaScript Closures',
-    goal: 'Understand closures for interviews',
-    questions: [
-      {
-        questionNumber: 1,
-        questionText: 'What is a closure?',
-        correctAnswer: 'A function that retains access to its outer scope variables after the outer function returns.',
-        userAnswer: 'A closure is when a function remembers variables from where it was created.',
-      },
-      {
-        questionNumber: 2,
-        questionText: 'Give a common use case for closures.',
-        correctAnswer: 'Data encapsulation — creating private variables that cannot be accessed from outside the function.',
-        userAnswer: 'Making private variables.',
-      },
-    ],
-  };
-
-  it('includes both question texts in the output', () => {
-    const output = buildGradingUserPrompt(sampleParams);
-    expect(output).toContain('What is a closure?');
-    expect(output).toContain('Give a common use case for closures.');
-  });
-
-  it('includes both correct answers in the output', () => {
-    const output = buildGradingUserPrompt(sampleParams);
-    expect(output).toContain('retains access to its outer scope');
-    expect(output).toContain('private variables');
-  });
-
-  it('includes both student answers in the output', () => {
-    const output = buildGradingUserPrompt(sampleParams);
-    expect(output).toContain('A closure is when a function remembers');
-    expect(output).toContain('Making private variables.');
-  });
-
-  it('wraps content in XML delimiters', () => {
-    const output = buildGradingUserPrompt(sampleParams);
-    expect(output).toContain('<subject>');
-    expect(output).toContain('<goal>');
-    expect(output).toContain('<questions_to_grade>');
-    expect(output).toContain('</questions_to_grade>');
-  });
-
-  it('replaces empty student answer with [No answer provided]', () => {
-    const output = buildGradingUserPrompt({
-      subject: 'Test',
-      goal: 'Test goal',
-      questions: [
-        {
-          questionNumber: 1,
-          questionText: 'What is X?',
-          correctAnswer: 'X is Y.',
-          userAnswer: '',
-        },
-      ],
-    });
-    expect(output).toContain('[No answer provided]');
-  });
-
-  it('replaces whitespace-only student answer with [No answer provided]', () => {
-    const output = buildGradingUserPrompt({
-      subject: 'Test',
-      goal: 'Test goal',
-      questions: [
-        {
-          questionNumber: 1,
-          questionText: 'What is X?',
-          correctAnswer: 'X is Y.',
-          userAnswer: '   ',
-        },
-      ],
-    });
-    expect(output).toContain('[No answer provided]');
-  });
-});
-
 // ── Generation user message (user.prompt.ts) ──────────────────────────────────
 
-describe('buildGenerationUserMessage', () => {
+describe('generation system prompt variables', () => {
   const BASE_PARAMS = {
     subject: 'React Hooks',
     goal: 'Understand the useState API',
@@ -216,41 +171,46 @@ describe('buildGenerationUserMessage', () => {
   };
 
   it('includes subject and goal in the output', () => {
-    const output = buildGenerationUserMessage(BASE_PARAMS);
+    const output = buildGenerationSystemPrompt(BASE_PARAMS);
     expect(output).toContain('React Hooks');
     expect(output).toContain('Understand the useState API');
   });
 
   it('includes difficulty, answerFormat, and questionCount in the output', () => {
-    const output = buildGenerationUserMessage(BASE_PARAMS);
+    const output = buildGenerationSystemPrompt(BASE_PARAMS);
     expect(output).toContain(QuizDifficulty.EASY);
     expect(output).toContain(AnswerFormat.MCQ);
     expect(output).toContain('3');
   });
 
   it('wraps user-supplied content in XML delimiter tags', () => {
-    const output = buildGenerationUserMessage(BASE_PARAMS);
+    const output = buildGenerationSystemPrompt(BASE_PARAMS);
     expect(output).toContain('<subject>');
     expect(output).toContain('</subject>');
     expect(output).toContain('<goal>');
     expect(output).toContain('</goal>');
-    expect(output).toContain('<materials>');
-    expect(output).toContain('</materials>');
+    expect(output).toContain('<study_materials>');
+    expect(output).toContain('</study_materials>');
   });
 
-  it('uses "No materials provided." placeholder and sets materials_provided to false when materialsText is null', () => {
-    const output = buildGenerationUserMessage({ ...BASE_PARAMS, materialsText: null });
+  it('uses "No materials provided." placeholder when materialsText is null', () => {
+    const output = buildGenerationSystemPrompt({ ...BASE_PARAMS, materialsText: null });
     expect(output).toContain('No materials provided.');
-    expect(output).toContain('<materials_provided>false</materials_provided>');
   });
 
-  it('includes the materials text and sets materials_provided to true when materialsText is provided', () => {
-    const output = buildGenerationUserMessage({
+  it('includes the materials text when materialsText is provided', () => {
+    const output = buildGenerationSystemPrompt({
       ...BASE_PARAMS,
       materialsText: 'Hooks let you use state in functional components.',
     });
     expect(output).toContain('Hooks let you use state in functional components.');
-    expect(output).toContain('<materials_provided>true</materials_provided>');
+  });
+});
+
+describe('buildGenerationUserMessage', () => {
+  it('returns a static trigger message', () => {
+    const output = buildGenerationUserMessage();
+    expect(output).toContain('Please generate the exercises');
   });
 });
 
@@ -271,7 +231,6 @@ const PROMPT_FILES = [
   'generation/medium.prompt.ts',
   'generation/hard.prompt.ts',
   'grading/system.prompt.ts',
-  'grading/freetext.prompt.ts',
 ];
 
 describe('documentation headers', () => {
