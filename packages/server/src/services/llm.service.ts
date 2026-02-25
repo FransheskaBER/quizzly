@@ -2,7 +2,14 @@ import pino from 'pino';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
 import type { ZodType, ZodTypeDef } from 'zod';
 import anthropic from '../config/anthropic.js';
-import { LLM_MODEL, LLM_MAX_TOKENS, SYSTEM_MARKER, CORRECTIVE_MESSAGE } from '../prompts/constants.js';
+import {
+  LLM_MODEL,
+  LLM_MAX_TOKENS,
+  LLM_GENERATION_TEMPERATURE,
+  LLM_GRADING_TEMPERATURE,
+  SYSTEM_MARKER,
+  CORRECTIVE_MESSAGE,
+} from '../prompts/constants.js';
 import { buildGenerationSystemPrompt } from '../prompts/generation/system.prompt.js';
 import { buildGenerationUserMessage } from '../prompts/generation/user.prompt.js';
 import { buildGradingSystemPrompt } from '../prompts/grading/system.prompt.js';
@@ -85,10 +92,15 @@ const checkExfiltration = (response: string): void => {
   }
 };
 
-async function callLlmStream(systemPrompt: string, messages: MessageParam[]): Promise<string> {
+async function callLlmStream(
+  systemPrompt: string,
+  messages: MessageParam[],
+  temperature: number,
+): Promise<string> {
   const stream = anthropic.messages.stream({
     model: LLM_MODEL,
     max_tokens: LLM_MAX_TOKENS,
+    temperature,
     system: systemPrompt,
     messages,
   });
@@ -124,9 +136,10 @@ async function runWithRetry<T>(
   userMessage: string,
   blockName: string,
   schema: ZodType<T, ZodTypeDef, unknown>,
+  temperature: number,
 ): Promise<T> {
   const firstMessages: MessageParam[] = [{ role: 'user', content: userMessage }];
-  const firstResponse = await callLlmStream(systemPrompt, firstMessages);
+  const firstResponse = await callLlmStream(systemPrompt, firstMessages, temperature);
   checkExfiltration(firstResponse);
 
   const firstResult = await parseBlock(firstResponse, blockName, schema);
@@ -138,7 +151,7 @@ async function runWithRetry<T>(
     { role: 'assistant', content: firstResponse },
     { role: 'user', content: CORRECTIVE_MESSAGE },
   ];
-  const retryResponse = await callLlmStream(systemPrompt, retryMessages);
+  const retryResponse = await callLlmStream(systemPrompt, retryMessages, temperature);
   checkExfiltration(retryResponse);
 
   const retryResult = await parseBlock(retryResponse, blockName, schema);
@@ -179,6 +192,7 @@ export const generateQuiz = async (
     userMessage,
     'questions',
     llmQuizOutputSchema,
+    LLM_GENERATION_TEMPERATURE,
   );
 
   for (const question of questions) {
@@ -204,6 +218,7 @@ export const gradeAnswers = async (
     userMessage,
     'results',
     llmGradedAnswersOutputSchema,
+    LLM_GRADING_TEMPERATURE,
   );
 
   const graded: LlmGradedAnswer[] = rawResults.map((r) => {
