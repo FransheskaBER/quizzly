@@ -184,6 +184,7 @@ describe('getSession', () => {
           status: 'completed',
           score: new Decimal('87.50'),
           materialsUsed: true,
+          startedAt: new Date('2024-01-01T12:00:00Z'),
           completedAt: new Date('2024-01-02T00:00:00Z'),
           createdAt: new Date('2024-01-01T00:00:00Z'),
         },

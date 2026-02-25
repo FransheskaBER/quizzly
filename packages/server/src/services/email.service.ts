@@ -14,6 +14,10 @@ export const sendVerificationEmail = async (to: string, token: string): Promise<
 
   const verifyUrl = `${env.CLIENT_URL}/verify-email?token=${token}`;
 
+  if (process.env.NODE_ENV === 'development') {
+    logger.info({ verifyUrl, to }, 'Development: verification link (copy if email not received)');
+  }
+
   try {
     const { data, error } = await resendClient.emails.send({
       from,
@@ -48,6 +52,10 @@ export const sendPasswordResetEmail = async (to: string, token: string): Promise
   }
 
   const resetUrl = `${env.CLIENT_URL}/reset-password?token=${token}`;
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.info({ resetUrl, to }, 'Development: password reset link (copy if email not received)');
+  }
 
   try {
     const { data, error } = await resendClient.emails.send({
