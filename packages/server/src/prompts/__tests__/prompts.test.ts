@@ -21,15 +21,7 @@ const readPromptSource = (relativePath: string): string =>
 // ── Generation system prompt ─────────────────────────────────────────────────
 
 describe('generation system prompt', () => {
-  const BASE_PARAMS = {
-    subject: 'React Hooks',
-    goal: 'Understand the useState API',
-    difficulty: QuizDifficulty.EASY,
-    answerFormat: AnswerFormat.MCQ,
-    questionCount: 3,
-    materialsText: null,
-  };
-  const output = buildGenerationSystemPrompt(BASE_PARAMS);
+  const output = buildGenerationSystemPrompt(QuizDifficulty.EASY);
 
   it('contains the JSON schema field specifications', () => {
     expect(output).toContain('questionNumber');
@@ -86,26 +78,17 @@ describe('difficulty prompts', () => {
   });
 
   it('generation system prompt dynamically embeds only the requested difficulty calibration', () => {
-    const BASE_PARAMS = {
-      subject: 'React Hooks',
-      goal: 'Understand the useState API',
-      difficulty: QuizDifficulty.EASY,
-      answerFormat: AnswerFormat.MCQ,
-      questionCount: 3,
-      materialsText: null,
-    };
-    
-    const easySystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.EASY });
+    const easySystem = buildGenerationSystemPrompt(QuizDifficulty.EASY);
     expect(easySystem).toContain('EASY difficulty');
     expect(easySystem).not.toContain('MEDIUM difficulty');
     expect(easySystem).not.toContain('HARD difficulty');
 
-    const mediumSystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.MEDIUM });
+    const mediumSystem = buildGenerationSystemPrompt(QuizDifficulty.MEDIUM);
     expect(mediumSystem).toContain('MEDIUM difficulty');
     expect(mediumSystem).not.toContain('EASY difficulty');
     expect(mediumSystem).not.toContain('HARD difficulty');
 
-    const hardSystem = buildGenerationSystemPrompt({ ...BASE_PARAMS, difficulty: QuizDifficulty.HARD });
+    const hardSystem = buildGenerationSystemPrompt(QuizDifficulty.HARD);
     expect(hardSystem).toContain('HARD difficulty');
     expect(hardSystem).not.toContain('EASY difficulty');
     expect(hardSystem).not.toContain('MEDIUM difficulty');
@@ -115,18 +98,7 @@ describe('difficulty prompts', () => {
 // ── Grading system prompt ─────────────────────────────────────────────────────
 
 describe('grading system prompt', () => {
-  const BASE_PARAMS = {
-    subject: 'React Hooks',
-    questionsAndAnswers: [
-      {
-        questionNumber: 1,
-        questionText: 'What does useState return?',
-        correctAnswer: 'A tuple of [state, setter].',
-        userAnswer: 'A state and a setter.',
-      }
-    ],
-  };
-  const output = buildGradingSystemPrompt(BASE_PARAMS);
+  const output = buildGradingSystemPrompt();
 
   it('contains the 3-tier scoring rubric values', () => {
     expect(output).toContain('0.5');
@@ -160,7 +132,7 @@ describe('grading system prompt', () => {
 
 // ── Generation user message (user.prompt.ts) ──────────────────────────────────
 
-describe('generation system prompt variables', () => {
+describe('generation user prompt variables', () => {
   const BASE_PARAMS = {
     subject: 'React Hooks',
     goal: 'Understand the useState API',
@@ -171,20 +143,20 @@ describe('generation system prompt variables', () => {
   };
 
   it('includes subject and goal in the output', () => {
-    const output = buildGenerationSystemPrompt(BASE_PARAMS);
+    const output = buildGenerationUserMessage(BASE_PARAMS);
     expect(output).toContain('React Hooks');
     expect(output).toContain('Understand the useState API');
   });
 
   it('includes difficulty, answerFormat, and questionCount in the output', () => {
-    const output = buildGenerationSystemPrompt(BASE_PARAMS);
+    const output = buildGenerationUserMessage(BASE_PARAMS);
     expect(output).toContain(QuizDifficulty.EASY);
     expect(output).toContain(AnswerFormat.MCQ);
     expect(output).toContain('3');
   });
 
   it('wraps user-supplied content in XML delimiter tags', () => {
-    const output = buildGenerationSystemPrompt(BASE_PARAMS);
+    const output = buildGenerationUserMessage(BASE_PARAMS);
     expect(output).toContain('<subject>');
     expect(output).toContain('</subject>');
     expect(output).toContain('<goal>');
@@ -194,23 +166,16 @@ describe('generation system prompt variables', () => {
   });
 
   it('uses "No materials provided." placeholder when materialsText is null', () => {
-    const output = buildGenerationSystemPrompt({ ...BASE_PARAMS, materialsText: null });
+    const output = buildGenerationUserMessage({ ...BASE_PARAMS, materialsText: null });
     expect(output).toContain('No materials provided.');
   });
 
   it('includes the materials text when materialsText is provided', () => {
-    const output = buildGenerationSystemPrompt({
+    const output = buildGenerationUserMessage({
       ...BASE_PARAMS,
       materialsText: 'Hooks let you use state in functional components.',
     });
     expect(output).toContain('Hooks let you use state in functional components.');
-  });
-});
-
-describe('buildGenerationUserMessage', () => {
-  it('returns a static trigger message', () => {
-    const output = buildGenerationUserMessage();
-    expect(output).toContain('Please generate the exercises');
   });
 });
 

@@ -1,17 +1,5 @@
 import { SYSTEM_MARKER } from '../constants.js';
 
-export interface QAEntry {
-  questionNumber: number;
-  questionText: string;
-  correctAnswer: string;
-  userAnswer: string;
-}
-
-export interface GradingUserPromptParams {
-  subject: string;
-  questionsAndAnswers: QAEntry[];
-}
-
 /**
  * ===================================================================
  * GRADING SYSTEM PROMPT
@@ -79,44 +67,12 @@ export interface GradingUserPromptParams {
  * ===================================================================
  */
 
-export const buildGradingSystemPrompt = (params: GradingUserPromptParams): string => {
-  const { subject, questionsAndAnswers } = params;
-
-  const formattedQuestionsAndAnswers = questionsAndAnswers
-    .map(({ questionNumber, questionText, correctAnswer }) => {
-      return `Question ${questionNumber}:\nQuestion: ${questionText}\nCorrect Answer: ${correctAnswer}`;
-    })
-    .join('\n\n');
-
-  const formattedStudentAnswers = questionsAndAnswers
-    .map(({ questionNumber, userAnswer }) => {
-      const answer = userAnswer?.trim() ? userAnswer : '[No answer provided]';
-      const sanitizedAnswer = answer.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `Question ${questionNumber}:\nStudent Answer: ${sanitizedAnswer}`;
-    })
-    .join('\n\n');
-
+export const buildGradingSystemPrompt = (): string => {
   return `You are an expert grader evaluating student answers to technical questions. Your purpose is to provide fair, specific, and constructive grading that helps students understand where they went right and wrong. ${SYSTEM_MARKER}
-
-<subject>
-${subject}
-</subject>
-
-Here are the questions with their correct answers:
-
-<questions_and_answers>
-${formattedQuestionsAndAnswers}
-</questions_and_answers>
-
-Here are the student's submitted answers:
-
-<student_answers>
-${formattedStudentAnswers}
-</student_answers>
 
 ## YOUR TASK
 
-You will grade each student answer against the corresponding correct answer. For each answer:
+You will grade each student answer against the corresponding correct answer provided in the user message. For each answer:
 1. Assess what the student got right and what they got wrong
 2. Determine whether the response is correct, partial, or incorrect
 3. Provide specific, constructive feedback

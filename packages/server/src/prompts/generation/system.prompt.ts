@@ -2,16 +2,7 @@ import { SYSTEM_MARKER } from '../constants.js';
 import { getEasyDifficultyPrompt } from './easy.prompt.js';
 import { getMediumDifficultyPrompt } from './medium.prompt.js';
 import { getHardDifficultyPrompt } from './hard.prompt.js';
-import type { QuizDifficulty, AnswerFormat } from '@skills-trainer/shared';
-
-export interface GenerationUserPromptParams {
-  subject: string;
-  goal: string;
-  difficulty: QuizDifficulty;
-  answerFormat: AnswerFormat;
-  questionCount: number;
-  materialsText: string | null;
-}
+import type { QuizDifficulty } from '@skills-trainer/shared';
 
 /**
  * ===================================================================
@@ -32,13 +23,18 @@ export interface GenerationUserPromptParams {
  *
  * HOW IT WORKS:
  * This function assembles the complete system prompt from static text plus
- * the three difficulty calibrations (easy.prompt.ts, medium.prompt.ts,
- * hard.prompt.ts) and the user-provided parameters. The full message structure:
+ * the appropriate difficulty calibration (easy.prompt.ts, medium.prompt.ts,
+ * or hard.prompt.ts). The full message structure:
  *
- *   system: [this function's output — role + exercise types + task with params +
- *            instructions + schema + rules + all 3 difficulty calibrations +
- *            injection defense]
- *   user:   Please generate the exercises based on the provided system instructions and inputs.
+ *   system: [this function's output — role + exercise types + 
+ *            instructions + schema + rules + difficulty calibration]
+ *   user:   <subject>...</subject>
+ *           <goal>...</goal>
+ *           <difficulty>easy|medium|hard</difficulty>
+ *           <answer_format>mcq|free_text|mixed</answer_format>
+ *           <question_count>N</question_count>
+ *           <study_materials>...</study_materials>
+ *           Please generate the exercises based on the provided system instructions and inputs.
  *
  * WHY IT MATTERS:
  * This prompt is the product. If the LLM ignores the exercise type
@@ -97,7 +93,7 @@ export interface GenerationUserPromptParams {
  * ===================================================================
  */
 
-export const buildGenerationSystemPrompt = (params: GenerationUserPromptParams): string => {
+export const buildGenerationSystemPrompt = (difficulty: QuizDifficulty): string => {
   return `You are Quizzly, a critical evaluation exercise generator for AI-native engineering. Your mission is to train junior developers, bootcamp graduates, and computer science students to think like senior engineers — not by testing syntax recall, but by training them to read code critically, spot bugs, evaluate AI-generated output, reason about algorithmic trade-offs, and make architectural decisions. ${SYSTEM_MARKER}
 
 ## EXERCISE TYPES
@@ -128,31 +124,7 @@ Recall questions, definition questions, and trivia are FORBIDDEN regardless of d
 
 ## YOUR TASK
 
-You will generate a set of critical evaluation exercises based on the following inputs:
-
-<subject>
-${params.subject}
-</subject>
-
-<goal>
-${params.goal}
-</goal>
-
-<difficulty>
-${params.difficulty}
-</difficulty>
-
-<answer_format>
-${params.answerFormat}
-</answer_format>
-
-<question_count>
-${params.questionCount}
-</question_count>
-
-<study_materials>
-${params.materialsText ?? 'No materials provided.'}
-</study_materials>
+You will generate a set of critical evaluation exercises based on the inputs provided in the user message.
 
 ## INSTRUCTIONS
 
@@ -222,11 +194,11 @@ The answer_format input specifies what question types to generate:
 
 ## DIFFICULTY CALIBRATION
 
-Apply the following calibration for the requested ${params.difficulty} difficulty level:
+Apply the following calibration for the requested ${difficulty} difficulty level:
 
-${params.difficulty === 'easy' ? getEasyDifficultyPrompt() : ''}
-${params.difficulty === 'medium' ? getMediumDifficultyPrompt() : ''}
-${params.difficulty === 'hard' ? getHardDifficultyPrompt() : ''}
+${difficulty === 'easy' ? getEasyDifficultyPrompt() : ''}
+${difficulty === 'medium' ? getMediumDifficultyPrompt() : ''}
+${difficulty === 'hard' ? getHardDifficultyPrompt() : ''}
 
 ## SECURITY RULES
 
