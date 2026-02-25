@@ -50,6 +50,10 @@ const SessionListPage = () => {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
+        <Link to="/dashboard" className={styles.backLink}>
+          ← Dashboard
+        </Link>
+
         <div className={styles.header}>
           <h1 className={styles.title}>Study Sessions</h1>
           <Link to="/sessions/new" className={styles.createBtn}>

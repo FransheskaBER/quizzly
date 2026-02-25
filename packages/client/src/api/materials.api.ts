@@ -27,6 +27,7 @@ const materialsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { sessionId }) => [
         { type: 'Session', id: sessionId },
+        { type: 'Session', id: 'LIST' },
       ],
     }),
 
@@ -39,6 +40,7 @@ const materialsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { sessionId }) => [
         { type: 'Session', id: sessionId },
+        { type: 'Session', id: 'LIST' },
       ],
     }),
 
@@ -50,6 +52,7 @@ const materialsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { sessionId }) => [
         { type: 'Session', id: sessionId },
+        { type: 'Session', id: 'LIST' },
         { type: 'Dashboard' },
       ],
     }),

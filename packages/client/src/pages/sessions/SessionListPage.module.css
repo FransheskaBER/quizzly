@@ -12,6 +12,16 @@
   gap: var(--section-gap-sm);
 }
 
+.backLink {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  display: inline-block;
+}
+
+.backLink:hover {
+  color: var(--color-primary);
+}
+
 .header {
   display: flex;
   align-items: center;

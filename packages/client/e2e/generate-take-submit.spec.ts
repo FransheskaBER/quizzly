@@ -53,10 +53,6 @@ test('generate quiz, take it, submit, and view results', async ({ page, baseURL 
   }
 
   await page.getByRole('button', { name: 'Complete Quiz' }).click();
-  await page.waitForURL(/\/sessions\/[a-f0-9-]+$/);
-
-  await expect(page.getByText('completed')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('link').filter({ hasText: 'completed' }).first().click();
   await page.waitForURL(/\/quiz\/[a-f0-9-]+\/results$/);
 
   await expect(page.getByText(/Grading your quiz|Loading results|Perfect score|Great effort|Good progress|Keep practicing|Quiz Results/)).toBeVisible({ timeout: 15_000 });

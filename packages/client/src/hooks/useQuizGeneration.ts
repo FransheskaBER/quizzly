@@ -84,8 +84,8 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
       flushBuffer();
       stopFlushInterval();
       dispatch(generationCompleted(quizAttemptId));
-      // Refresh the session detail so the new quiz attempt appears in the list.
-      dispatch(api.util.invalidateTags([{ type: 'Session', id: sessionId }]));
+      // Refresh the session detail and list so the new quiz attempt appears.
+      dispatch(api.util.invalidateTags([{ type: 'Session', id: sessionId }, { type: 'Session', id: 'LIST' }]));
       return;
     }
 

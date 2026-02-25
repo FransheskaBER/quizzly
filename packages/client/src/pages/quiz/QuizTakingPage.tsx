@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
+import { QuizStatus } from '@skills-trainer/shared';
+
 import { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } from '@/api/quizzes.api';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -95,6 +97,13 @@ const QuizTakingPage = () => {
     };
   }, [doSave]);
 
+  // Redirect to results when quiz is already submitted (grading, completed, submitted_ungraded)
+  useEffect(() => {
+    if (quiz && [QuizStatus.GRADING, QuizStatus.COMPLETED, QuizStatus.SUBMITTED_UNGRADED].includes(quiz.status)) {
+      navigate(`/quiz/${id}/results`, { replace: true });
+    }
+  }, [quiz, id, navigate]);
+
   const handleSubmit = async () => {
     if (!quiz) return;
 
@@ -113,7 +122,7 @@ const QuizTakingPage = () => {
 
     try {
       await submitQuiz({ id, answers: finalAnswers }).unwrap();
-      navigate(`/sessions/${quiz.sessionId}`);
+      navigate(`/quiz/${id}/results`);
     } catch (err) {
       // fetchBaseQuery returns status: 'PARSING_ERROR' when it can't JSON-parse
       // the response body. For the submit endpoint this means the SSE stream
@@ -130,7 +139,7 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus < 300;
 
       if (isStreamStarted) {
-        navigate(`/sessions/${quiz.sessionId}`);
+        navigate(`/quiz/${id}/results`);
       } else {
         setSubmitError(parseApiError(err).message);
       }
