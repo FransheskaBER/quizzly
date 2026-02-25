@@ -1,4 +1,4 @@
-import { prisma } from '@server/config/database.js';
+import { prisma } from '../config/database.js';
 
 export const healthService = {
   async checkDatabase(): Promise<{ db: 'connected' | 'disconnected' }> {
