@@ -17,7 +17,10 @@ import { UnauthorizedError } from '../utils/errors.js';
 
 const router = Router();
 
-const signupLimiter = createRateLimiter(60 * 60 * 1000, 5);     // 5/IP/hr
+const signupLimiter = createRateLimiter(
+  60 * 60 * 1000,
+  process.env.NODE_ENV === 'test' ? 100 : 5,
+); // 5/IP/hr prod; 100 in test for E2E
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 10);     // 10/IP/15min
 const resendLimiter = createRateLimiter(60 * 60 * 1000, 3);     // 3/IP/hr
 const forgotLimiter = createRateLimiter(60 * 60 * 1000, 3);     // 3/IP/hr

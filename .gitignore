@@ -140,3 +140,10 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local testing docs (not for repo)
+packages/client/e2e/TESTING-DOCS.md
+
+# Playwright
+packages/client/playwright-report/
+packages/client/test-results/

@@ -215,3 +215,18 @@ export const getMe = async (userId: string): Promise<UserResponse> => {
     createdAt: user.createdAt.toISOString(),
   };
 };
+
+/**
+ * TEST ONLY: Verify email by address. Used by E2E tests to bypass email flow.
+ * Only call when NODE_ENV=test. Not exposed in production.
+ */
+export const verifyEmailByAddress = async (email: string): Promise<void> => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerified: true },
+  });
+};
