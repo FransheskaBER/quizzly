@@ -182,7 +182,7 @@ BACKEND
 ```
 DATABASE
 ├── Primary: PostgreSQL on Neon — Serverless Postgres, free tier, connection pooling built-in.
-├── Local Dev: Docker Postgres 16 — Zero network latency, works offline.
+├── Local Dev: Docker Postgres 17 — Zero network latency, works offline.
 ├── Cache: None for MVP — 30 users don't need Redis.
 ├── Rejected alternatives:
 │   - MongoDB: Relational data. Document DB adds complexity for no benefit.
@@ -1531,7 +1531,7 @@ TIMEOUT: 120s server-side. 30s client-side no-event warning.
 LOCAL DEV
 ├── Frontend: Vite dev server (localhost:5173)
 ├── Backend: tsx watch (localhost:3000)
-├── Database: Docker Postgres 16 (localhost:5432)
+├── Database: Docker Postgres 17 (localhost:5432)
 ├── S3: Real AWS S3 (dev bucket)
 ├── Email: Resend test mode
 ├── LLM: Real Anthropic (dev key)
@@ -1554,7 +1554,7 @@ PRODUCTION
 ```yaml
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     ports:
       - "5432:5432"
     environment:
