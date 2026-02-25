@@ -15,7 +15,8 @@
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx}'",
     "format:check": "prettier --check 'packages/*/src/**/*.{ts,tsx}'",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "dev:e2e": "NODE_ENV=test npm run dev --workspace=packages/server & npm run dev --workspace=packages/client & wait"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",

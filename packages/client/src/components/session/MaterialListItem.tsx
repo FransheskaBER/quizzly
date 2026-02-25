@@ -62,7 +62,10 @@ export const MaterialListItem = memo(({ material, onDelete }: MaterialListItemPr
       </div>
 
       <div className={styles.right}>
-        <span className={`${styles.statusBadge} ${styles[`status_${material.status}`]}`}>
+        <span
+          className={`${styles.statusBadge} ${styles[`status_${material.status}`]}`}
+          data-testid="material-status"
+        >
           {material.status}
         </span>
         <button

@@ -1,0 +1,13 @@
+Binary Search
+
+Binary search is an efficient algorithm for finding an element in a sorted array. It works by repeatedly dividing the search interval in half. If the value being searched is less than the middle element, the search continues in the lower half. If it is greater, the search continues in the upper half. This process repeats until the value is found or the interval is empty.
+
+The time complexity of binary search is O(log n), which is significantly faster than linear search's O(n) for large datasets. The space complexity is O(1) when implemented iteratively.
+
+Binary search requires the array to be sorted beforehand. Common applications include searching in databases, autocomplete systems, and game development. Variations include finding the first or last occurrence of an element, and searching in rotated sorted arrays.
+
+REST APIs
+
+REST (Representational State Transfer) is an architectural style for designing networked applications. RESTful APIs use HTTP methods: GET for retrieving resources, POST for creating, PUT for updating, and DELETE for removing. Resources are identified by URLs, and responses typically use JSON format.
+
+Key principles include statelessness (each request contains all needed information), cacheability, and a uniform interface. REST APIs are widely used for web and mobile backends. Authentication often uses API keys, OAuth, or JWT tokens.

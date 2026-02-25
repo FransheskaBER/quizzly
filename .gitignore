@@ -140,3 +140,14 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Task 030 — E2E: local docs + generated artifacts
+packages/client/e2e/TESTING-DOCS.md
+packages/client/playwright-report/
+packages/client/test-results/
+
+# Task 031 — Prompt iteration: evaluation output
+packages/server/scripts/output/
+
+# Task 032 — Launch: personal checklist (until finalized)
+docs/LAUNCH-CHECKLIST*.md
