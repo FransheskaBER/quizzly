@@ -185,8 +185,8 @@ export const generateQuiz = async (
     goal,
     materialsText,
   };
-  const systemPrompt = buildGenerationSystemPrompt(promptParams);
-  const userMessage = buildGenerationUserMessage();
+  const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
+  const userMessage = buildGenerationUserMessage(promptParams);
 
   const questions = await runWithRetry<LlmGeneratedQuestion[]>(
     systemPrompt,
@@ -208,11 +208,11 @@ export const gradeAnswers = async (
   onGraded: OnGradedCallback,
 ): Promise<LlmGradedAnswer[]> => {
   const subject = sanitizeForPrompt(params.subject);
-  const systemPrompt = buildGradingSystemPrompt({
+  const systemPrompt = buildGradingSystemPrompt();
+  const userMessage = buildGradingUserMessage({
     subject,
     questionsAndAnswers: params.answers,
   });
-  const userMessage = buildGradingUserMessage();
 
   const rawResults = await runWithRetry<LlmGradedAnswer[]>(
     systemPrompt,

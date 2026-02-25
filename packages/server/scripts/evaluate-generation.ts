@@ -155,8 +155,8 @@ async function runGeneration(
     questionCount,
     materialsText: sanitizedMaterials,
   };
-  const systemPrompt = buildGenerationSystemPrompt(promptParams);
-  const userMessage = buildGenerationUserMessage();
+  const systemPrompt = buildGenerationSystemPrompt(difficulty);
+  const userMessage = buildGenerationUserMessage(promptParams);
 
   const firstMessages: MessageParam[] = [{ role: 'user', content: userMessage }];
   let firstResponse: string;
