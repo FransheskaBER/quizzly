@@ -4,9 +4,11 @@
  * ===================================================================
  *
  * PURPOSE:
- * Defines what "medium" means for quiz question generation — calibrates
- * questions to test applied understanding rather than recall, requiring
- * genuine comprehension to answer correctly.
+ * Defines what "medium" means for Quizzly exercise generation — calibrates
+ * exercises to require applied reasoning and trade-off analysis rather than
+ * surface-level identification. Students must think carefully about why one
+ * approach is better, what algorithmic implications a choice has, or why a
+ * subtle bug is wrong — not just spot an obvious error.
  *
  * WHEN IT'S USED:
  * Imported and embedded by buildGenerationSystemPrompt() in
@@ -22,32 +24,39 @@
  *
  * WHY IT MATTERS:
  * Medium is the most common difficulty and has the narrowest sweet spot.
- * If calibrated too low, medium questions become definition lookups (same as
- * easy). If calibrated too high, they become research problems (same as hard).
- * The wrong calibration means users can't tell if they're improving — a core
- * value proposition of the product fails silently.
+ * Too easy: the student spots an obvious bug or picks the faster algorithm
+ * without needing to reason about the trade-off (that's easy).
+ * Too hard: the student needs to synthesise 3+ concepts or reason about
+ * deep architectural implications (that's hard).
+ * The sweet spot: "I know these concepts, but I need to think to choose
+ * the right one here and justify why." Medium must train judgment, not
+ * just identification.
  *
  * OPTIMIZATION NOTES:
- * - Primary failure mode (too easy): questions only ask "what is X?" with the
- *   answer directly in the materials. If a student can answer by copying a
- *   sentence from the study material, the question is not medium.
- * - Primary failure mode (too hard): questions require combining 3+ concepts
- *   or deep expertise. If the correct answer requires reasoning not derivable
- *   from the materials, the question belongs at hard.
- * - Sweet spot: "I understand this concept, but I need to think to apply it here."
- * - After editing: generate 5 medium questions. Verify you cannot answer them
- *   correctly by keyword-scanning the material — but you can after carefully
- *   re-reading and reasoning about it.
- * - For code questions: the bug or output should require tracing execution, not
- *   just recognizing a keyword. An off-by-one error in a loop is medium; a
- *   memory leak from circular references is hard.
+ * - Primary failure mode (wrong type): LLM generates SPOT THE BUG with
+ *   an obvious bug, which is easy. Medium SPOT THE BUG requires a subtle
+ *   logical error — not a typo or wrong method, but a correct-looking
+ *   implementation that fails under a specific condition.
+ * - Primary failure mode (too easy): COMPARE APPROACHES where one option
+ *   is obviously better. Both approaches must look plausible; the student
+ *   has to reason about constraints to pick the right one.
+ * - Primary failure mode (too hard): exercises that require combining 3+
+ *   concepts or expertise the materials don't provide. Stick to 2 related
+ *   concepts at most.
+ * - After editing: generate 5 medium questions. Verify you cannot answer
+ *   them by keyword-scanning the material — you must read carefully and
+ *   reason. If any answer is immediately obvious from the question text,
+ *   the exercise is too easy.
+ * - For COMPARE APPROACHES: the "why" must reference a concrete trade-off
+ *   (time complexity, memory use, readability in a given context), not just
+ *   "this one is cleaner."
  *
  * MANUAL TESTING (Anthropic Console):
  * Paste the output of buildGenerationSystemPrompt() into the System Prompt field.
  * In the User message, paste:
  *
- *   <subject>JavaScript Arrays</subject>
- *   <goal>Understand when to use map vs forEach vs filter</goal>
+ *   <subject>JavaScript Array Methods</subject>
+ *   <goal>Understand when to use map vs forEach vs filter for interviews</goal>
  *   <difficulty>medium</difficulty>
  *   <answer_format>mixed</answer_format>
  *   <question_count>4</question_count>
@@ -55,20 +64,24 @@
  *   <materials>No materials provided.</materials>
  *   Generate 4 medium difficulty quiz question(s) in mixed format based on the subject and goal above.
  *
- * Verify: questions ask about application and trade-offs (e.g., "which method
- * would you choose to build a new array?"), not just definitions. MCQ distractors
- * are methods that look like they could work but are incorrect for the specific
- * use case. At least one free_text question requires a short explanation.
+ * Verify: questions require active reasoning about trade-offs or subtle
+ * correctness, not just recall or obvious identification. At least one
+ * COMPARE APPROACHES question should require explaining why one method
+ * suits the scenario better (e.g. "you need a new array" vs "side effects
+ * are intentional"). MCQ distractors should be tempting to someone who
+ * has studied but hasn't applied the concept under constraints.
  *
  * ===================================================================
  */
 
 export const getMediumDifficultyPrompt = (): string =>
   `MEDIUM difficulty calibration:
-- Focus on applied understanding: using concepts in new contexts, comparing approaches, and identifying trade-offs.
-- Questions may connect 2 related concepts or apply a concept to a scenario not explicitly covered in the materials.
-- MCQ distractors: represent mistakes that experienced beginners actually make — wrong, but require genuine understanding to distinguish from the correct answer (not obviously wrong at a glance).
-- Free-text answers: expect explanations and analysis (3–5 sentences). A correct answer demonstrates understanding, not just recall of what was written.
-- Code questions: predict the output of a realistic short snippet, identify a subtle bug, or choose the correct implementation for a stated constraint.
-- Success signal: cannot be answered correctly by keyword-scanning the material — requires reading carefully and reasoning about it.
-- Do NOT make questions that are simply definitions with longer phrasing (that's easy). Do NOT require combining 3+ concepts or deep expertise (that's hard).`.trim();
+- Primary exercise types: COMPARE APPROACHES and CHOOSE THE RIGHT TOOL. SPOT THE BUG is also valid at medium but must use subtle bugs (see below). EVALUATE AI OUTPUT is valid when the code has a non-obvious flaw requiring understanding, not just recognition.
+- COMPARE APPROACHES: both implementations must look plausible. The correct choice depends on a concrete constraint (time complexity, memory, mutability, use-case context). The student must justify their choice with explicit reasoning — "this is O(n log n) while this is O(n²) for the given input size."
+- CHOOSE THE RIGHT TOOL: present a realistic scenario with a specific constraint. The correct algorithm or data structure is not immediately obvious — the student must reason about the problem's shape (e.g. frequency counting, ordering requirements, lookup speed).
+- SPOT THE BUG at medium: bugs must be subtle — a logical error that looks correct at first glance, an off-by-one that only surfaces under specific conditions, or an edge case the implementation misses. Not a wrong method name or typo.
+- Scenarios may connect 2 related concepts or apply a concept to a context not explicitly covered in the materials — but never 3+ concepts or deep expertise.
+- MCQ distractors: represent mistakes that experienced beginners actually make — wrong but require genuine understanding to distinguish from the correct answer. Not obviously wrong at a glance.
+- Free-text answers: expect explanation and analysis (3–5 sentences). A correct answer demonstrates reasoning about trade-offs, not just recall of what was written.
+- Success signal: cannot be answered by keyword-scanning the material — requires reading carefully and reasoning about the specific scenario.
+- Do NOT make exercises that are simply definitions with longer phrasing (that's easy). Do NOT require 3+ concept synthesis or architectural expertise (that's hard).`.trim();
