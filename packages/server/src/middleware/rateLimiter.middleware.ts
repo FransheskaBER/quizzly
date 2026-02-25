@@ -35,7 +35,7 @@ export const createRateLimiterByEmail = (
       const email = (req.body as { email?: string })?.email;
       return typeof email === 'string' && email.length > 0
         ? `email:${email.toLowerCase()}`
-        : (req.socket?.remoteAddress ?? req.ip ?? 'unknown');
+        : (req.ip ?? 'unknown');
     },
     standardHeaders: true,
     legacyHeaders: false,
