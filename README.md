@@ -1,12 +1,29 @@
 # Quizzly
 
-Quizzly generates critical evaluation exercises from your study materials — spot the bug, critique the architecture, challenge the AI — so bootcamp graduates can practice the skills modern technical interviews actually test.
+Quizzly generates critical evaluation exercises from your study materials — spot the bug, critique the architecture, challenge the AI — so junior developers, bootcamp graduates, and CS students can practice the skills modern technical interviews actually test.
 
 ---
 
 ## The Problem
 
-LeetCode trains code *writing*. Modern technical interviews increasingly test something different: the ability to evaluate code, identify suboptimal approaches, critique AI-generated output, and reason about architecture. Bootcamps produce graduates who can build things but haven't practiced reviewing them. No existing platform occupies this gap between "write code from scratch" and "learn system design concepts."
+LeetCode trains code *writing*. Modern technical interviews increasingly test something different: the ability to evaluate code, identify suboptimal approaches, critique AI-generated output, and reason about architecture. The AI era has shifted what employers expect — less code-writing from scratch, more code-evaluation, debugging, and AI collaboration. Junior developers, bootcamp graduates, and CS students can build things but haven't practiced reviewing them, leading AI tools, or making architectural decisions. No existing platform occupies this gap between "write code from scratch" and "learn system design concepts."
+
+---
+
+## Exercise Types
+
+Quizzly generates six types of critical evaluation exercises — not recall, not definitions:
+
+| # | Type | What the student does |
+|---|------|-----------------------|
+| 1 | **Spot the Bug** | Identify and explain a realistic bug in a code snippet |
+| 2 | **Evaluate AI Output** | Critically review AI-generated code for correctness, edge cases, and performance |
+| 3 | **Compare Approaches** | Justify which of two implementations is better and why (complexity, trade-offs) |
+| 4 | **Choose the Right Tool** | Select the correct algorithm or data structure for a given constraint, with justification |
+| 5 | **Architectural Trade-Off** | Reason about weaknesses in a system design and make justified decisions |
+| 6 | **AI-Collaboration** | Use an AI tool to solve a problem, then evaluate the output for correctness, optimality, and production-readiness |
+
+Difficulty controls which types are used and how deep the reasoning must go — not just how long the question is.
 
 ---
 

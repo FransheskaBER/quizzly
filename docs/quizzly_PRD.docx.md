@@ -2,11 +2,9 @@
 
 PRODUCT REQUIREMENTS DOCUMENT
 
-**AI-Era Engineering**
+**Quizzly**
 
-**Skills Trainer**
-
-*Training bootcamp graduates to think like senior engineers by building critical evaluation, architectural thinking, and AI collaboration skills.*
+*Training junior developers, bootcamp graduates, and CS students to think like senior engineers by building critical evaluation, architectural thinking, and AI collaboration skills.*
 
 Version 1.0  |  MVP Definition
 
@@ -17,45 +15,49 @@ February 2026
 
 # **1\. Problem Statement**
 
-*Bootcamp graduates entering the job market lack the ability to evaluate code quality, identify suboptimal approaches, and think architecturally — skills that modern technical interviews increasingly demand as AI tools handle code generation. Currently, they rely on platforms like LeetCode (which trains code writing, not code evaluation), prompting ChatGPT ad-hoc (which requires effort to set up each time and provides no structure or progression), or their bootcamp’s built-in quizzes (which are outdated and focused on recall rather than critical analysis). As a result, graduates feel unprepared to apply for jobs and fail technical interviews that test their ability to review, critique, and improve solutions rather than write them from scratch.*
+*Junior developers, bootcamp graduates, and computer science students entering the job market lack the ability to evaluate code quality, identify suboptimal approaches, and think architecturally — skills that modern technical interviews increasingly demand as AI tools handle code generation. The AI era has shifted what employers expect: less code-writing from scratch, more code-evaluation, debugging, and AI collaboration. Currently, these learners rely on platforms like LeetCode (which trains code writing, not code evaluation), prompting ChatGPT ad-hoc (which requires effort to set up each time and provides no structure or progression), or their bootcamp’s built-in quizzes (which are outdated and focused on recall rather than critical analysis). As a result, they feel unprepared to apply for jobs and fail technical interviews that test their ability to review, critique, and improve solutions — or lead AI tools effectively — rather than write code from scratch.*
 
 *This problem statement is based on personal experience and anecdotal evidence from 3 bootcamp peers. It has not been validated through structured user research. Quantification of the pain (e.g., interview failure rates, time spent on inadequate prep) is not available.*
 
 # **2\. Target User**
 
-## **Primary Persona: The Bootcamp Graduate**
+## **Primary Persona: The Early-Career Developer**
 
-**Who:** Recent graduates of fullstack development bootcamps (3–6 month intensive programs) who are transitioning into junior software engineering roles.
+Quizzly targets three overlapping audiences who share the same core gap: they can write code, but they cannot yet evaluate it critically, reason about trade-offs, or lead AI tools effectively.
 
-**Age Range:** 22–35 years old (career changers and recent university graduates).
+**1. Bootcamp Graduate** — Recent graduates of fullstack development bootcamps (3–6 month intensive programs) transitioning into junior software engineering roles.
 
-**Technical Level:** Can write functional code but lacks depth in algorithms, system design, architectural thinking, and the ability to critically evaluate code quality.
+**2. CS Student (Final Year)** — University students completing their degree who are preparing for technical interviews and know algorithms in theory but lack practice applying critical evaluation skills.
 
-**Behavioral Profile**
+**3. Junior Developer (0–2 years)** — Developers already in their first role who need to level up from code-writing to code-evaluation, architecture awareness, and effective AI collaboration.
 
-* Completed an intensive bootcamp focused on writing code (syntax, frameworks, building projects)
+**Age Range:** 20–35 years old.
 
-* Actively job searching or about to start applying for junior engineering positions
+**Technical Level:** Can write functional code but lacks depth in algorithms, system design, architectural thinking, and the ability to critically evaluate code quality or AI-generated output.
 
-* Has experienced or fears failing technical interviews that go beyond basic coding
+**Behavioral Profile (all three audiences)**
 
-* Uses AI tools (ChatGPT, Cursor, Claude) for coding but lacks skills to evaluate and improve AI-generated output
+* Writes code but has not yet developed the instinct to critically evaluate code, spot problems, or reason about architectural trade-offs
 
-* Willing to invest time in interview prep (uses or has considered LeetCode, AlgoExpert, etc.)
+* Actively preparing for technical interviews or looking to level up in their current role
+
+* Uses AI tools (ChatGPT, Cursor, Claude) daily for coding but struggles to evaluate or improve the output
+
+* Willing to invest structured time in skills development (has tried or considered LeetCode, AlgoExpert, etc.)
+
+* Feels the gap between "I can build this" and "I can lead this, review this, or architect this"
 
 **Pain Points**
 
-* Bootcamp curriculum was too fast and focused on code-writing mechanics, not problem-solving or architecture
+* Training focused on code-writing mechanics, not problem-solving, architecture, or critical evaluation
 
 * Existing interview prep platforms (LeetCode) train code production, not code evaluation
 
 * No structured way to practice the skills modern interviews actually test: reviewing AI output, identifying bugs, choosing optimal approaches, designing systems
 
-* Using ChatGPT for ad-hoc practice requires significant prompting effort and provides no progression or tracking
+* Using ChatGPT for ad-hoc practice requires significant prompting effort and provides no structure or progression tracking
 
-**Secondary Persona (Future Expansion)**
-
-Computer Science university students preparing for technical interviews share the same core pain point: they can write code but lack practice in evaluating, critiquing, and improving code and architecture. This segment can be served by the same product without modification.
+* The rise of AI tools has changed what "being a good developer" means — syntax recall matters less; judgment, evaluation, and architectural thinking matter more
 
 # **3\. User Research Summary**
 
@@ -109,15 +111,15 @@ Conduct structured interviews with 10–15 bootcamp graduates using the intervie
 
 **Competitive Positioning**
 
-No existing product specifically trains the skill of evaluating, critiquing, and improving code and architecture — the exact skill modern technical interviews increasingly test as AI handles code generation. This product occupies the gap between “write code from scratch” (LeetCode) and “learn system design concepts” (ByteByteGo) by providing interactive, AI-powered critical evaluation exercises tailored to the user’s study materials and goals.
+No existing product specifically trains the skill of evaluating, critiquing, and improving code and architecture — the exact skill modern technical interviews increasingly test as AI handles code generation. Quizzly occupies the gap between “write code from scratch” (LeetCode) and “learn system design concepts” (ByteByteGo) by providing interactive, AI-powered critical evaluation exercises tailored to the user’s study materials and goals.
 
 # **5\. Solution Overview**
 
-The AI-Era Engineering Skills Trainer is a web application that generates critical evaluation exercises — find the bug, evaluate AI-generated code, identify better approaches, design system improvements — tailored to the user’s uploaded study materials and goals. Unlike traditional interview prep platforms that test code production, this product trains the reviewer/architect mindset that modern employers demand.
+Quizzly is a web application that generates critical evaluation exercises — find the bug, evaluate AI-generated code, identify better approaches, design system improvements — tailored to the user’s uploaded study materials and goals. Unlike traditional interview prep platforms that test code production, Quizzly trains the reviewer/architect mindset that modern employers demand.
 
 **Core Value Proposition**
 
-*Train bootcamp graduates to think like senior engineers by generating critical evaluation exercises — find the bug, improve the architecture, challenge the AI — tailored to their study materials.*
+*Train junior developers, bootcamp graduates, and CS students to think like senior engineers by generating critical evaluation exercises — find the bug, improve the architecture, challenge the AI — tailored to their study materials.*
 
 **Key Differentiators**
 
@@ -253,11 +255,21 @@ The MVP consists of 7 user stories that deliver the complete core loop: create a
 
 **Difficulty Level Definitions (LLM Prompt Spec)**
 
-**Easy — Focused Evaluation:** Spot the bug in a code snippet. Evaluate AI-generated code for issues. Compare two approaches for time/space complexity. Suggest improvements to a function. Contained, single-concept questions — but calibrated to AI-era expectations (not trivial junior-level recall).
+Quizzly generates six exercise types. Difficulty controls which types are used and how deep the reasoning must go.
 
-**Medium — Applied Analysis:** Predict the output of a code block and explain why. Choose the best algorithm for a problem and justify. Select the optimal data structure with trade-off analysis. Identify weaknesses in a partial architecture. May require using AI tools to research an approach and then evaluate the result.
+**Exercise Types:**
+1. **SPOT THE BUG** — A code snippet with a realistic bug. Student identifies and explains the issue.
+2. **EVALUATE AI OUTPUT** — Code described as AI-generated. Student critically reviews it for correctness, edge cases, performance, and style.
+3. **COMPARE APPROACHES** — Two or more implementations. Student justifies which is better and why (time/space complexity, readability, maintainability).
+4. **CHOOSE THE RIGHT TOOL** — A scenario or constraint. Student selects the correct algorithm, data structure, or pattern with explicit trade-off justification.
+5. **ARCHITECTURAL TRADE-OFF** — A system design problem or partial architecture. Student reasons about weaknesses and design decisions.
+6. **AI-COLLABORATION** — Student uses an AI tool (Claude, Cursor) to solve a problem, then evaluates whether the output is correct, optimal, and production-ready. Always free-text.
 
-**Hard — System-Level Thinking:** Design a system for a given scenario and evaluate trade-offs. Critique an AI-generated architecture for scaling issues. Use AI to solve a senior-level problem, then explain whether the approach is optimal and why. Multi-step problems combining code evaluation, architecture, and trade-off analysis.
+**Easy — Focused Evaluation:** Primary types: SPOT THE BUG and EVALUATE AI OUTPUT. Contained, single-concept scenarios — bugs are visible to someone who has studied the material for 30 minutes (off-by-one, wrong method, missing null check). No multi-concept synthesis required.
+
+**Medium — Applied Analysis:** Primary types: COMPARE APPROACHES and CHOOSE THE RIGHT TOOL, with some SPOT THE BUG (subtle bugs). Student must reason about time/space complexity and trade-offs, not just identify syntax. May require using AI tools to explore an approach and then evaluate the result.
+
+**Hard — System-Level Thinking:** Primary types: ARCHITECTURAL TRADE-OFF and AI-COLLABORATION. Multi-step problems requiring synthesis across concepts. No single correct answer — student must justify decisions with explicit reasoning about constraints, trade-offs, scalability, and production-readiness.
 
 ## **Story 5: Generate Critical Evaluation Exercises**
 

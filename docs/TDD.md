@@ -111,10 +111,12 @@ The code parses out only the `<questions>` block. Analysis is discarded. Same pa
 ```
 PROMPT ASSEMBLY (at quiz generation time)
 ├── SYSTEM PROMPT (code-controlled, never user-editable)
-│   ├── Role definition
+│   ├── Role definition (Quizzly — critical evaluation exercise generator)
+│   ├── Exercise type taxonomy (6 types — see below)
 │   ├── Output format: strict JSON schema
-│   ├── Quality rules
-│   └── Difficulty calibration spec (Easy/Medium/Hard from PRD)
+│   ├── Quality rules (subject adherence, goal alignment, no recall/trivia)
+│   └── Difficulty calibration (Easy/Medium/Hard — each difficulty prompt
+│       specifies which exercise types to prioritise and how deep to go)
 ├── CONTEXT INJECTION (dynamic, per-request)
 │   ├── Session subject
 │   ├── Session goal
@@ -127,6 +129,17 @@ PROMPT ASSEMBLY (at quiz generation time)
 │   └── Flag: materials_provided: true/false
 └── OUTPUT → Structured JSON array of questions
 ```
+
+**Exercise Type Taxonomy (owned by system prompt, calibrated per difficulty):**
+
+| # | Type | Description | Difficulty Focus |
+|---|------|-------------|-----------------|
+| 1 | SPOT THE BUG | Code snippet with realistic bug; student identifies and explains | Easy, Medium |
+| 2 | EVALUATE AI OUTPUT | AI-generated code; student critically reviews for correctness, edge cases, performance | Easy, Medium |
+| 3 | COMPARE APPROACHES | Two implementations; student justifies which is better and why | Medium |
+| 4 | CHOOSE THE RIGHT TOOL | Scenario/constraint; student selects algorithm or data structure with trade-off justification | Medium |
+| 5 | ARCHITECTURAL TRADE-OFF | System design problem; student reasons about weaknesses and decisions | Hard |
+| 6 | AI-COLLABORATION | Student uses AI tool, then evaluates output for correctness, optimality, production-readiness (always free_text) | Hard |
 
 Prompt templates live in `src/prompts/` as TypeScript files. Version-controlled, reviewed, deployed with the app. NOT stored in database.
 
@@ -393,7 +406,7 @@ DEVOPS & INFRASTRUCTURE
 ### 3.5 Project Structure
 
 ```
-ai-skills-trainer/
+quizzly/
 ├── package.json                    # Workspace root
 ├── tsconfig.base.json              # Shared TS config
 ├── docker-compose.yml              # Local Postgres
