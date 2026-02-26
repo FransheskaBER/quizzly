@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useGetDashboardQuery } from '@/api/dashboard.api';
+import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
@@ -7,6 +8,7 @@ import { formatScore } from '@/utils/formatters';
 import styles from './HomeDashboardPage.module.css';
 
 const HomeDashboardPage = () => {
+  const { logout } = useAuth();
   const { data, isLoading, error } = useGetDashboardQuery();
 
   if (isLoading) return <LoadingSpinner fullPage />;
@@ -23,6 +25,10 @@ const HomeDashboardPage = () => {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
+        <div className={styles.topBar}>
+          <span className={styles.appName}>Quizzly</span>
+          <button className={styles.logoutBtn} onClick={logout}>Log out</button>
+        </div>
         <h1 className={styles.greeting}>
           {data?.totalSessions === 0 ? 'Welcome' : 'Welcome back'}, {data?.username}
         </h1>
