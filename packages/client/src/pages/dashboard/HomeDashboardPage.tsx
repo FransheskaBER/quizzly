@@ -27,7 +27,7 @@ const HomeDashboardPage = () => {
       <div className={styles.inner}>
         <div className={styles.topBar}>
           <span className={styles.appName}>Quizzly</span>
-          <button className={styles.logoutBtn} onClick={logout}>Log out</button>
+          <button type="button" className={styles.logoutBtn} onClick={logout}>Log out</button>
         </div>
         <h1 className={styles.greeting}>
           {data?.totalSessions === 0 ? 'Welcome' : 'Welcome back'}, {data?.username}
