@@ -10,7 +10,7 @@
 .backRow {
   width: 100%;
   max-width: 560px;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
 }
 
 .backLink {
