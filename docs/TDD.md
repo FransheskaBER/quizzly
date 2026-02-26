@@ -1791,4 +1791,25 @@ Decisions made during implementation that differ from what this document origina
 
 ---
 
+### 12.4 Development-only router: POST /dev/set-password added alongside /dev/verify-email
+
+**Original spec:** The TDD (§5, §6) does not mention any development-only routes. The only reference to email verification bypass is implicit — tests must be able to create verified accounts without a real email delivery.
+
+**What was built:** `packages/server/src/routes/dev.routes.ts` is mounted at `/dev` when `NODE_ENV=development`. It exposes two endpoints:
+
+| Method | Path | Body | Purpose |
+|--------|------|------|---------|
+| POST | /dev/verify-email | `{ email }` | Marks the user's email as verified without requiring a link click |
+| POST | /dev/set-password | `{ email, password }` | Replaces the stored password hash for any existing user |
+
+The `set-password` endpoint was added alongside `verify-email` to support local development and E2E test setup scenarios where a known password is needed (e.g. seeding a test account with a predictable credential).
+
+**Why it was added:** During E2E test development (task 030) a second bootstrapping step emerged: after `verify-email` creates a usable account, tests need to sign in with a specific password. Without this endpoint the only option is to create the account via the signup form in the test itself — which couples account creation to every test that needs an authenticated session. The `/dev/set-password` endpoint lets setup scripts or `beforeAll` hooks directly set a known password hash, making tests faster and more independent.
+
+**Security posture:** Both endpoints are guarded by the same condition — the router is never mounted when `NODE_ENV !== 'development'`. They are not available in the production build on Render.
+
+**Side effects:** None. The endpoint updates only the `passwordHash` field on an existing user row. It does not clear sessions, invalidate tokens, or change `emailVerified` state.
+
+---
+
 *End of Technical Design Document*

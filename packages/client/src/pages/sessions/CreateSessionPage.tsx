@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCreateSessionMutation } from '@/api/sessions.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { parseApiError } from '@/hooks/useApiError';
@@ -18,6 +18,9 @@ const CreateSessionPage = () => {
 
   return (
     <div className={styles.page}>
+      <div className={styles.backRow}>
+        <Link to="/dashboard" className={styles.backLink}>← Dashboard</Link>
+      </div>
       <div className={styles.card}>
         <div className={styles.header}>
           <h1 className={styles.title}>Create Session</h1>

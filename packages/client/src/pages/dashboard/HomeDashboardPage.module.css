@@ -12,6 +12,34 @@
   gap: var(--section-gap-md);
 }
 
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.appName {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.logoutBtn {
+  background: none;
+  border: none;
+  padding: var(--spacing-xs) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.logoutBtn:hover {
+  color: var(--color-text);
+}
+
 .greeting {
   font-size: var(--font-size-2xl);
   font-weight: 700;
