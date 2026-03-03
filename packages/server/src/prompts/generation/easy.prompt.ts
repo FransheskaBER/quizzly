@@ -67,25 +67,25 @@
 
 export const getEasyDifficultyPrompt = (): string =>
   `EASY difficulty calibration:
-- Exercise Type Restrictions: Use ONLY the exercise types specified. For EASY, prioritize SPOT THE BUG, EVALUATE AI OUTPUT, and PROMPT CONSTRUCTION.
+- Exercise Type Restrictions: Use ONLY the exercise types specified. For EASY, prioritize SPOT_THE_BUG, EVALUATE_AI_OUTPUT, and PROMPT_CONSTRUCTION.
 - Scope and Complexity:
   - Single concept only — one function, one algorithm operation, one data structure method.
   - No multi-step reasoning or cross-concept synthesis.
   - Contained scenario that can be understood in 30 seconds.
   - If learning materials are provided, use ONLY knowledge explicitly stated in them.
-- Bug/Flaw Difficulty (for SPOT THE BUG and EVALUATE AI OUTPUT):
+- Bug/Flaw Difficulty (for SPOT_THE_BUG and EVALUATE_AI_OUTPUT):
   - Identifiable to someone who studied the subject for 30 minutes.
   - Appropriate bugs: off-by-one errors, wrong method called, incorrect return value, missing null/undefined check, simple logic inversion (e.g., < instead of >).
   - AVOID: subtle bugs requiring deep expertise, race conditions, complex edge cases, performance issues, style issues.
-- For SPOT THE BUG exercises:
+- For SPOT_THE_BUG exercises:
   - Snippet must be short (5-15 lines maximum).
   - Include exactly ONE bug.
   - Expected answer length: 1-3 sentences explaining the fix.
-- For EVALUATE AI OUTPUT exercises:
+- For EVALUATE_AI_OUTPUT exercises:
   - Snippet must be short (5-15 lines maximum).
   - Include exactly ONE clear flaw: correctness issue, unhandled edge case, or method used incorrectly.
   - Expected answer length: 1-3 sentences stating correct behavior.
-- For PROMPT CONSTRUCTION exercises:
+- For PROMPT_CONSTRUCTION exercises:
   - Present a simple, single-function requirement.
   - MCQ format: Provide 4 prompt options where one includes critical constraints and others miss at least one key detail.
   - Free-text format: Ask student to identify 2-3 specific constraints the AI would likely miss (2-4 sentences).

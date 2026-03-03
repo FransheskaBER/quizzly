@@ -67,13 +67,12 @@
 
 export const getMediumDifficultyPrompt = (): string =>
   `MEDIUM difficulty calibration:
-- Exercise Type Restrictions: For MEDIUM, prioritize COMPARE APPROACHES, CHOOSE THE RIGHT TOOL, PROMPT CONSTRUCTION, and PREDICT THE FAILURE. SPOT THE BUG is valid but must use subtle bugs. EVALUATE AI OUTPUT is valid when the code has a non-obvious flaw requiring understanding.
+- Exercise Type Restrictions: For MEDIUM, prioritize COMPARE_APPROACHES and CHOOSE_THE_RIGHT_TOOL. PROMPT_CONSTRUCTION, EVALUATE_AI_OUTPUT, and SPOT_THE_BUG are permissible but not primary. SPOT_THE_BUG must use subtle bugs. EVALUATE_AI_OUTPUT is only valid when the code has a non-obvious flaw requiring understanding.
 - General Requirement: Must require active reasoning and analysis, not just keyword recall or pattern matching.
-- For COMPARE APPROACHES: Verify both options look plausible and the choice depends on concrete constraints (time/space complexity, mutability, specific use-case requirements).
-- For CHOOSE THE RIGHT TOOL: Verify the scenario has specific constraints that make the correct choice non-obvious.
-- For SPOT THE BUG: Verify the bug is subtle (logical error, edge case, off-by-one under specific conditions) — not a typo or obviously wrong method name.
-- For PROMPT CONSTRUCTION: Verify it requires specifying error handling, input validation, return types, and at least one non-obvious constraint.
-- For PREDICT THE FAILURE: Verify the code looks correct on casual inspection and the bug stems from common patterns (wrong defaults, async issues, missing null checks, boundary conditions, loose test assertions).
+- For COMPARE_APPROACHES: Verify both options look plausible and the choice depends on concrete constraints (time/space complexity, mutability, specific use-case requirements).
+- For CHOOSE_THE_RIGHT_TOOL: Verify the scenario has specific constraints that make the correct choice non-obvious.
+- For SPOT_THE_BUG: Verify the bug is subtle (logical error, edge case, off-by-one under specific conditions) — not a typo or obviously wrong method name.
+- For PROMPT_CONSTRUCTION: Verify it requires specifying error handling, input validation, return types, and at least one non-obvious constraint.
 - Multiple Choice Questions (if applicable): Distractors must represent genuine mistakes experienced beginners make. They must require genuine understanding to distinguish from the correct answer (plausibly wrong rather than obviously wrong).
 - Free-text answers: Require 3-5 sentences of explanation/reasoning.
 - Complexity limits: Do NOT require 3+ concept synthesis or deep architectural expertise. Cannot be answered by simply scanning for keywords.
