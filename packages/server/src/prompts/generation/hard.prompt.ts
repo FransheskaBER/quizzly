@@ -68,14 +68,10 @@
 
 export const getHardDifficultyPrompt = (): string =>
   `HARD difficulty calibration:
+- Exercise Type Restrictions: Use ONLY ARCHITECTURAL_TRADE_OFF and AI_COLLABORATION. All other exercise types are forbidden at hard difficulty.
 - General Requirement: Exercise MUST require combining multiple concepts or reasoning about non-obvious implications. Challenge practitioners with real experience, not just beginners. Focus on depth over length - a short question requiring substantial thought is better than a verbose question with an obvious answer.
-- ARCHITECTURAL TRADE-OFF: Scenario must have explicit constraints (scale, latency, consistency requirements, team size, budget, etc.). There is NO single objectively correct answer. Student must reason about trade-offs given constraints.
-- AI-COLLABORATION: Specify exactly what to build. Ask student to critically evaluate output for correctness, edge cases, and optimality.
-- PROMPT CONSTRUCTION: Scenario must involve system-level concerns (API design, error propagation, concurrency). Student must anticipate SDK-specific behavior, failure modes, and architectural constraints.
-- PREDICT THE FAILURE: Code must look clean but contain a subtle failure (e.g., promises resolving with errors, inaccurate mocks, silent database filters). Student must identify the specific contract violation/assumption gap and explain production impact.
-- EVALUATE AI OUTPUT: Issues should be complex and multi-faceted, requiring synthesis to identify.
-- CODE_REVIEW: Issues should be subtle and require understanding of how systems behave in production.
-- CONCEPT_APPLICATION / SPOT THE BUG / COMPARE APPROACHES / CHOOSE THE RIGHT TOOL: Issues must be subtle and require understanding of how systems behave in production. Test understanding through application, not just recall.
+- ARCHITECTURAL_TRADE_OFF: Scenario must have explicit constraints (scale, latency, consistency requirements, team size, budget, etc.). There is NO single objectively correct answer. Student must reason about trade-offs given constraints.
+- AI_COLLABORATION: Specify exactly what to build. Ask student to critically evaluate output for correctness, edge cases, and optimality.
 - Multiple Choice Questions (if applicable): All four options must look plausible to someone with 1-2 years of experience. Distractors represent expert-level misconceptions or valid-sounding-but-wrong generalizations.
 - Free-text answers: Expect multi-paragraph responses demonstrating synthesis, design rationale, or explicit trade-off analysis. The correctAnswer describes what strong reasoning looks like, not a single fact.
 - Quality Checks: In your <analysis> block, explicitly verify that the exercise requires genuine synthesis/architectural reasoning and that the distractors/evaluation criteria are appropriate for the hard level.`.trim();
