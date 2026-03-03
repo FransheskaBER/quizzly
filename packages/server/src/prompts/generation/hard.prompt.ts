@@ -68,6 +68,7 @@
 
 export const getHardDifficultyPrompt = (): string =>
   `HARD difficulty calibration:
+- Exercise Type Restrictions: Use ONLY ARCHITECTURAL_TRADE_OFF and AI_COLLABORATION. All other exercise types are forbidden at hard difficulty.
 - General Requirement: Exercise MUST require combining multiple concepts or reasoning about non-obvious implications. Challenge practitioners with real experience, not just beginners. Focus on depth over length - a short question requiring substantial thought is better than a verbose question with an obvious answer.
 - ARCHITECTURAL_TRADE_OFF: Scenario must have explicit constraints (scale, latency, consistency requirements, team size, budget, etc.). There is NO single objectively correct answer. Student must reason about trade-offs given constraints.
 - AI_COLLABORATION: Specify exactly what to build. Ask student to critically evaluate output for correctness, edge cases, and optimality.

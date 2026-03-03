@@ -67,7 +67,7 @@
 
 export const getMediumDifficultyPrompt = (): string =>
   `MEDIUM difficulty calibration:
-- Exercise Type Restrictions: For MEDIUM, prioritize COMPARE_APPROACHES, CHOOSE_THE_RIGHT_TOOL and PROMPT_CONSTRUCTION. SPOT THE BUG is valid but must use subtle bugs. EVALUATE_AI_OUTPUT is valid when the code has a non-obvious flaw requiring understanding.
+- Exercise Type Restrictions: For MEDIUM, prioritize COMPARE_APPROACHES and CHOOSE_THE_RIGHT_TOOL. PROMPT_CONSTRUCTION, EVALUATE_AI_OUTPUT, and SPOT_THE_BUG are permissible but not primary. SPOT_THE_BUG must use subtle bugs. EVALUATE_AI_OUTPUT is only valid when the code has a non-obvious flaw requiring understanding.
 - General Requirement: Must require active reasoning and analysis, not just keyword recall or pattern matching.
 - For COMPARE_APPROACHES: Verify both options look plausible and the choice depends on concrete constraints (time/space complexity, mutability, specific use-case requirements).
 - For CHOOSE_THE_RIGHT_TOOL: Verify the scenario has specific constraints that make the correct choice non-obvious.
