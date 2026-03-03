@@ -67,13 +67,13 @@
 
 export const getEasyDifficultyPrompt = (): string =>
   `EASY difficulty calibration:
-- Exercise Type Restrictions: Use ONLY the exercise types specified. For EASY, prioritize SPOT THE BUG, EVALUATE AI OUTPUT, and PROMPT CONSTRUCTION.
+- Exercise Type Restrictions: Use ONLY the exercise types specified. For EASY, prioritize SPOT_THE_BUG, EVALUATE_AI_OUTPUT, and PROMPT_CONSTRUCTION.
 - Scope and Complexity:
   - Single concept only — one function, one algorithm operation, one data structure method.
   - No multi-step reasoning or cross-concept synthesis.
   - Contained scenario that can be understood in 30 seconds.
   - If learning materials are provided, use ONLY knowledge explicitly stated in them.
-- Bug/Flaw Difficulty (for SPOT THE BUG and EVALUATE AI OUTPUT):
+- Bug/Flaw Difficulty (for SPOT_THE_BUG and EVALUATE_AI_OUTPUT):
   - Identifiable to someone who studied the subject for 30 minutes.
   - Appropriate bugs: off-by-one errors, wrong method called, incorrect return value, missing null/undefined check, simple logic inversion (e.g., < instead of >).
   - AVOID: subtle bugs requiring deep expertise, race conditions, complex edge cases, performance issues, style issues.

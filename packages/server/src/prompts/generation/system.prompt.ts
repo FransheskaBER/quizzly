@@ -12,7 +12,7 @@ import type { QuizDifficulty } from '@skills-trainer/shared';
  * PURPOSE:
  * The core system-role message sent on every quiz generation API call.
  * It defines Quizzly's role as a critical evaluation exercise generator,
- * the ten exercise types, output schema, quality rules, subject/goal
+ * the seven exercise types, output schema, quality rules, subject/goal
  * adherence constraints, difficulty calibrations, and injection defenses.
  *
  * WHEN IT'S USED:
@@ -67,7 +67,7 @@ import type { QuizDifficulty } from '@skills-trainer/shared';
  *   The extractBlock() parser ignores everything outside the expected tags, but
  *   extra text signals the LLM ignored the output structure instruction.
  * - #4 failure mode: LLM generates recall/definition questions instead of the
- *   ten exercise types. Check exercise type labels in the EXERCISE TYPES section
+ *   seven exercise types. Check exercise type labels in the EXERCISE TYPES section
  *   are present and the QUALITY RULES explicitly forbid recall questions.
  * - #5 failure mode: LLM drifts outside the subject (e.g. TypeScript session
  *   produces a binary/decimal question). Verify QUALITY RULES subject adherence
@@ -83,7 +83,7 @@ import type { QuizDifficulty } from '@skills-trainer/shared';
  * 1. Run buildGenerationSystemPrompt() in a local script and copy the output.
  * 2. Paste it into the "System Prompt" field in the Anthropic Console workbench.
  * 3. In the "User" message field, paste: "Please generate the exercises based on the provided system instructions and inputs."
- * 4. Verify EVERY question is one of the ten exercise types — no definitions,
+ * 4. Verify EVERY question is one of the seven exercise types — no definitions,
  *    no recall, no "What is X?" questions.
  * 5. Verify the response contains ONLY <analysis> and <questions> blocks.
  * 6. Verify the JSON parses cleanly and every field matches the schema above.
@@ -98,9 +98,9 @@ export const buildGenerationSystemPrompt = (difficulty: QuizDifficulty): string 
 
 ## EXERCISE TYPES
 
-Every exercise you generate MUST be one of these ten types. Select types appropriate to the difficulty and goal provided:
+Every exercise you generate MUST be one of these seven types. Select types appropriate to the difficulty and goal provided:
 
-1. **SPOT_THE_BUG** — Present a code snippet containing a realistic bug or issue( anti-patterns, performance problems, security issues, etc.). The student identifies the bug and explains the fix.
+1. **SPOT_THE_BUG** — Present a code snippet containing a realistic bug or issue (anti-patterns, performance problems, security issues, etc.). The student identifies the bug and explains the fix.
 
 2. **EVALUATE_AI_OUTPUT** — Present a prompt that was given to an AI AND the code the AI generated. The code looks correct on the surface. The student identifies what the AI got wrong and why — missing contracts, unhandled edge cases, performance, and style, incorrect assumptions about SDK/API behavior, tests that pass but mask bugs, or error handling that silently swallows failures.
 
@@ -174,7 +174,7 @@ The answer_format input specifies what question types to generate:
 
 ## QUALITY RULES
 
-- Every question MUST be one of the ten exercise types listed above
+- Every question MUST be one of the seven exercise types listed above
 - All questions MUST be directly relevant to the subject
 - When materials are provided, every question must be derivable from those materials
 - When no materials are provided, every question must directly serve the stated goal
