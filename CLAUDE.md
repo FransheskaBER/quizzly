@@ -138,3 +138,11 @@ Sprint 4: 018 LLM service → 019 prompt templates → 020 quiz gen backend → 
 Sprint 5: 023 quiz taking backend → 024 quiz taking frontend → 025 grading backend → 026 results frontend → 027 quiz tests
 Sprint 6: 028 error boundaries+sentry → 029 render deploy → 030 E2E tests → 031 prompt iteration → 032 launch checklist
 ```
+
+## 10. Frontend styling rules
+
+For how we organize CSS, design tokens, and shared UI primitives, see `packages/client/RULES_STYLING.md`. That doc defines:
+
+- Tokens and utilities in `src/styles/global.css` as the single source of truth
+- Shared components (e.g. `Button`, `FormField`, `Card`, `AuthPageLayout`) as the only place visual identity is defined
+- Page `.module.css` files as layout‑only glue that arranges shared components into complete screens
