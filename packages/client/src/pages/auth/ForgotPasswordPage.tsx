@@ -9,6 +9,8 @@ import { parseApiError } from '@/hooks/useApiError';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
+import { Card } from '@/components/common/Card';
+import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import styles from './ForgotPasswordPage.module.css';
 
 const ForgotPasswordPage = () => {
@@ -35,31 +37,31 @@ const ForgotPasswordPage = () => {
 
   if (submittedEmail) {
     return (
-      <div className={styles.page}>
-        <div className={styles.card}>
+      <AuthPageLayout>
+        <Card className={styles.card}>
           <div className={styles.successBox}>
             <span className={styles.successIcon}>✉️</span>
-            <h1 className={styles.successTitle}>Check your email</h1>
-            <p className={styles.successText}>
+            <h1 className="heading-lg text-center">Check your email</h1>
+            <p className="text-sm text-muted">
               If an account exists for{' '}
-              <span className={styles.successEmail}>{submittedEmail}</span>, a reset link has been
+              <strong>{submittedEmail}</strong>, a reset link has been
               sent.
             </p>
-            <p className={styles.footer}>
+            <p className={`${styles.footer} text-sm text-muted`}>
               <Link to="/login">Back to sign in</Link>
             </p>
           </div>
-        </div>
-      </div>
+        </Card>
+      </AuthPageLayout>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <div className={styles.card}>
+    <AuthPageLayout>
+      <Card className={styles.card}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Forgot password?</h1>
-          <p className={styles.subtitle}>
+          <h1 className="heading-xl text-center">Forgot password?</h1>
+          <p className="text-sm text-muted text-center">
             Enter your email and we&apos;ll send you a reset link.
           </p>
         </div>
@@ -82,11 +84,11 @@ const ForgotPasswordPage = () => {
           </Button>
         </form>
 
-        <p className={styles.footer}>
+        <p className={`${styles.footer} text-sm text-muted`}>
           <Link to="/login">Back to sign in</Link>
         </p>
-      </div>
-    </div>
+      </Card>
+    </AuthPageLayout>
   );
 };
 
