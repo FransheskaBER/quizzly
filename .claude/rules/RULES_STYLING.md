@@ -15,7 +15,7 @@
   - Own all **visual identity** decisions: colors, borders, radii, shadows, typography choices, component paddings.
   - Must read appearance exclusively from tokens defined in `global.css`.
   - Expose `variant` / `size` / layout props instead of encouraging page‑specific overrides.
-  - Examples: `Button`, `FormField`, `FormError`, `Modal`, `Card`, `Alert`, `PageShell`, `AuthPageLayout`.
+  - Examples: `Button`, `FormField`, `FormError`, `Modal`, `Card`, `ResultSummary`, `AuthPageLayout`.
 
 - **Page `.module.css` files** (`packages/client/src/pages/**`):
   - Are **layout‑only glue**:
@@ -31,7 +31,7 @@
     - Add a new utility class there, or
     - Extract a small shared layout component.
 - Example utilities (defined in `global.css`):
-  - Layout: `.pageShell`, `.stack-sm`, `.stack-md`, `.stack-lg`, `.row-between`, `.row-center`.
+  - Layout: `.page-shell`, `.stack-sm`, `.stack-md`, `.stack-lg`, `.row-between`, `.row-center`.
   - Typography: `.heading-xl`, `.heading-lg`, `.text-sm`, `.text-muted`, `.text-center`.
 
 ### Code review checklist for CSS changes

@@ -44,7 +44,7 @@ const ForgotPasswordPage = () => {
             <h1 className="heading-lg text-center">Check your email</h1>
             <p className="text-sm text-muted">
               If an account exists for{' '}
-              <span className={styles.successEmail}>{submittedEmail}</span>, a reset link has been
+              <strong>{submittedEmail}</strong>, a reset link has been
               sent.
             </p>
             <p className={`${styles.footer} text-sm text-muted`}>
