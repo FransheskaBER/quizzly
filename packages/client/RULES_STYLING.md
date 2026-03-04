@@ -33,7 +33,7 @@ This document describes how styling is organized in the client app. It mirrors t
     - Add a new utility class there, or
     - Extract a small shared layout component.
 - Example utilities (defined in `global.css`):
-  - Layout: `.pageShell`, `.stack-sm`, `.stack-md`, `.stack-lg`, `.row-between`, `.row-center`.
+  - Layout: `.page-shell`, `.stack-sm`, `.stack-md`, `.stack-lg`, `.row-between`, `.row-center`.
   - Typography: `.heading-xl`, `.heading-lg`, `.text-sm`, `.text-muted`, `.text-center`.
 
 ### Code review checklist for CSS changes
