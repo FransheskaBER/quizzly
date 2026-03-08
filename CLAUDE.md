@@ -2,12 +2,7 @@
 
 LLM-powered skills training platform for software engineers
 
-<!-- Fill after running /product:generate-prd and /architecture:generate-tdd -->
-
 ## Tech Stack
-
-<!-- Fill after running /architecture:tech-stack. List each category on one line. -->
-<!-- Format: Category: Tool (version constraint if any). Add "Never use: X" for prohibited alternatives. -->
 
 - Frontend:
 ├── Framework: React 18 with Vite — Fast builds, developer familiarity, Vite is modern standard
@@ -77,8 +72,6 @@ Follow `.claude/rules/coding-conventions.md` for all code written in this projec
 
 ## Architectural Boundaries
 
-<!-- Fill after running /architecture:system-design. Define what each layer is allowed and prohibited from doing. -->
-
 Universal rules (apply regardless of architecture):
 - No circular dependencies between modules.
 - No business logic in route handlers — routes are thin wrappers that call services.
@@ -87,10 +80,18 @@ Universal rules (apply regardless of architecture):
 - No hardcoded values — extract to constants or environment variables.
 
 Project-specific boundaries:
-<!-- Example format: -->
-<!-- - Routes: NO business logic, NO direct DB calls, NO try/catch (asyncHandler handles it). -->
-<!-- - Services: NO req/res imports, NO direct response formatting. -->
-<!-- - Components: NO direct API calls — all through designated data fetching pattern. -->
+
+**Routes:** Parse request → call service → return response. NO business logic, NO direct Prisma calls, NO try/catch (wrap in `asyncHandler()`), NO error response formatting.
+
+**Services:** NO `req`/`res` imports, NO HTTP response formatting. Call `assertOwnership()` for every protected resource. Only layer that throws `AppError` subclasses. May call Prisma directly; extract reused query patterns into private helpers.
+
+**Shared package:** NO imports from `packages/server` or `packages/client`. Zod schemas are the single source of truth — derive all types via `z.infer<>`. Never duplicate a schema.
+
+**Frontend components:** NO direct API calls (`fetch`, `axios`). All server communication through RTK Query hooks. NO business logic — render UI and call hooks.
+
+**Middleware:** `error.middleware.ts` is the only place that formats error responses. `validate.middleware.ts` is the only place that runs Zod parsing. `auth.middleware.ts` is the only place that verifies JWT tokens.
+
+**General:** All env-specific values come from `src/config/env.ts` (Zod-validated on startup). Database columns use `snake_case` via `@map()`; Prisma fields and application code use `camelCase`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -168,8 +169,6 @@ After implementation:
 - Commit messages: `type: description` (types: feat, fix, docs, refactor, test, chore)
 - Pre-push: run lint, typecheck, and tests locally before pushing. Do not push failing code.
 - PRs: one feature branch per spec. PR description references the spec file path.
-
-<!-- Fill branch prefix convention after project setup. Example: task number (007), ticket ID (QZ-42). -->
 
 ## Reference Documents
 
