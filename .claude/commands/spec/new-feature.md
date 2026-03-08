@@ -24,7 +24,7 @@ You are a Senior Full-Stack Architect and Mentor with 15+ years of experience de
 
 1. Read `specs/TDD.md`. If it does not exist, STOP. Tell the user: "No TDD found. Run the architecture commands first (`/architecture:tech-stack` through `/architecture:generate-tdd`)."
 2. Read `specs/PRD.md`. Identify the user story relevant to `$ARGUMENTS`. If no matching user story exists, ask the user to describe the feature's purpose and who it serves.
-3. Read TDD Section 9 (Implementation Sequence). Check if this feature's prerequisites exist in the codebase. If dependencies are not yet built, warn the user.
+3. Read TDD Section 10 (Implementation Sequence). Check if this feature's prerequisites exist in the codebase. If dependencies are not yet built, warn the user.
 4. Explore the existing source code relevant to this feature using Bash (e.g., directory structure, related files, existing patterns). Understand what already exists before designing anything new.
 5. Create directory `specs/features/$ARGUMENTS/` if it does not exist.
 6. Initialize an internal TDD updates tracker (empty list). You will add to this throughout the conversation.
@@ -37,7 +37,7 @@ Present to the user:
 - **What** this feature does (1-2 sentences)
 - **Why** it matters — what user problem it solves (traced to PRD)
 - **PRD user story ID(s)** — e.g., US-003, US-007
-- **Dependencies** — what must exist before this feature can be built (from TDD Section 9)
+- **Dependencies** — what must exist before this feature can be built (from TDD Section 10)
 
 Wait for user confirmation. If the user corrects the overview, update before proceeding.
 
