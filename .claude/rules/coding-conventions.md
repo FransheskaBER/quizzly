@@ -13,7 +13,7 @@ These rules apply to every file written or modified in this project. Never devia
 - Variables: descriptive camelCase. Use `userData` not `data`, `passwordHash` not `hash`, `currentUser` not `u`. The name must tell the reader what the variable holds without looking at the assignment.
 - Constants: UPPER_SNAKE_CASE. Examples: `COOKIE_NAME`, `MAX_RETRY_COUNT`, `DEFAULT_PAGE_SIZE`.
 - Booleans: prefix with `is`, `has`, `can`, `should`. Examples: `isAuthenticated`, `hasPermission`, `canEdit`.
-- Files: kebab-case. Examples: `auth-service.ts`, `quiz-attempt.controller.ts`, `validate-input.utils.ts`.
+- Files: dot-case with kebab-case segments. Format: `name.role.ts`. Examples: `auth.service.ts`, `quiz.routes.ts`, `auth.middleware.ts`, `validate-input.utils.ts`.
 - Types/Interfaces: PascalCase, noun-based. Examples: `User`, `QuizAttempt`, `CreateUserInput`, `ApiResponse`.
 - Never use single-letter variables except in algorithm-specific code (e.g., `left`, `right` pointers in two-pointer pattern, `i` in simple loops). Application code must always use descriptive names.
 
@@ -88,13 +88,16 @@ function createUser(input: { email: string; username: string; password: string }
 
 ## Error Handling
 
-- Input validation: use early returns. Never throw for expected validation failures.
+- Input validation: use early returns for pure functions. In this project, validation failures in services throw an `AppError` subclass — the global `error.middleware.ts` handles response formatting. Project-specific architectural boundaries (see CLAUDE.md) override these general examples.
 
 ```typescript
-// CORRECT — early return for validation
+// CORRECT — throw AppError for validation in services (project pattern)
 if (!email || !password) {
-  return res.status(400).json({ error: "email and password are required" });
+  throw new ValidationError("email and password are required");
 }
+
+// CORRECT — early return for validation in pure/utility functions
+if (!id) return null;
 ```
 
 - Operations that can fail (database, external APIs, file I/O): use try/catch.
@@ -176,6 +179,7 @@ function findDuplicates(items: string[]): string[] { ... }
 ## Test File Structure
 
 - Unit and integration tests: co-located with source code. Place `filename.test.ts` next to `filename.ts` in the same folder.
+- **Migration note**: The existing codebase uses `__tests__/` subdirectories (e.g., `services/__tests__/auth.service.test.ts`). Do not move existing tests — leave them in `__tests__/` until explicitly migrated. All **new** test files follow the co-located convention (`filename.test.ts` next to `filename.ts`).
 - E2E tests: live in `e2e/` folder at project root, organized by user journey.
 - Test file naming: `{source-filename}.test.ts`. Example: `auth.service.ts` → `auth.service.test.ts`.
 
