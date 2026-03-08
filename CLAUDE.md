@@ -1,148 +1,179 @@
-# CLAUDE.md — Project Working Brief
+# Quizzly
 
-## 1. Project Overview
+LLM-powered skills training platform for software engineers
 
-Web app that generates quiz questions from user-uploaded study materials for technical skill practice. Solo-dev MVP, 30-user target. Monorepo: `packages/shared`, `packages/server`, `packages/client` as npm workspaces.
+## Tech Stack
 
-## 2. Tech Stack
+- Frontend:
+├── Framework: React 18 with Vite — Fast builds, developer familiarity, Vite is modern standard
+├── State Management: Redux Toolkit (RTK) + RTK Query — Developer specified Redux. RTK Query
+│   handles API caching/fetching, eliminates boilerplate for server state.
+├── Routing: React Router DOM v6 — Developer specified. Standard choice.
+├── Styling: CSS Modules — Plain CSS scoped per component. Enables paste-in styling from
+│   external tools (Gemini). global.css for resets and CSS variables.
+├── Form Handling: React Hook Form + Zod — Lightweight forms. Zod schemas shared with backend.
+├── Markdown/Code Rendering: react-markdown + react-syntax-highlighter — Quiz questions contain
+│   code snippets needing proper rendering.
+├── Rejected alternatives:
+│   - Next.js: SSR overkill for authenticated SPA. No SEO benefit. Adds complexity.
+│   - Tailwind: Adds translation layer vs plain CSS from Gemini. Unnecessary friction.
+│   - MUI/Chakra: Heavy. CSS Modules + custom components give more control.
+│   - Zustand/Jotai: Developer knows Redux. RTK Query covers server state.
 
-- **Monorepo:** npm workspaces — `packages/shared`, `packages/server`, `packages/client`
-- **Shared:** Zod schemas (single source of truth for validation + types), TypeScript types via `z.infer<>`, enums, constants
-- **Frontend:** React 18 + Vite, Redux Toolkit + RTK Query, React Router DOM v6, CSS Modules, React Hook Form + Zod
-- **Backend:** Node.js 22 LTS, Express.js, Prisma ORM, Zod validation, pino logger
-- **Database:** PostgreSQL 17 (Docker local, Neon production). All PKs UUID. All timestamps UTC.
-- **Storage:** AWS S3 (original files) + Neon `materials.extracted_text` (plain text for LLM). Quiz generation reads from Neon only — never S3.
-- **LLM:** Anthropic Claude Sonnet 4 via `@anthropic-ai/sdk`. Streaming via SSE.
-- **Auth:** Self-managed JWT (jsonwebtoken, 7-day expiry, localStorage) + bcryptjs (cost factor 12)
-- **Email:** Resend. **Hosting:** Render (backend $7/mo, frontend free static site)
+- Backend:
+├── Runtime: Node.js 22 LTS — Developer specified. Stable, good Render support.
+├── Framework: Express.js — Mature ecosystem, handles SSE natively, developer familiarity.
+├── ORM: Prisma — Type-safe, generates TS types from schema, excellent migration tooling,
+│   works with Neon Postgres. Shared types via monorepo.
+├── Validation: Zod — Schemas shared between frontend and backend via shared package.
+├── File Processing:
+│   ├── PDF: pdfjs-dist (legacy build) — see §12 for why pdf-parse was replaced
+│   ├── DOCX: mammoth
+│   ├── TXT: Native fs
+│   └── URL: Mozilla Readability + jsdom
+├── Email: Resend — Simple API, generous free tier (100 emails/day).
+├── Logging: pino — Structured JSON logging, lightweight.
+├── Rejected alternatives:
+│   - NestJS: Heavyweight for solo-dev MVP.
+│   - Drizzle: Less mature migration tooling than Prisma.
+│   - Nodemailer + SMTP: Unreliable self-managed email.
+│   - Passport.js: Abstraction over 10 lines of bcrypt + JWT.
 
-Do not add new dependencies without explicit approval. Use what's listed.
-Pin to the versions specified: Node.js 22 LTS, React 18, PostgreSQL 17, Prisma (latest stable).
-If a task requires a library not listed here, stop and ask before proceeding.
+- Database:
+├── Primary: PostgreSQL on Neon — Serverless Postgres, free tier, connection pooling built-in.
+├── Local Dev: Docker Postgres 17 — Zero network latency, works offline.
+├── Cache: None for MVP — 30 users don't need Redis.
+├── Rejected alternatives:
+│   - MongoDB: Relational data. Document DB adds complexity for no benefit.
+│   - SQLite: Can't share between instances if scaling.
 
-## 3. Architecture Rules
+- Infrastructure:
+├── Hosting: Render
+│   ├── Backend: Web Service ($7/mo starter — avoids cold starts)
+│   └── Frontend: Static Site (free tier)
+├── CI/CD: GitHub Actions (lint, typecheck, test, build) + Render auto-deploy
+├── Secrets: Render Environment Variables
+├── Monorepo: npm workspaces — Three packages: client, server, shared
 
-### 3A: Code Quality Conventions
+- Testing:
+| Layer | Type | Tool | Est. Count |
+|---|---|---|---|
+| Shared schemas | Unit | Vitest | ~20 |
+| Server utils | Unit | Vitest | ~15 |
+| Server services | Unit (mocked deps) | Vitest | ~30 |
+| Server prompts | Unit | Vitest | ~10 |
+| Server API | Integration (real Postgres) | Vitest + Supertest | ~25 |
+| Client components | Component | Vitest + React Testing Library | ~15 |
+| Critical paths | E2E | Playwright | 5 |
 
-Enable TypeScript strict mode everywhere. Never use `any` unless a specific inline comment justifies it.
-Never use magic strings or numbers. Extract cross-package values to `packages/shared/src/constants/`; extract file-scoped values to a local `const`.
-Every function does one thing. Split any function that handles two concerns.
-Never duplicate types, schemas, constants, or utilities across packages. If both server and client need it, it lives in `packages/shared/`.
-Never duplicate logic within a package. Extract repeated Prisma query patterns into shared helpers in `src/utils/`.
-Import order: shared package imports first, then external dependencies, then local modules. Separate each group with a blank line.
-All error messages must be actionable — state what the user must do, not just what went wrong.
-Use early returns instead of nested conditionals.
-Never commit commented-out code. Remove it.
-Never use `console.log` on the server. Use pino logger for all server-side logging. Frontend may use `console.error` only inside error boundaries.
+## Code Conventions
 
-### 3B: Architectural Boundaries
+Follow `.claude/rules/coding-conventions.md` for all code written in this project. These rules are non-negotiable. Never deviate without explicit user approval.
 
-**Routes:**
-- Must contain no business logic. Parse request → call service → return response.
-- Must never import or call Prisma directly.
-- Must never contain try/catch blocks. Wrap every route handler in `asyncHandler()`.
-- Must never format error responses. Return the service result and let Express serialize it.
+## Architectural Boundaries
 
-**Services:**
-- Must never import `req`, `res`, or any Express types.
-- Must never call `res.status().json()` or format HTTP responses.
-- Must call `assertOwnership()` from `utils/ownership.ts` for every protected resource access.
-- Are the only layer that throws `AppError` subclasses.
-- May call Prisma directly. Extract complex or reused query patterns into private helper functions within the same service file.
+Universal rules (apply regardless of architecture):
+- No circular dependencies between modules.
+- No business logic in route handlers — routes are thin wrappers that call services.
+- No direct database calls outside the designated data access layer.
+- Shared types, constants, and validation schemas live in one place — never duplicated across packages.
+- No hardcoded values — extract to constants or environment variables.
 
-**Shared package:**
-- Must never import from `packages/server` or `packages/client`.
-- Zod schemas are the single source of truth for all validation. Both frontend and backend import from `@skills-trainer/shared`. Never duplicate a schema.
-- All types must be derived from Zod schemas via `z.infer<>`. Never manually write a type that a schema already defines.
+Project-specific boundaries:
 
-**Frontend components:**
-- Must never make direct API calls (no `fetch`, no `axios`). All server communication goes through RTK Query hooks.
-- Must contain no business logic. Components render UI and call hooks.
+**Routes:** Parse request → call service → return response. NO business logic, NO direct Prisma calls, NO try/catch (wrap in `asyncHandler()`), NO error response formatting.
 
-**Middleware:**
-- `error.middleware.ts` is the only place that formats error responses. No other file calls `res.status().json()` for errors.
-- `validate.middleware.ts` is the only place that runs Zod parsing on request input.
-- `auth.middleware.ts` is the only place that extracts and verifies JWT tokens.
+**Services:** NO `req`/`res` imports, NO HTTP response formatting. Call `assertOwnership()` for every protected resource. Only layer that throws `AppError` subclasses. May call Prisma directly; extract reused query patterns into private helpers.
 
-**General:**
-- Never hardcode URLs, ports, API keys, or environment-specific values. All come from `src/config/env.ts`, which validates via Zod on startup.
-- Database columns use `snake_case` in Postgres via `@map()`. Prisma model fields use `camelCase`. Application code only ever sees `camelCase`.
+**Shared package:** NO imports from `packages/server` or `packages/client`. Zod schemas are the single source of truth — derive all types via `z.infer<>`. Never duplicate a schema.
 
-### 3C: Testing Conventions
+**Frontend components:** NO direct API calls (`fetch`, `axios`). All server communication through RTK Query hooks. NO business logic — render UI and call hooks.
 
-Co-locate tests with source: `services/__tests__/auth.service.test.ts`.
-Place E2E tests in `packages/client/e2e/`.
-Test services with mocked external dependencies (Prisma, S3, Anthropic, Resend).
-Integration tests must run against real Postgres via Docker. Never mock the database in integration tests.
-Mock LLM responses in all test environments (unit, integration, E2E). Never make real Anthropic API calls in tests.
-Every bug fix must include a regression test that fails without the fix and passes with it.
-Maintain 80% minimum coverage on all files in `packages/server/src/services/`.
-Name test files `[source-filename].test.ts`.
-Name `describe` blocks after the function or method under test. Write `it` blocks as behavior descriptions: `it('throws NotFoundError when session does not exist')`.
+**Middleware:** `error.middleware.ts` is the only place that formats error responses. `validate.middleware.ts` is the only place that runs Zod parsing. `auth.middleware.ts` is the only place that verifies JWT tokens.
 
-## 4. Error Handling
-
-Both frontend and backend must know this format. Every API error response follows:
-```json
-{ "error": { "code": "VALIDATION_ERROR", "message": "human-readable", "details": [] } }
-```
-- **Backend:** Services throw `AppError` subclasses (`ValidationError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `RateLimitError`). Global `error.middleware.ts` is the ONLY place that formats responses. Translates Prisma errors (P2002→409, P2025→404) and ZodError (→400 with field details). 5xx: generic message to client, full stack to Sentry.
-- **Frontend:** `useApiError(error)` hook extracts `{ message, code, details }` from any RTK Query error. Global 401 handler in `baseQueryWithAuth` dispatches `logout()` — never handle auth expiry in individual components.
-- **SSE streams:** Pre-stream errors return normal JSON. Mid-stream errors sent as `{ type: 'error', message: '...' }` SSE event (can't send HTTP status after writeHead).
-
-Never throw raw `Error`. Always use an `AppError` subclass.
-Never catch an error and swallow it silently. Either rethrow, log, or handle explicitly.
-4xx errors must include an actionable message for the user. 5xx errors send a generic message to the client and full details to Sentry and pino logs.
-SSE mid-stream errors: send `{ type: 'error', message }` event, close the stream, and update the DB status to reflect the failure state.
-
-## 5. LLM Integration
-
-- **Prompt templates are code.** Live in `src/prompts/` as TypeScript functions. Version-controlled. Never stored in DB.
-- **Two-phase prompting (single API call):** LLM outputs `<analysis>` (reasoning) then `<questions>` or `<results>` (structured JSON). Parse only the JSON block — discard analysis.
-- **Validation + retry:** Every LLM response validated against Zod. On failure: retry once with corrective prompt. On second failure: error to user, log for investigation.
-
-Prompt template functions are pure functions — no side effects, no database calls, no imports from services.
-All user content must pass through `sanitize.utils.ts` before injection into prompt strings. Never concatenate unvalidated user input directly into a prompt.
-
-## 6. Quiz Attempt Status Lifecycle
+**General:** All env-specific values come from `src/config/env.ts` (Zod-validated on startup). Database columns use `snake_case` via `@map()`; Prisma fields and application code use `camelCase`.
 
 ```
-generating → in_progress → grading → completed
-                              ↓
-                       submitted_ungraded → grading (retry) → completed
+┌─────────────────────────────────────────────────────────────┐
+│                     CLIENT (React SPA)                       │
+│                  Render Static Site (Free)                    │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
+│  │   Auth   │ │ Sessions │ │   Quiz   │ │  Dashboard   │   │
+│  │  Pages   │ │  Pages   │ │  Pages   │ │    Page      │   │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────┬───────┘   │
+│       └─────────────┴────────────┴──────────────┘            │
+│                         │                                    │
+│                    RTK Query                                 │
+│                 (API Client Layer)                            │
+│                         │                                    │
+└─────────────────────────┼────────────────────────────────────┘
+                          │ HTTPS (REST + SSE for streaming)
+                          │
+┌─────────────────────────┼────────────────────────────────────┐
+│                   SERVER (Express.js)                         │
+│                Render Web Service ($7/mo)                     │
+│                         │                                    │
+│  ┌──────────────────────┴──────────────────────────┐        │
+│  │             MIDDLEWARE CHAIN                      │        │
+│  │  cors → helmet → rateLimit → auth → validate     │        │
+│  └──────────────────────┬──────────────────────────┘        │
+│                         │                                    │
+│  ┌──────────┐ ┌────────┴───┐ ┌──────────┐ ┌──────────┐    │
+│  │  Auth    │ │  Session   │ │   Quiz   │ │ Material │    │
+│  │ Routes   │ │  Routes    │ │  Routes  │ │  Routes  │    │
+│  └────┬─────┘ └─────┬──────┘ └────┬─────┘ └────┬─────┘    │
+│       │             │              │             │           │
+│  ┌────┴─────┐ ┌─────┴──────┐ ┌────┴─────┐ ┌────┴─────┐    │
+│  │  Auth    │ │  Session   │ │   Quiz   │ │ Material │    │
+│  │ Service  │ │  Service   │ │  Service │ │  Service │    │
+│  └────┬─────┘ └─────┬──────┘ └────┬─────┘ └────┬─────┘    │
+│       │             │         ┌────┴─────┐      │           │
+│       │             │         │   LLM    │      │           │
+│       │             │         │ Service  │      │           │
+│       │             │         └──────────┘      │           │
+│  ┌────┴─────────────┴──────────────────────┬────┴─────┐    │
+│  │                Prisma ORM               │ S3 Svc   │    │
+│  └─────────────────┬──────────────────────┘└────┬─────┘    │
+└────────────────────┼────────────────────────────┼──────────┘
+                     │                            │
+        ┌────────────┼──────────────┐             │
+        │            │              │             │
+ ┌──────┴──────┐ ┌───┴────┐ ┌──────┴──────┐ ┌───┴────┐
+ │    Neon     │ │  AWS   │ │   Resend    │ │Anthropic│
+ │  Postgres   │ │   S3   │ │  (Email)    │ │  (LLM) │
+ └─────────────┘ └────────┘ └─────────────┘ └────────┘
 ```
-Never skip a state. Both frontend (UI states) and backend (DB status field) must respect this lifecycle.
 
-## 7. File Upload Flow
+## Spec-Driven Workflow
 
-```
-Frontend: POST /materials/upload-url → receives presigned S3 URL + materialId
-Frontend: PUT file directly to S3 (server never touches bytes)
-Frontend: POST /materials/:id/process → server extracts text → stores in Neon
-Generation: server reads extracted_text from Neon → sends to LLM (S3 never touched)
-```
+**ABSOLUTE RULE: Never make autonomous decisions. If implementation requires deviating from the spec in any way — different approach, additional dependency, changed data model, skipped requirement — STOP immediately. Explain the deviation to the user: what the spec says, what you think needs to change, and why. Wait for explicit user confirmation before proceeding. This applies to every decision, no matter how small.**
 
-## 8. Current Sprint
+Before implementing any feature:
+1. Read `specs/features/{feature-name}/SPEC.md` (or `RFC.md` for refactors). This is your implementation brief.
+2. If a `REVIEW.md` exists in the same folder, read its Lessons Learned section. Apply those rules during implementation.
+3. Implement ONLY what the spec defines. Nothing more, nothing less. No gold-plating.
 
-Sprint 6: Polish & Deploy (Week 6-7)
-Current task: 032 — Launch checklist (security review, performance, README)
+During implementation:
+- Every acceptance criterion in the spec must be satisfied. Check them off as you implement.
+- Test expectations come from acceptance criteria — never derive tests from reading your own implementation.
+- If you discover the spec is incomplete or ambiguous, STOP and ask. Do not fill gaps with assumptions.
 
-## 9. Task Reference
+After implementation:
+- Verify every acceptance criterion is covered by at least one test.
+- Verify every error status code in the API contracts has a corresponding test.
 
-```
-Sprint 0: 001 monorepo → 002 docker+prisma → 003 express scaffold → 004 react scaffold → 005 shared package → 006 CI
-Sprint 1: 007 auth backend → 008 auth frontend → 009 auth tests
-Sprint 2: 010 session backend → 011 dashboard backend → 012 session+dashboard frontend → 013 session tests
-Sprint 3: 014 S3 service → 015 material backend → 016 material frontend → 017 material tests
-Sprint 4: 018 LLM service → 019 prompt templates → 020 quiz gen backend → 021 quiz gen frontend → 022 quiz gen tests
-Sprint 5: 023 quiz taking backend → 024 quiz taking frontend → 025 grading backend → 026 results frontend → 027 quiz tests
-Sprint 6: 028 error boundaries+sentry → 029 render deploy → 030 E2E tests → 031 prompt iteration → 032 launch checklist
-```
+## Git Workflow
 
-## 10. Frontend styling rules
+- Branch naming: `feature/QZ32-description` or `fix/QZ32-description`
+- Commit messages: `type: description` (types: feat, fix, docs, refactor, test, chore)
+- Pre-push: run lint, typecheck, and tests locally before pushing. Do not push failing code.
+- PRs: one feature branch per spec. PR description references the spec file path.
 
-For how we organize CSS, design tokens, and shared UI primitives, see `packages/client/RULES_STYLING.md`. That doc defines:
+## Reference Documents
 
-- Tokens and utilities in `src/styles/global.css` as the single source of truth
-- Shared components (e.g. `Button`, `FormField`, `Card`, `AuthPageLayout`) as the only place visual identity is defined
-- Page `.module.css` files as layout‑only glue that arranges shared components into complete screens
+- Product requirements: `specs/PRD.md`
+- Technical design: `specs/TDD.md`
+- Feature specs: `specs/features/{name}/SPEC.md`
+- Implementation rules: `.claude/rules/implementation-mode.md`
+- Coding standards: `.claude/rules/coding-conventions.md`
