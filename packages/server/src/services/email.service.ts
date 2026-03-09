@@ -5,12 +5,14 @@ import { Sentry } from '../config/sentry.js';
 
 const logger = pino({ name: 'email-service' });
 
+const EMAIL_DISPLAY_NAME = 'Quizzly AI';
+
 export const sendVerificationEmail = async (to: string, token: string): Promise<void> => {
-  const from = env.EMAIL_FROM;
-  if (!from) {
+  if (!env.EMAIL_FROM) {
     logger.warn({ to }, 'EMAIL_FROM not configured — skipping verification email');
     return;
   }
+  const from = `${EMAIL_DISPLAY_NAME} <${env.EMAIL_FROM}>`;
 
   const verifyUrl = `${env.CLIENT_URL}/verify-email?token=${token}`;
 
@@ -45,11 +47,11 @@ export const sendVerificationEmail = async (to: string, token: string): Promise<
 };
 
 export const sendPasswordResetEmail = async (to: string, token: string): Promise<void> => {
-  const from = env.EMAIL_FROM;
-  if (!from) {
+  if (!env.EMAIL_FROM) {
     logger.warn({ to }, 'EMAIL_FROM not configured — skipping password reset email');
     return;
   }
+  const from = `${EMAIL_DISPLAY_NAME} <${env.EMAIL_FROM}>`;
 
   const resetUrl = `${env.CLIENT_URL}/reset-password?token=${token}`;
 
