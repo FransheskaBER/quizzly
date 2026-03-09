@@ -3,6 +3,7 @@ import {
   QuestionType,
   MaterialStatus,
   SSE_SERVER_TIMEOUT_MS,
+  FREE_TRIAL_QUESTION_COUNT,
   type QuizDifficulty,
   type AnswerFormat,
   type QuizAttemptResponse,
@@ -15,7 +16,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
-import { BadRequestError, ConflictError, NotFoundError } from '../utils/errors.js';
+import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from './llm.service.js';
 import type { FreeTextAnswer } from './llm.service.js';
 import type { SseWriter } from '../utils/sse.utils.js';
@@ -31,6 +32,8 @@ interface PreparedGeneration {
   sessionGoal: string;
   materialsText: string;
   materialsUsed: boolean;
+  isFreeTrialGeneration: boolean;
+  anthropicApiKey?: string;
 }
 
 interface GenerationParams {
@@ -64,6 +67,7 @@ export interface GradingContext {
   sessionSubject: string;
   questions: GradingQuestion[];
   answers: GradingAnswer[];
+  anthropicApiKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +82,24 @@ export interface GradingContext {
 export const prepareGeneration = async (
   sessionId: string,
   userId: string,
+  anthropicApiKey?: string,
 ): Promise<PreparedGeneration> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { freeTrialUsedAt: true },
+  });
+
+  if (!user) throw new NotFoundError('User not found');
+
+  const isTrialUsed = user.freeTrialUsedAt !== null;
+  const isFreeTrialGeneration = !isTrialUsed;
+
+  if (isTrialUsed && !anthropicApiKey) {
+    throw new TrialExhaustedError(
+      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
+    );
+  }
+
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: {
@@ -108,6 +129,9 @@ export const prepareGeneration = async (
     sessionGoal: session.goal,
     materialsText,
     materialsUsed,
+    isFreeTrialGeneration,
+    // Only pass the user's key for BYOK generations; free trial uses the server key.
+    anthropicApiKey: isFreeTrialGeneration ? undefined : anthropicApiKey,
   };
 };
 
@@ -129,12 +153,16 @@ export const executeGeneration = async (
     userId,
     difficulty,
     answerFormat,
-    questionCount,
+    questionCount: requestedCount,
     sessionSubject,
     sessionGoal,
     materialsText,
     materialsUsed,
+    isFreeTrialGeneration,
+    anthropicApiKey,
   } = params;
+
+  const questionCount = isFreeTrialGeneration ? FREE_TRIAL_QUESTION_COUNT : requestedCount;
 
   let quizAttemptId: string | null = null;
   let timedOut = false;
@@ -154,6 +182,7 @@ export const executeGeneration = async (
         answerFormat,
         questionCount,
         materialsUsed,
+        isFreeTrial: isFreeTrialGeneration,
         status: QuizStatus.GENERATING,
       },
     });
@@ -173,6 +202,7 @@ export const executeGeneration = async (
         materialsText: materialsText || null,
       },
       () => {},
+      anthropicApiKey,
     );
 
     let questionsGenerated = 0;
@@ -224,14 +254,20 @@ export const executeGeneration = async (
     // startedAt is set null here and stamped only when the user first opens the
     // quiz on the taking page, so the session list can distinguish
     // "generated but not started" from "started (can continue)".
-    await prisma.quizAttempt.update({
-      where: { id: quizAttempt.id },
-      data: {
-        status: QuizStatus.IN_PROGRESS,
-        questionCount: questionsGenerated,
-        startedAt: null,
-      },
-    });
+    // Mark free trial as used in the same transaction so it's atomic.
+    await prisma.$transaction([
+      prisma.quizAttempt.update({
+        where: { id: quizAttempt.id },
+        data: {
+          status: QuizStatus.IN_PROGRESS,
+          questionCount: questionsGenerated,
+          startedAt: null,
+        },
+      }),
+      ...(isFreeTrialGeneration
+        ? [prisma.user.update({ where: { id: userId }, data: { freeTrialUsedAt: new Date() } })]
+        : []),
+    ]);
 
     if (!timedOut) {
       writer({ type: 'complete', data: { quizAttemptId: quizAttempt.id } });
@@ -362,6 +398,7 @@ export const prepareGrading = async (
   quizAttemptId: string,
   userId: string,
   answers: Array<{ questionId: string; answer: string }>,
+  anthropicApiKey?: string,
 ): Promise<GradingContext> => {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: quizAttemptId },
@@ -380,6 +417,14 @@ export const prepareGrading = async (
   }
   if (attempt.status !== QuizStatus.IN_PROGRESS) {
     throw new BadRequestError('Quiz is not in progress');
+  }
+
+  // BYOK quizzes require the user's key for free-text grading
+  const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
+  if (!attempt.isFreeTrial && hasFreeText && !anthropicApiKey) {
+    throw new TrialExhaustedError(
+      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
+    );
   }
 
   // Apply any final answers sent with the submit payload
@@ -420,6 +465,7 @@ export const prepareGrading = async (
       questionId: a.questionId,
       userAnswer: a.userAnswer,
     })),
+    anthropicApiKey,
   };
 };
 
@@ -431,6 +477,7 @@ export const prepareGrading = async (
 export const prepareRegrade = async (
   quizAttemptId: string,
   userId: string,
+  anthropicApiKey?: string,
 ): Promise<GradingContext> => {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: quizAttemptId },
@@ -448,6 +495,14 @@ export const prepareRegrade = async (
     throw new ConflictError('Quiz is not in submitted_ungraded status');
   }
 
+  // BYOK quizzes require the user's key for free-text grading
+  const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
+  if (!attempt.isFreeTrial && hasFreeText && !anthropicApiKey) {
+    throw new TrialExhaustedError(
+      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
+    );
+  }
+
   return {
     quizAttemptId,
     sessionSubject: attempt.session.subject,
@@ -463,6 +518,7 @@ export const prepareRegrade = async (
       questionId: a.questionId,
       userAnswer: a.userAnswer,
     })),
+    anthropicApiKey,
   };
 };
 
@@ -480,7 +536,7 @@ export const executeGrading = async (
   context: GradingContext,
   writer: SseWriter,
 ): Promise<void> => {
-  const { quizAttemptId, sessionSubject, questions, answers } = context;
+  const { quizAttemptId, sessionSubject, questions, answers, anthropicApiKey } = context;
   const now = new Date();
   let timedOut = false;
 
@@ -538,6 +594,7 @@ export const executeGrading = async (
       const gradedResults = await llmGradeAnswers(
         { subject: sessionSubject, answers: freeTextPayload },
         () => {},
+        anthropicApiKey,
       );
 
       for (const result of gradedResults) {

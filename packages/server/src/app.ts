@@ -14,6 +14,14 @@ import { globalRateLimiter } from './middleware/rateLimiter.middleware.js';
 import { requestIdMiddleware } from './middleware/requestId.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 
+/** Strips `x-anthropic-key` from request headers before pino-http logs them. */
+export const redactSensitiveHeaders = (req: { headers: Record<string, string>; [key: string]: unknown }): Record<string, unknown> => {
+  const { headers, ...rest } = req;
+  const safeHeaders = { ...headers };
+  delete safeHeaders['x-anthropic-key'];
+  return { ...rest, headers: safeHeaders };
+};
+
 export const createApp = () => {
   const app = express();
   const logger = pino({ name: 'server' });
@@ -30,12 +38,28 @@ export const createApp = () => {
   // can throw (e.g. express.json() on a malformed body), guaranteeing errorHandler
   // always has the requestId available for Sentry context and logging.
   app.use(requestIdMiddleware);
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          connectSrc: ["'self'"],
+        },
+      },
+    }),
+  );
   app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   // genReqId reads the requestId already attached by requestIdMiddleware so that
   // pino-http's req.log child logger carries it — no second pino instance needed.
-  app.use(pinoHttp({ logger, genReqId: (req) => req.requestId }));
+  app.use(pinoHttp({
+    logger,
+    genReqId: (req) => req.requestId,
+    serializers: {
+      req: redactSensitiveHeaders,
+    },
+  }));
   app.use(globalRateLimiter);
 
   app.use('/api', apiRouter);

@@ -5,6 +5,7 @@ import {
   generateQuizQuerySchema,
   QuizDifficulty,
   AnswerFormat,
+  FREE_TRIAL_QUESTION_COUNT,
   MIN_QUESTION_COUNT,
   MAX_QUESTION_COUNT,
 } from '@skills-trainer/shared';
@@ -30,9 +31,10 @@ interface QuizPreferencesProps {
   onGenerate: (preferences: GenerateQuizQuery) => void;
   isDisabled: boolean;
   error: string | null;
+  isByok?: boolean;
 }
 
-export const QuizPreferences = ({ onGenerate, isDisabled, error }: QuizPreferencesProps) => {
+export const QuizPreferences = ({ onGenerate, isDisabled, error, isByok = false }: QuizPreferencesProps) => {
   const {
     register,
     handleSubmit,
@@ -42,13 +44,19 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error }: QuizPreferenc
     defaultValues: {
       difficulty: QuizDifficulty.MEDIUM,
       format: AnswerFormat.MIXED,
-      count: 10,
+      count: FREE_TRIAL_QUESTION_COUNT,
     },
   });
 
   return (
     <form onSubmit={handleSubmit(onGenerate)} noValidate className={styles.form}>
       <FormError message={error} />
+
+      {!isByok && (
+        <p className={styles.hint}>
+          Free trial — 1 quiz, {FREE_TRIAL_QUESTION_COUNT} questions
+        </p>
+      )}
 
       <div className={styles.field}>
         <span className={styles.label}>Difficulty</span>
@@ -76,23 +84,24 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error }: QuizPreferenc
         {errors.format && <p className={styles.errorText}>{errors.format.message}</p>}
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="question-count">
-          Number of Questions
-        </label>
-        <input
-          id="question-count"
-          type="number"
-          min={MIN_QUESTION_COUNT}
-          max={MAX_QUESTION_COUNT}
-          className={styles.countInput}
-          {...register('count')}
-        />
-        <p className={styles.hint}>
-          {MIN_QUESTION_COUNT}–{MAX_QUESTION_COUNT} questions
-        </p>
-        {errors.count && <p className={styles.errorText}>{errors.count.message}</p>}
-      </div>
+      {isByok ? (
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="questionCount">
+            Questions ({MIN_QUESTION_COUNT}–{MAX_QUESTION_COUNT})
+          </label>
+          <input
+            id="questionCount"
+            type="number"
+            min={MIN_QUESTION_COUNT}
+            max={MAX_QUESTION_COUNT}
+            className={styles.countInput}
+            {...register('count', { valueAsNumber: true })}
+          />
+          {errors.count && <p className={styles.errorText}>{errors.count.message}</p>}
+        </div>
+      ) : (
+        <input type="hidden" {...register('count')} />
+      )}
 
       <Button type="submit" variant="primary" disabled={isDisabled}>
         {isDisabled ? 'Generating…' : 'Generate Quiz'}

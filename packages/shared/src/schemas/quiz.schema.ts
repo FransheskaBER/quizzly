@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { uuidSchema } from './common.schema.js';
-import { MIN_QUESTION_COUNT, MAX_QUESTION_COUNT, MCQ_OPTIONS_COUNT } from '../constants/quiz.constants.js';
+import { MIN_QUESTION_COUNT, MAX_QUESTION_COUNT, MCQ_OPTIONS_COUNT, ANTHROPIC_KEY_PREFIX, MIN_ANTHROPIC_KEY_LENGTH } from '../constants/quiz.constants.js';
 import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus } from '../enums/index.js';
 
 // Request schemas
@@ -42,6 +42,13 @@ export const quizParamsSchema = z.object({
 export const quizSessionParamsSchema = z.object({
   sessionId: uuidSchema,
 });
+
+export const anthropicKeySchema = z
+  .string()
+  .min(MIN_ANTHROPIC_KEY_LENGTH, `API key must be at least ${MIN_ANTHROPIC_KEY_LENGTH} characters`)
+  .refine((key) => key.startsWith(ANTHROPIC_KEY_PREFIX), {
+    message: `API key must start with "${ANTHROPIC_KEY_PREFIX}"`,
+  });
 
 // Response schemas — quiz taking (no answers revealed)
 

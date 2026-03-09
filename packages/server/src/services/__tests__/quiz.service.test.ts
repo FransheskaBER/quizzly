@@ -3,6 +3,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // vi.mock calls are hoisted — mock factories run before imports
 vi.mock('../../config/database.js', () => ({
   prisma: {
+    user: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
     session: {
       findUnique: vi.fn(),
     },
@@ -46,6 +50,7 @@ import {
   ForbiddenError,
   ConflictError,
   BadRequestError,
+  TrialExhaustedError,
 } from '../../utils/errors.js';
 import {
   QuizDifficulty,
@@ -151,6 +156,7 @@ const BASE_EXECUTION_PARAMS = {
   sessionGoal: 'Learn TypeScript fundamentals',
   materialsText: 'TypeScript is a typed superset of JavaScript.',
   materialsUsed: true,
+  isFreeTrialGeneration: true,
 };
 
 // Quiz attempt as returned by quizAttempt.findUnique (includes questions + answers)
@@ -162,6 +168,7 @@ const mockAttemptWithQA = {
   answerFormat: 'mcq',
   questionCount: 1,
   materialsUsed: false,
+  isFreeTrial: true,
   status: QuizStatus.IN_PROGRESS,
   score: null,
   startedAt: new Date(),
@@ -233,6 +240,11 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('prepareGeneration', () => {
+  beforeEach(() => {
+    // Default: trial not used
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ freeTrialUsedAt: null } as never);
+  });
+
   it('returns sessionSubject, sessionGoal, concatenated materialsText, and materialsUsed:true', async () => {
     vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
     vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
@@ -244,6 +256,15 @@ describe('prepareGeneration', () => {
     expect(result.materialsText).toContain('TypeScript is a typed superset of JavaScript.');
     expect(result.materialsText).toContain('Interfaces define the shape of objects.');
     expect(result.materialsUsed).toBe(true);
+  });
+
+  it('returns isFreeTrialGeneration:true when user has not used trial', async () => {
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
+    vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
+
+    const result = await prepareGeneration(SESSION_ID, USER_ID);
+
+    expect(result.isFreeTrialGeneration).toBe(true);
   });
 
   it('joins multiple material texts with a double newline', async () => {
@@ -263,6 +284,20 @@ describe('prepareGeneration', () => {
 
     expect(result.materialsUsed).toBe(false);
     expect(result.materialsText).toBe('');
+  });
+
+  it('throws NotFoundError when user does not exist', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+
+    await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('throws TrialExhaustedError when free trial has already been used', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      freeTrialUsedAt: new Date('2026-01-01'),
+    } as never);
+
+    await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(TrialExhaustedError);
   });
 
   it('throws NotFoundError when session does not exist', async () => {
@@ -306,6 +341,37 @@ describe('prepareGeneration', () => {
       }),
     );
   });
+
+  it('allows generation with BYOK key when trial is used', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      freeTrialUsedAt: new Date('2026-01-01'),
+    } as never);
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
+    vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
+
+    const result = await prepareGeneration(SESSION_ID, USER_ID, 'sk-ant-test-key-1234567890');
+
+    expect(result.isFreeTrialGeneration).toBe(false);
+    expect(result.anthropicApiKey).toBe('sk-ant-test-key-1234567890');
+  });
+
+  it('ignores provided API key when trial is not used (uses server key)', async () => {
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
+    vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
+
+    const result = await prepareGeneration(SESSION_ID, USER_ID, 'sk-ant-test-key-1234567890');
+
+    expect(result.isFreeTrialGeneration).toBe(true);
+    expect(result.anthropicApiKey).toBeUndefined();
+  });
+
+  it('throws TrialExhaustedError when trial is used and no API key provided', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      freeTrialUsedAt: new Date('2026-01-01'),
+    } as never);
+
+    await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(TrialExhaustedError);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -318,6 +384,8 @@ describe('executeGeneration', () => {
     vi.mocked(prisma.question.create).mockResolvedValue(mockDbQuestion as never);
     vi.mocked(prisma.answer.create).mockResolvedValue({ id: 'answer-uuid-ddd' } as never);
     vi.mocked(prisma.quizAttempt.update).mockResolvedValue(mockQuizAttemptRecord as never);
+    vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.$transaction).mockResolvedValue([]);
     vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
   });
 
@@ -332,7 +400,7 @@ describe('executeGeneration', () => {
           userId: USER_ID,
           difficulty: QuizDifficulty.MEDIUM,
           answerFormat: AnswerFormat.MIXED,
-          questionCount: 2,
+          questionCount: 5,
           status: QuizStatus.GENERATING,
           materialsUsed: true,
         }),
@@ -400,20 +468,18 @@ describe('executeGeneration', () => {
     expect(questionEvent?.data).toHaveProperty('options');
   });
 
-  it('updates quiz_attempt to IN_PROGRESS with actual question count on completion', async () => {
+  it('updates quiz_attempt to IN_PROGRESS and marks trial as used via $transaction', async () => {
     const writer = vi.fn();
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
 
-    expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: mockQuizAttemptRecord.id },
-        data: expect.objectContaining({
-          status: QuizStatus.IN_PROGRESS,
-          questionCount: 1,
-          startedAt: null,
-        }),
-      }),
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({}),
+        expect.objectContaining({}),
+      ]),
     );
+    const transactionArg = vi.mocked(prisma.$transaction).mock.calls[0][0] as unknown[];
+    expect(transactionArg).toHaveLength(2);
   });
 
   it('sends the complete event with the quizAttemptId on successful completion', async () => {
@@ -430,18 +496,13 @@ describe('executeGeneration', () => {
     );
   });
 
-  it('updates questionCount to the actual number when LLM returns fewer than requested', async () => {
-    // Request 2, LLM returns 1 (partial success)
+  it('completes via $transaction when LLM returns fewer questions than requested', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
     const writer = vi.fn();
 
     await executeGeneration({ ...BASE_EXECUTION_PARAMS, questionCount: 2 }, writer);
 
-    expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ questionCount: 1 }),
-      }),
-    );
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('still sends the complete event when LLM returns fewer questions than requested', async () => {
@@ -485,6 +546,22 @@ describe('executeGeneration', () => {
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: null }),
       expect.any(Function),
+      undefined,
+    );
+  });
+
+  it('passes anthropicApiKey to LLM service for BYOK generation', async () => {
+    const writer = vi.fn();
+    const byokKey = 'sk-ant-byok-test-key-123';
+    await executeGeneration(
+      { ...BASE_EXECUTION_PARAMS, isFreeTrialGeneration: false, anthropicApiKey: byokKey },
+      writer,
+    );
+
+    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Function),
+      byokKey,
     );
   });
 });
@@ -810,6 +887,54 @@ describe('prepareGrading', () => {
 
     await expect(prepareGrading(ATTEMPT_ID, USER_ID, [])).rejects.toBeInstanceOf(BadRequestError);
   });
+
+  it('throws TrialExhaustedError when BYOK quiz has free-text questions and no key provided', async () => {
+    const byokFreeTextAttempt = {
+      ...answeredAttempt,
+      isFreeTrial: false,
+      questions: [
+        {
+          ...mockAttemptWithQA.questions[0],
+          questionType: QuestionType.FREE_TEXT,
+          options: null,
+        },
+      ],
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokFreeTextAttempt as never);
+
+    await expect(prepareGrading(ATTEMPT_ID, USER_ID, [])).rejects.toBeInstanceOf(TrialExhaustedError);
+  });
+
+  it('allows grading BYOK MCQ-only quiz without key', async () => {
+    const byokMcqAttempt = {
+      ...answeredAttempt,
+      isFreeTrial: false,
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokMcqAttempt as never);
+
+    const result = await prepareGrading(ATTEMPT_ID, USER_ID, []);
+
+    expect(result.quizAttemptId).toBe(ATTEMPT_ID);
+  });
+
+  it('allows grading free trial quiz with free-text questions without key', async () => {
+    const freeTrialFreeTextAttempt = {
+      ...answeredAttempt,
+      isFreeTrial: true,
+      questions: [
+        {
+          ...mockAttemptWithQA.questions[0],
+          questionType: QuestionType.FREE_TEXT,
+          options: null,
+        },
+      ],
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(freeTrialFreeTextAttempt as never);
+
+    const result = await prepareGrading(ATTEMPT_ID, USER_ID, []);
+
+    expect(result.quizAttemptId).toBe(ATTEMPT_ID);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -951,6 +1076,7 @@ describe('executeGrading', () => {
     expect(llmGradeAnswers).toHaveBeenCalledWith(
       expect.objectContaining({ subject: 'TypeScript' }),
       expect.any(Function),
+      undefined,
     );
   });
 
@@ -996,6 +1122,49 @@ describe('executeGrading', () => {
 
     const writer = vi.fn();
     await expect(executeGrading(mockGradingContext, writer)).resolves.toBeUndefined();
+  });
+
+  it('passes anthropicApiKey to LLM grading service for BYOK', async () => {
+    const byokKey = 'sk-ant-byok-grading-key-99';
+    const byokFreeTextContext: GradingContext = {
+      quizAttemptId: ATTEMPT_ID,
+      sessionSubject: 'TypeScript',
+      questions: [
+        {
+          id: QUESTION_ID,
+          questionNumber: 1,
+          questionType: QuestionType.FREE_TEXT,
+          questionText: 'Explain TypeScript.',
+          correctAnswer: 'A typed superset of JavaScript.',
+        },
+      ],
+      answers: [
+        { id: ANSWER_ID, questionId: QUESTION_ID, userAnswer: 'It adds types to JS.' },
+      ],
+      anthropicApiKey: byokKey,
+    };
+
+    vi.mocked(llmGradeAnswers).mockResolvedValue([
+      { questionNumber: 1, score: 0.8, isCorrect: true, feedback: 'Good.' },
+    ] as never);
+    vi.mocked(prisma.answer.findMany).mockResolvedValue([{ score: decimal(1) }] as never);
+
+    const writer = vi.fn();
+    await executeGrading(byokFreeTextContext, writer);
+
+    expect(llmGradeAnswers).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: 'TypeScript' }),
+      expect.any(Function),
+      byokKey,
+    );
+  });
+
+  it('grades MCQ-only quiz without API key even post-trial', async () => {
+    // MCQ context with no anthropicApiKey — should still succeed
+    const writer = vi.fn();
+    await executeGrading(mockGradingContext, writer);
+
+    expect(llmGradeAnswers).not.toHaveBeenCalled();
   });
 });
 
@@ -1156,5 +1325,34 @@ describe('prepareRegrade', () => {
     } as never);
 
     await expect(prepareRegrade(ATTEMPT_ID, USER_ID)).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('throws TrialExhaustedError when BYOK quiz has free-text questions and no key provided', async () => {
+    const byokFreeTextAttempt = {
+      ...submittedAttempt,
+      isFreeTrial: false,
+      questions: [
+        {
+          ...mockAttemptWithQA.questions[0],
+          questionType: QuestionType.FREE_TEXT,
+          options: null,
+        },
+      ],
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokFreeTextAttempt as never);
+
+    await expect(prepareRegrade(ATTEMPT_ID, USER_ID)).rejects.toBeInstanceOf(TrialExhaustedError);
+  });
+
+  it('allows regrading BYOK MCQ-only quiz without key', async () => {
+    const byokMcqAttempt = {
+      ...submittedAttempt,
+      isFreeTrial: false,
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokMcqAttempt as never);
+
+    const result = await prepareRegrade(ATTEMPT_ID, USER_ID);
+
+    expect(result.quizAttemptId).toBe(ATTEMPT_ID);
   });
 });

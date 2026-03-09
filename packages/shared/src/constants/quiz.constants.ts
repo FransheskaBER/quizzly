@@ -1,5 +1,6 @@
 export const MIN_QUESTION_COUNT = 5;
 export const MAX_QUESTION_COUNT = 20;
+export const FREE_TRIAL_QUESTION_COUNT = 5;
 export const QUIZ_GENERATION_TIMEOUT_MS = 90_000;
 export const SSE_CLIENT_WARNING_TIMEOUT_MS = 30_000;
 export const SSE_SERVER_TIMEOUT_MS = 120_000;
@@ -7,6 +8,8 @@ export const RATE_LIMIT_QUIZ_GENERATION_PER_HOUR = 10;
 export const RATE_LIMIT_QUIZ_GENERATION_PER_DAY = 50;
 export const RATE_LIMIT_REGRADE_PER_HOUR = 3;
 export const MCQ_OPTIONS_COUNT = 4;
+export const ANTHROPIC_KEY_PREFIX = 'sk-ant-';
+export const MIN_ANTHROPIC_KEY_LENGTH = 20;
 export const SUBJECT_MAX_LENGTH = 200;
 export const GOAL_MAX_LENGTH = 1000;
 export const SESSION_NAME_MAX_LENGTH = 200;

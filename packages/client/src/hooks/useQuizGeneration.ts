@@ -3,7 +3,9 @@ import { useState, useRef, useEffect } from 'react';
 import type { GenerateQuizQuery, Question } from '@skills-trainer/shared';
 
 import { api, API_BASE_URL } from '@/store/api';
+import { authApi } from '@/api/auth.api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
+import { getApiKey } from '@/store/apiKeyStore';
 import {
   generationStarted,
   questionsBatchReceived,
@@ -85,7 +87,9 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
       stopFlushInterval();
       dispatch(generationCompleted(quizAttemptId));
       // Refresh the session detail and list so the new quiz attempt appears.
+      // Also refetch user profile so hasUsedFreeTrial updates in the UI.
       dispatch(api.util.invalidateTags([{ type: 'Session', id: sessionId }, { type: 'Session', id: 'LIST' }]));
+      void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
       return;
     }
 
@@ -112,7 +116,12 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
     }
   };
 
-  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token });
+  // Build extra headers at render time; the ref inside useSSEStream ensures the
+  // latest value is used when fetch fires. getApiKey() reads the module-level store.
+  const apiKey = getApiKey();
+  const extraHeaders = apiKey ? { 'X-Anthropic-Key': apiKey } : undefined;
+
+  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token, extraHeaders });
 
   // Keep close in a ref so the unmount effect always calls the latest version.
   const closeRef = useRef(close);

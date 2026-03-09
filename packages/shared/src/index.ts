@@ -37,6 +37,7 @@ export {
 export {
   MIN_QUESTION_COUNT,
   MAX_QUESTION_COUNT,
+  FREE_TRIAL_QUESTION_COUNT,
   MCQ_OPTIONS_COUNT,
   QUIZ_GENERATION_TIMEOUT_MS,
   SSE_CLIENT_WARNING_TIMEOUT_MS,
@@ -47,6 +48,8 @@ export {
   SESSION_NAME_MAX_LENGTH,
   SUBJECT_MAX_LENGTH,
   GOAL_MAX_LENGTH,
+  ANTHROPIC_KEY_PREFIX,
+  MIN_ANTHROPIC_KEY_LENGTH,
 } from './constants/quiz.constants.js';
 
 // Schemas
@@ -96,6 +99,7 @@ export {
   submitQuizBodySchema,
   quizParamsSchema,
   quizSessionParamsSchema,
+  anthropicKeySchema,
   questionSchema,
   answerSchema,
   quizAttemptResponseSchema,

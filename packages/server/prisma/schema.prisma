@@ -18,6 +18,7 @@ model User {
   authProvider               String    @default("email") @map("auth_provider") @db.VarChar(20)
   googleId                   String?   @unique @map("google_id") @db.VarChar(255)
   subscriptionTier           String    @default("free") @map("subscription_tier") @db.VarChar(20)
+  freeTrialUsedAt            DateTime? @map("free_trial_used_at") @db.Timestamptz()
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -93,6 +94,7 @@ model QuizAttempt {
   status        String    @default("generating") @db.VarChar(20)
   score         Decimal?  @db.Decimal(5, 2)
   materialsUsed Boolean   @default(false) @map("materials_used")
+  isFreeTrial   Boolean   @default(false) @map("is_free_trial")
   startedAt     DateTime? @map("started_at") @db.Timestamptz()
   completedAt   DateTime? @map("completed_at") @db.Timestamptz()
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
