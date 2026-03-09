@@ -62,11 +62,11 @@ describe('sendVerificationEmail when Resend returns error', () => {
     await sendVerificationEmail('user@example.com', 'token-123');
 
     expect(mockLogger.error).toHaveBeenCalledWith(
-      { err: resendError, to: 'user@example.com', from: 'noreply@test.com' },
+      { err: resendError, to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
       'Failed to send verification email',
     );
     expect(Sentry.captureException).toHaveBeenCalledWith(resendError, {
-      extra: { to: 'user@example.com', from: 'noreply@test.com' },
+      extra: { to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
     });
     expect(mockLogger.info).not.toHaveBeenCalled();
   });
@@ -107,11 +107,11 @@ describe('sendPasswordResetEmail when Resend returns error', () => {
     await sendPasswordResetEmail('user@example.com', 'token-456');
 
     expect(mockLogger.error).toHaveBeenCalledWith(
-      { err: resendError, to: 'user@example.com', from: 'noreply@test.com' },
+      { err: resendError, to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
       'Failed to send password reset email',
     );
     expect(Sentry.captureException).toHaveBeenCalledWith(resendError, {
-      extra: { to: 'user@example.com', from: 'noreply@test.com' },
+      extra: { to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
     });
     expect(mockLogger.info).not.toHaveBeenCalled();
   });
