@@ -15,6 +15,8 @@ interface UseSSEStreamOptions {
   token: string;
   /** Optional fetch overrides (e.g. method: 'POST', body: '...'). Headers and signal are managed internally. */
   fetchInit?: Omit<RequestInit, 'headers' | 'signal'>;
+  /** Optional extra headers merged into the fetch call (e.g. X-Anthropic-Key). */
+  extraHeaders?: Record<string, string>;
 }
 
 export interface UseSSEStreamResult {
@@ -55,12 +57,14 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
   const onCompleteRef = useRef(options.onComplete);
   const tokenRef = useRef(options.token);
   const fetchInitRef = useRef(options.fetchInit);
+  const extraHeadersRef = useRef(options.extraHeaders);
 
   onEventRef.current = options.onEvent;
   onErrorRef.current = options.onError;
   onCompleteRef.current = options.onComplete;
   tokenRef.current = options.token;
   fetchInitRef.current = options.fetchInit;
+  extraHeadersRef.current = options.extraHeaders;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,7 +102,10 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
       try {
         const response = await fetch(url, {
           ...fetchInitRef.current,
-          headers: { Authorization: `Bearer ${tokenRef.current}` },
+          headers: {
+            Authorization: `Bearer ${tokenRef.current}`,
+            ...extraHeadersRef.current,
+          },
           signal: controller.signal,
         });
 

@@ -13,7 +13,7 @@ import type {
   MessageResponse,
 } from '@skills-trainer/shared';
 
-const authApi = api.injectEndpoints({
+export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     signup: builder.mutation<MessageResponse, SignupRequest>({
       query: (body) => ({ url: '/auth/signup', method: 'POST', body }),

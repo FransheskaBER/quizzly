@@ -1,7 +1,8 @@
 import pino from 'pino';
+import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
 import type { ZodType, ZodTypeDef } from 'zod';
-import anthropic from '../config/anthropic.js';
+import defaultClient from '../config/anthropic.js';
 import {
   LLM_MODEL,
   LLM_MAX_TOKENS,
@@ -92,19 +93,35 @@ const checkExfiltration = (response: string): void => {
   }
 };
 
+/** Returns a per-request client when `apiKey` is provided, otherwise the global singleton. */
+const resolveAnthropicClient = (apiKey?: string): Anthropic =>
+  apiKey ? new Anthropic({ apiKey }) : defaultClient;
+
 async function callLlmStream(
   systemPrompt: string,
   messages: MessageParam[],
   temperature: number,
+  client: Anthropic,
 ): Promise<string> {
-  const stream = anthropic.messages.stream({
-    model: LLM_MODEL,
-    max_tokens: LLM_MAX_TOKENS,
-    temperature,
-    system: systemPrompt,
-    messages,
-  });
-  return stream.finalText();
+  try {
+    const stream = client.messages.stream({
+      model: LLM_MODEL,
+      max_tokens: LLM_MAX_TOKENS,
+      temperature,
+      system: systemPrompt,
+      messages,
+    });
+    return await stream.finalText();
+  } catch (err) {
+    // Sanitize Anthropic auth errors so the raw SDK message (which may contain
+    // key-related details) is never forwarded to the client.
+    if (err instanceof Anthropic.AuthenticationError) {
+      throw new BadRequestError(
+        'Invalid API key. Please check your key and try again.',
+      );
+    }
+    throw err;
+  }
 }
 
 /**
@@ -137,9 +154,10 @@ async function runWithRetry<T>(
   blockName: string,
   schema: ZodType<T, ZodTypeDef, unknown>,
   temperature: number,
+  client: Anthropic,
 ): Promise<T> {
   const firstMessages: MessageParam[] = [{ role: 'user', content: userMessage }];
-  const firstResponse = await callLlmStream(systemPrompt, firstMessages, temperature);
+  const firstResponse = await callLlmStream(systemPrompt, firstMessages, temperature, client);
   checkExfiltration(firstResponse);
 
   const firstResult = await parseBlock(firstResponse, blockName, schema);
@@ -151,7 +169,7 @@ async function runWithRetry<T>(
     { role: 'assistant', content: firstResponse },
     { role: 'user', content: CORRECTIVE_MESSAGE },
   ];
-  const retryResponse = await callLlmStream(systemPrompt, retryMessages, temperature);
+  const retryResponse = await callLlmStream(systemPrompt, retryMessages, temperature, client);
   checkExfiltration(retryResponse);
 
   const retryResult = await parseBlock(retryResponse, blockName, schema);
@@ -169,6 +187,7 @@ async function runWithRetry<T>(
 export const generateQuiz = async (
   params: GenerateQuizParams,
   onQuestion: OnQuestionCallback,
+  apiKey?: string,
 ): Promise<LlmGeneratedQuestion[]> => {
   const subject = sanitizeForPrompt(params.subject);
   const goal = sanitizeForPrompt(params.goal);
@@ -187,6 +206,7 @@ export const generateQuiz = async (
   };
   const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
   const userMessage = buildGenerationUserMessage(promptParams);
+  const client = resolveAnthropicClient(apiKey);
 
   const questions = await runWithRetry<LlmGeneratedQuestion[]>(
     systemPrompt,
@@ -194,6 +214,7 @@ export const generateQuiz = async (
     'questions',
     llmQuizOutputSchema,
     LLM_GENERATION_TEMPERATURE,
+    client,
   );
 
   for (const question of questions) {
@@ -206,6 +227,7 @@ export const generateQuiz = async (
 export const gradeAnswers = async (
   params: GradeAnswersParams,
   onGraded: OnGradedCallback,
+  apiKey?: string,
 ): Promise<LlmGradedAnswer[]> => {
   const subject = sanitizeForPrompt(params.subject);
   const systemPrompt = buildGradingSystemPrompt();
@@ -213,6 +235,7 @@ export const gradeAnswers = async (
     subject,
     questionsAndAnswers: params.answers,
   });
+  const client = resolveAnthropicClient(apiKey);
 
   const rawResults = await runWithRetry<LlmGradedAnswer[]>(
     systemPrompt,
@@ -220,6 +243,7 @@ export const gradeAnswers = async (
     'results',
     llmGradedAnswersOutputSchema,
     LLM_GRADING_TEMPERATURE,
+    client,
   );
 
   const graded: LlmGradedAnswer[] = rawResults.map((r) => {
