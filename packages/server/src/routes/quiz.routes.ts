@@ -24,7 +24,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSSEEvent } from '../utils/sse.utils.js';
 import * as quizService from '../services/quiz.service.js';
-import { UnauthorizedError, BadRequestError } from '../utils/errors.js';
+import { UnauthorizedError, InvalidKeyFormatError } from '../utils/errors.js';
 
 const logger = pino({ name: 'quiz.routes' });
 
@@ -35,7 +35,7 @@ const readAnthropicKey = (req: { headers: Record<string, string | string[] | und
   const key = Array.isArray(raw) ? raw[0] : raw;
   const result = anthropicKeySchema.safeParse(key);
   if (!result.success) {
-    throw new BadRequestError('Invalid API key format');
+    throw new InvalidKeyFormatError('Invalid API key format');
   }
   return result.data;
 };

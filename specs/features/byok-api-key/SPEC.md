@@ -128,7 +128,7 @@ X-Anthropic-Key: sk-ant-api03-...
 |---|---|---|---|
 | Not used | Any | Any | Free trial generation (server key), `isFreeTrialGeneration = true`, count locked to 5 |
 | Used | Yes | Valid | BYOK generation, `isFreeTrialGeneration = false`, count from query (5–20) |
-| Used | Yes | Malformed | 400 `BAD_REQUEST` — "Invalid API key format" |
+| Used | Yes | Malformed | 400 `INVALID_KEY_FORMAT` — "Invalid API key format" |
 | Used | No | — | 403 `TRIAL_EXHAUSTED` — "Free trial generation used. Provide your own Anthropic API key to generate more quizzes." |
 
 **SSE error for invalid key (during stream):**
