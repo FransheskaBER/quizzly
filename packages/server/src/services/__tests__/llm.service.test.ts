@@ -1,6 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.mock calls are hoisted — mock factory runs before imports
+const mockByokStream = vi.fn();
+vi.mock('@anthropic-ai/sdk', () => {
+  class AuthenticationError extends Error {
+    status = 401;
+    constructor(message: string) {
+      super(message);
+      this.name = 'AuthenticationError';
+    }
+  }
+  class MockAnthropic {
+    messages = { stream: mockByokStream };
+  }
+  // Attach AuthenticationError as a static property on the class (matches SDK structure)
+  (MockAnthropic as Record<string, unknown>).AuthenticationError = AuthenticationError;
+  return { default: MockAnthropic, AuthenticationError };
+});
+
 vi.mock('../../config/anthropic.js', () => ({
   default: {
     messages: {
@@ -443,5 +460,46 @@ describe('gradeAnswers — prompt assembly', () => {
     const userMessageContent = (call.messages[0] as { content: string }).content;
     expect(userMessageContent).toContain('React Hooks');
     expect(userMessageContent).toContain(DEFAULT_GRADE_PARAMS.answers[0].userAnswer);
+  });
+});
+
+// --- BYOK: per-request client + error sanitization ---
+
+describe('BYOK — per-request client', () => {
+  it('uses a per-request client (not the default) when apiKey is provided', async () => {
+    mockByokStream.mockReturnValue(mockStream(VALID_GENERATION_RESPONSE));
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-test-key-123');
+
+    expect(mockByokStream).toHaveBeenCalled();
+    // Default client should NOT be used
+    expect(anthropic.messages.stream).not.toHaveBeenCalled();
+  });
+
+  it('uses default client when no apiKey is provided', async () => {
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+
+    expect(anthropic.messages.stream).toHaveBeenCalled();
+  });
+
+  it('throws sanitized BadRequestError when Anthropic returns 401 for invalid key', async () => {
+    const { AuthenticationError } = await import('@anthropic-ai/sdk') as unknown as {
+      AuthenticationError: new (msg: string) => Error;
+    };
+    mockByokStream.mockImplementation(() => {
+      throw new AuthenticationError('Invalid API Key supplied — raw SDK error details here');
+    });
+
+    await expect(
+      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-bad-key-456'),
+    ).rejects.toThrow(BadRequestError);
+
+    await expect(
+      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-bad-key-456'),
+    ).rejects.toThrow('Invalid API key. Please check your key and try again.');
   });
 });

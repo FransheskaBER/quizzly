@@ -627,6 +627,7 @@ Merge to main → Render auto-deploys.
 | auth_provider | VARCHAR(20) | NOT NULL, DEFAULT 'email' | Future: 'google' |
 | google_id | VARCHAR(255) | NULLABLE, UNIQUE | Future: BL-004 |
 | subscription_tier | VARCHAR(20) | NOT NULL, DEFAULT 'free' | Future: BL-012 |
+| free_trial_used_at | TIMESTAMPTZ | NULLABLE | Set on first quiz generation |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | |
 
@@ -784,6 +785,7 @@ model User {
   authProvider               String    @default("email") @map("auth_provider") @db.VarChar(20)
   googleId                   String?   @unique @map("google_id") @db.VarChar(255)
   subscriptionTier           String    @default("free") @map("subscription_tier") @db.VarChar(20)
+  freeTrialUsedAt            DateTime? @map("free_trial_used_at") @db.Timestamptz()
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -944,9 +946,9 @@ ERROR FORMAT (all endpoints):
 }
 
 ERROR CODES:
-├── 400: VALIDATION_ERROR, BAD_REQUEST
+├── 400: VALIDATION_ERROR, BAD_REQUEST, INVALID_KEY_FORMAT
 ├── 401: UNAUTHORIZED, TOKEN_EXPIRED, EMAIL_NOT_VERIFIED
-├── 403: FORBIDDEN
+├── 403: FORBIDDEN, TRIAL_EXHAUSTED
 ├── 404: NOT_FOUND
 ├── 409: CONFLICT
 ├── 429: RATE_LIMITED
@@ -1036,7 +1038,7 @@ Request: { "token": "abc123...", "password": "newSecurePass456" }
 ```
 Auth: Required
 
-200: { "id": "uuid", "email": "...", "username": "Alex", "emailVerified": true, "createdAt": "..." }
+200: { "id": "uuid", "email": "...", "username": "Alex", "emailVerified": true, "hasUsedFreeTrial": false, "createdAt": "..." }
 401: UNAUTHORIZED
 ```
 
@@ -1154,6 +1156,7 @@ Auth: Required (must own session)
 ```
 Auth: Required (must own session)
 Rate Limit: 10/user/hour, 50/user/day
+Optional Header: X-Anthropic-Key (required after free trial; format: sk-ant-..., min 20 chars)
 
 Query: ?difficulty=medium&format=mixed&count=10
 
@@ -1166,7 +1169,7 @@ Events:
 ├── { "type": "complete", "data": { "quizAttemptId": "uuid" } }
 └── { "type": "error", "message": "Generation failed..." }
 
-Pre-stream errors: 400, 401, 403, 404, 429
+Pre-stream errors: 400 (INVALID_KEY_FORMAT), 401, 403 (TRIAL_EXHAUSTED), 404, 429
 ```
 
 #### GET /api/quizzes/:id
@@ -1198,6 +1201,7 @@ Request: { "answers": [{ "questionId": "uuid", "answer": "O(n log n)" }] }
 
 ```
 Auth: Required (must own, must be in_progress)
+Optional Header: X-Anthropic-Key (required for free-text grading after free trial)
 
 Request: { "answers": [{ "questionId": "uuid", "answer": "..." }] }
 
@@ -1209,7 +1213,7 @@ Events:
 ├── { "type": "complete", "data": { "quizAttemptId", "score": 75.00 } }
 └── { "type": "error", "message": "Grading failed..." }
 
-Pre-stream errors: 400 (unanswered questions), 409 (already submitted)
+Pre-stream errors: 400 (unanswered questions, INVALID_KEY_FORMAT), 403 (TRIAL_EXHAUSTED), 409 (already submitted)
 ```
 
 #### GET /api/quizzes/:id/results
@@ -1235,6 +1239,7 @@ Auth: Required (must own, must be completed)
 ```
 Auth: Required (must own, status must be submitted_ungraded)
 Rate Limit: 3/quiz/hour
+Optional Header: X-Anthropic-Key (required for free-text grading after free trial)
 
 Response: SSE stream (same as submit grading)
 ```
@@ -1343,7 +1348,9 @@ SIMPLE OWNERSHIP:
 
 **Transport:** HTTPS (Render default), HSTS via helmet.
 
-**Headers:** helmet middleware (X-Frame-Options, CSP, etc.), CORS restricted to frontend domain.
+**Headers:** helmet middleware with custom CSP: `script-src 'self'`, `connect-src 'self'`. CORS restricted to frontend domain.
+
+**Header Redaction:** pino-http uses a custom request serializer that strips `x-anthropic-key` from logged headers. User-provided API keys must never appear in logs.
 
 **Input Validation:** Zod on every endpoint (body, params, query). Strings trimmed, email lowercased. Max lengths enforced.
 
@@ -1811,5 +1818,9 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 **Side effects:** None. The endpoint updates only the `passwordHash` field on an existing user row. It does not clear sessions, invalidate tokens, or change `emailVerified` state.
 
 ---
+
+### Update Log
+- [2026-03-08] Updated Sections 4, 5, 7 per specs/features/free-trial-limit/RFC.md
+- [2026-03-08] Updated Sections 5, 6 per specs/features/byok-api-key/SPEC.md
 
 *End of Technical Design Document*

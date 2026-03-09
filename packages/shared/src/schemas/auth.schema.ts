@@ -60,6 +60,7 @@ export const userResponseSchema = z.object({
   email: z.string(),
   username: z.string(),
   emailVerified: z.boolean(),
+  hasUsedFreeTrial: z.boolean(),
   createdAt: z.string().datetime(),
 });
 

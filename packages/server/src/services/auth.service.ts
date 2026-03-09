@@ -214,6 +214,7 @@ export const getMe = async (userId: string): Promise<UserResponse> => {
     email: user.email,
     username: user.username,
     emailVerified: user.emailVerified,
+    hasUsedFreeTrial: user.freeTrialUsedAt !== null,
     createdAt: user.createdAt.toISOString(),
   };
 };

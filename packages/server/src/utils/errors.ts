@@ -35,6 +35,11 @@ export class ForbiddenError extends AppError {
   readonly code = 'FORBIDDEN';
 }
 
+export class TrialExhaustedError extends AppError {
+  readonly statusCode = 403;
+  readonly code = 'TRIAL_EXHAUSTED';
+}
+
 export class NotFoundError extends AppError {
   readonly statusCode = 404;
   readonly code = 'NOT_FOUND';

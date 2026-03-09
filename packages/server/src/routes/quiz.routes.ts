@@ -4,6 +4,7 @@ import {
   quizParamsSchema,
   saveAnswersSchema,
   submitQuizBodySchema,
+  anthropicKeySchema,
   type GenerateQuizQuery,
   type QuizParams,
   type SaveAnswersRequest,
@@ -23,9 +24,21 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSSEEvent } from '../utils/sse.utils.js';
 import * as quizService from '../services/quiz.service.js';
-import { UnauthorizedError } from '../utils/errors.js';
+import { UnauthorizedError, BadRequestError } from '../utils/errors.js';
 
 const logger = pino({ name: 'quiz.routes' });
+
+/** Reads `X-Anthropic-Key` header. Returns the key string or undefined if absent. Throws 400 if present but malformed. */
+const readAnthropicKey = (req: { headers: Record<string, string | string[] | undefined> }): string | undefined => {
+  const raw = req.headers['x-anthropic-key'];
+  if (!raw) return undefined;
+  const key = Array.isArray(raw) ? raw[0] : raw;
+  const result = anthropicKeySchema.safeParse(key);
+  if (!result.success) {
+    throw new BadRequestError('Invalid API key format');
+  }
+  return result.data;
+};
 
 const router = Router();
 
@@ -46,10 +59,11 @@ router.get(
     const sessionId = req.params.sessionId as string;
     const { difficulty, format: answerFormat, count: questionCount } =
       req.query as unknown as GenerateQuizQuery;
+    const anthropicApiKey = readAnthropicKey(req);
 
     // Phase 1: pre-stream validation — throws AppErrors caught by asyncHandler
     // and returned as JSON before any SSE headers are written.
-    const prepared = await quizService.prepareGeneration(sessionId, userId);
+    const prepared = await quizService.prepareGeneration(sessionId, userId, anthropicApiKey);
 
     // Phase 2: open SSE stream — no JSON errors possible after this point.
     res.writeHead(200, {
@@ -119,9 +133,10 @@ takingRouter.post(
     if (!req.user) throw new UnauthorizedError('Not authenticated');
     const { id } = req.params as unknown as QuizParams;
     const { answers } = req.body as SubmitQuizBody;
+    const anthropicApiKey = readAnthropicKey(req);
 
     // Phase 1: pre-stream checks (ownership, status, save answers, all-answered)
-    const context = await quizService.prepareGrading(id, req.user.userId, answers);
+    const context = await quizService.prepareGrading(id, req.user.userId, answers, anthropicApiKey);
 
     // Phase 2: open SSE stream
     res.writeHead(200, {
@@ -173,9 +188,10 @@ takingRouter.post(
   asyncHandler(async (req, res) => {
     if (!req.user) throw new UnauthorizedError('Not authenticated');
     const { id } = req.params as unknown as QuizParams;
+    const anthropicApiKey = readAnthropicKey(req);
 
     // Phase 1: pre-stream check (ownership, status must be submitted_ungraded)
-    const context = await quizService.prepareRegrade(id, req.user.userId);
+    const context = await quizService.prepareRegrade(id, req.user.userId, anthropicApiKey);
 
     // Phase 2: open SSE stream
     res.writeHead(200, {
