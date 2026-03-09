@@ -16,7 +16,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
+import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from './llm.service.js';
 import type { FreeTextAnswer } from './llm.service.js';
 import type { SseWriter } from '../utils/sse.utils.js';

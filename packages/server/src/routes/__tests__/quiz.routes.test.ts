@@ -884,7 +884,7 @@ describe('X-Anthropic-Key header validation', () => {
       .set('X-Anthropic-Key', 'bad-prefix-key-that-is-long-enough');
 
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(res.body.error.code).toBe('INVALID_KEY_FORMAT');
     expect(res.body.error.message).toContain('Invalid API key format');
   });
 
@@ -899,7 +899,7 @@ describe('X-Anthropic-Key header validation', () => {
       .set('X-Anthropic-Key', 'sk-ant-short');
 
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(res.body.error.code).toBe('INVALID_KEY_FORMAT');
   });
 
   it('succeeds when X-Anthropic-Key is absent', async () => {
