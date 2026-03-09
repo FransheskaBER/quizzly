@@ -867,3 +867,53 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
     expect(attempt?.status).toBe(QuizStatus.COMPLETED);
   });
 });
+
+// ---------------------------------------------------------------------------
+// X-Anthropic-Key header validation (AC5)
+// ---------------------------------------------------------------------------
+
+describe('X-Anthropic-Key header validation', () => {
+  it('returns 400 when X-Anthropic-Key has wrong prefix', async () => {
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+    await createMaterial(session.id);
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('X-Anthropic-Key', 'bad-prefix-key-that-is-long-enough');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_KEY_FORMAT');
+    expect(res.body.error.message).toContain('Invalid API key format');
+  });
+
+  it('returns 400 when X-Anthropic-Key is too short', async () => {
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+    await createMaterial(session.id);
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('X-Anthropic-Key', 'sk-ant-short');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_KEY_FORMAT');
+  });
+
+  it('succeeds when X-Anthropic-Key is absent', async () => {
+    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+    await createMaterial(session.id);
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .buffer(true);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+  });
+});

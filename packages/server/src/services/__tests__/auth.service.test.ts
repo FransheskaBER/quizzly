@@ -52,6 +52,7 @@ const mockUser = {
   authProvider: 'email',
   googleId: null,
   subscriptionTier: 'free',
+  freeTrialUsedAt: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
 };
@@ -422,8 +423,20 @@ describe('getMe', () => {
       email: mockUser.email,
       username: mockUser.username,
       emailVerified: mockUser.emailVerified,
+      hasUsedFreeTrial: false,
       createdAt: mockUser.createdAt.toISOString(),
     });
+  });
+
+  it('returns hasUsedFreeTrial:true when freeTrialUsedAt is set', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      ...mockUser,
+      freeTrialUsedAt: new Date('2026-03-01'),
+    });
+
+    const result = await authService.getMe(mockUser.id);
+
+    expect(result.hasUsedFreeTrial).toBe(true);
   });
 
   it('throws NotFoundError when the user does not exist', async () => {

@@ -20,6 +20,11 @@ export class BadRequestError extends AppError {
   readonly code = 'BAD_REQUEST';
 }
 
+export class InvalidKeyFormatError extends AppError {
+  readonly statusCode = 400;
+  readonly code = 'INVALID_KEY_FORMAT';
+}
+
 export class UnauthorizedError extends AppError {
   readonly statusCode = 401;
   readonly code = 'UNAUTHORIZED';
@@ -33,6 +38,11 @@ export class EmailNotVerifiedError extends AppError {
 export class ForbiddenError extends AppError {
   readonly statusCode = 403;
   readonly code = 'FORBIDDEN';
+}
+
+export class TrialExhaustedError extends AppError {
+  readonly statusCode = 403;
+  readonly code = 'TRIAL_EXHAUSTED';
 }
 
 export class NotFoundError extends AppError {

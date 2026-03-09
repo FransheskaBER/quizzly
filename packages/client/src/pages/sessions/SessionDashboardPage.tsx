@@ -4,6 +4,7 @@ import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
 import { useGetSessionQuery, useUpdateSessionMutation, useDeleteSessionMutation } from '@/api/sessions.api';
 import { useSubmitQuizMutation } from '@/api/quizzes.api';
+import { useGetMeQuery } from '@/api/auth.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { MaterialUploader } from '@/components/session/MaterialUploader';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -13,8 +14,10 @@ import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import { useQuizGeneration } from '@/hooks/useQuizGeneration';
+import { useApiKey } from '@/store/apiKeyStore';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
+import { ApiKeyInput } from '@/components/quiz/ApiKeyInput';
 import { formatDate, formatScore } from '@/utils/formatters';
 import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '@skills-trainer/shared';
 import { api } from '@/store/api';
@@ -71,6 +74,8 @@ const SessionDashboardPage = () => {
     skip: !id,
     pollingInterval: pollingActive ? SESSION_POLL_INTERVAL_MS : 0,
   });
+  const { data: meData } = useGetMeQuery();
+  const savedApiKey = useApiKey();
   const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
   const [submitQuiz] = useSubmitQuizMutation();
@@ -258,8 +263,15 @@ const SessionDashboardPage = () => {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Generate Quiz</h2>
           <ComponentErrorBoundary>
-            {generationStatus === 'idle' ? (
-              <QuizPreferences onGenerate={generate} isDisabled={false} error={null} />
+            {meData?.hasUsedFreeTrial && !savedApiKey ? (
+              <ApiKeyInput />
+            ) : generationStatus === 'idle' ? (
+              <QuizPreferences
+                onGenerate={generate}
+                isDisabled={false}
+                error={null}
+                isByok={meData?.hasUsedFreeTrial === true && savedApiKey !== null}
+              />
             ) : (
               <QuizProgress
                 status={generationStatus}
