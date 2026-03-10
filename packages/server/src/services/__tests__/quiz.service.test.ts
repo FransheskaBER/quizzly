@@ -33,7 +33,12 @@ vi.mock('../llm.service.js', () => ({
   gradeAnswers: vi.fn(),
 }));
 
+vi.mock('../../config/sentry.js', () => ({
+  Sentry: { captureException: vi.fn() },
+}));
+
 import { prisma } from '../../config/database.js';
+import { Sentry } from '../../config/sentry.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from '../llm.service.js';
 import {
   prepareGeneration,
@@ -644,9 +649,6 @@ describe('getQuiz', () => {
 
     await getQuiz(ATTEMPT_ID, USER_ID);
 
-    // Fire-and-forget update — give the micro-task queue a tick to settle.
-    await Promise.resolve();
-
     expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: ATTEMPT_ID },
@@ -661,6 +663,23 @@ describe('getQuiz', () => {
     await getQuiz(ATTEMPT_ID, USER_ID);
 
     expect(prisma.quizAttempt.update).not.toHaveBeenCalled();
+  });
+
+  it('captures to Sentry when startedAt update fails', async () => {
+    const dbError = new Error('DB connection lost');
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue({
+      ...mockAttemptWithQA,
+      startedAt: null,
+    } as never);
+    vi.mocked(prisma.quizAttempt.update).mockRejectedValueOnce(dbError);
+
+    // getQuiz should still return the quiz — startedAt failure is non-fatal
+    const result = await getQuiz(ATTEMPT_ID, USER_ID);
+
+    expect(result).toBeDefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(dbError, {
+      extra: { quizAttemptId: ATTEMPT_ID },
+    });
   });
 });
 
@@ -1122,6 +1141,39 @@ describe('executeGrading', () => {
 
     const writer = vi.fn();
     await expect(executeGrading(mockGradingContext, writer)).resolves.toBeUndefined();
+  });
+
+  it('captures grading failure to Sentry when Prisma throws', async () => {
+    const dbError = new Error('DB unavailable');
+    vi.mocked(prisma.answer.update).mockRejectedValueOnce(dbError);
+
+    const writer = vi.fn();
+    await executeGrading(mockGradingContext, writer);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(dbError, {
+      extra: { quizAttemptId: ATTEMPT_ID },
+    });
+  });
+
+  it('captures error recovery failure to Sentry when status update also fails', async () => {
+    const gradingError = new Error('DB unavailable');
+    const recoveryError = new Error('Recovery update failed');
+    vi.mocked(prisma.answer.update).mockRejectedValueOnce(gradingError);
+    // First update call (set GRADING) succeeds, second (set SUBMITTED_UNGRADED) fails
+    vi.mocked(prisma.quizAttempt.update)
+      .mockResolvedValueOnce({ id: ATTEMPT_ID } as never) // GRADING
+      .mockRejectedValueOnce(recoveryError); // SUBMITTED_UNGRADED recovery
+
+    const writer = vi.fn();
+    await executeGrading(mockGradingContext, writer);
+
+    // Both the original error and the recovery error should be captured
+    expect(Sentry.captureException).toHaveBeenCalledWith(gradingError, {
+      extra: { quizAttemptId: ATTEMPT_ID },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(recoveryError, {
+      extra: { quizAttemptId: ATTEMPT_ID },
+    });
   });
 
   it('passes anthropicApiKey to LLM grading service for BYOK', async () => {
