@@ -14,6 +14,7 @@ import {
 import { uploadToS3 } from '@/utils/uploadToS3';
 import { MaterialListItem } from './MaterialListItem';
 import { parseApiError } from '@/hooks/useApiError';
+import { Sentry } from '@/config/sentry';
 import { Button } from '@/components/common/Button';
 import styles from './MaterialUploader.module.css';
 
@@ -159,8 +160,10 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
   const handleDelete = async (materialId: string): Promise<void> => {
     try {
       await deleteMaterial({ sessionId, materialId }).unwrap();
-    } catch {
-      // Silent — user can retry by clicking delete again
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete material:', err);
+      Sentry.captureException(err, { extra: { sessionId, materialId } });
     }
   };
 

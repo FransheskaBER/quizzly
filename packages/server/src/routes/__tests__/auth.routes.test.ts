@@ -21,7 +21,8 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   regradeRateLimiter: (_req: never, _res: never, next: () => void) => next(),
 }));
 
-import { sendPasswordResetEmail } from '../../services/email.service.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../services/email.service.js';
+import { EmailDeliveryError } from '../../utils/errors.js';
 
 const app = createApp();
 
@@ -121,6 +122,25 @@ describe('POST /api/auth/signup', () => {
     });
 
     expect(res.status).toBe(201);
+  });
+
+  it('502 — returns EMAIL_DELIVERY_ERROR when email service fails (account still created)', async () => {
+    vi.mocked(sendVerificationEmail).mockRejectedValueOnce(
+      new EmailDeliveryError('Failed to send verification email'),
+    );
+
+    const res = await request(app).post('/api/auth/signup').send({
+      email: 'emailfail@example.com',
+      username: 'emailfail',
+      password: 'Password123!',
+    });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error.code).toBe('EMAIL_DELIVERY_ERROR');
+
+    // Account should still exist in DB
+    const user = await prisma.user.findUnique({ where: { email: 'emailfail@example.com' } });
+    expect(user).not.toBeNull();
   });
 });
 
@@ -300,6 +320,21 @@ describe('POST /api/auth/forgot-password', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toBeTruthy();
     expect(await prisma.passwordReset.count()).toBe(0);
+  });
+
+  it('200 always — returns generic response even when email delivery fails (enumeration protection)', async () => {
+    await createTestUser({ email: 'enumtest@example.com' });
+    vi.mocked(sendPasswordResetEmail).mockRejectedValueOnce(
+      new EmailDeliveryError('Resend down'),
+    );
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'enumtest@example.com' });
+
+    // Must still return 200 with generic message — not 502
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBeTruthy();
   });
 });
 

@@ -6,6 +6,7 @@ import { loginSchema } from '@skills-trainer/shared';
 import type { LoginRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
+import { Sentry } from '@/config/sentry';
 import { FormField } from '@/components/common/FormField';
 import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
@@ -49,8 +50,10 @@ const LoginPage = () => {
     try {
       await resendVerification(unverifiedEmail);
       setResendStatus('sent');
-    } catch {
-      // network error — reset so user can retry
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to resend verification email:', err);
+      Sentry.captureException(err, { extra: { email: unverifiedEmail } });
       setResendStatus('idle');
     }
   };
