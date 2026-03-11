@@ -1,6 +1,7 @@
 import { api } from '@/store/api';
 import { setCredentials } from '@/store/slices/auth.slice';
 import type { RootState } from '@/store/store';
+import { Sentry } from '@/config/sentry';
 import type {
   SignupRequest,
   LoginRequest,
@@ -55,9 +56,16 @@ export const authApi = api.injectEndpoints({
               }),
             );
           }
-        } catch {
+        } catch (err) {
           // 401 is handled globally by baseQueryWithAuth (dispatches logout()).
-          // Other errors are silently ignored here — hydration just won't populate user.
+          // Capture non-401 errors that indicate real failures.
+          const isUnauthorized =
+            (err as { error?: { status?: number } })?.error?.status === 401;
+          if (!isUnauthorized) {
+            // eslint-disable-next-line no-console
+            console.error('getMe hydration failed:', err);
+            Sentry.captureException(err);
+          }
         }
       },
     }),

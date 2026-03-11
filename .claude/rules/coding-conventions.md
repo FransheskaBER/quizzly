@@ -58,6 +58,13 @@ Every file follows this order. No exceptions:
 4. Helper functions (small, private utilities used only in this file)
 5. Main exports (the primary function, class, or component this file exists for)
 
+**Import ordering rule:** All `import` statements must appear as a single contiguous block before any non-import code. Never interleave constants, variable declarations, or executable code between import statements. Within the import block, group in this order with a blank line between groups:
+1. External packages (`pino`, `express`, `zod`, `@prisma/client`)
+2. Shared package (`@skills-trainer/shared` — values first, then `import type`)
+3. Internal modules (`../config/`, `../utils/`, `./` — relative imports)
+
+When adding new imports to an existing file, verify the final ordering respects this grouping. Do not insert constants or declarations between import groups.
+
 ## Types and Interfaces
 
 - Prefer `interface` for object shapes that describe data structures (entities, API payloads, props).

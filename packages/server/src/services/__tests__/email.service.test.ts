@@ -41,8 +41,10 @@ vi.mock('../../config/sentry.js', () => ({
 }));
 
 import { resendClient } from '../../config/resend.js';
+import { env } from '../../config/env.js';
 import { Sentry } from '../../config/sentry.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../email.service.js';
+import { EmailDeliveryError } from '../../utils/errors.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -52,14 +54,16 @@ beforeEach(() => {
 // sendVerificationEmail — Resend returns { error }
 // ---------------------------------------------------------------------------
 describe('sendVerificationEmail when Resend returns error', () => {
-  it('logs error, captures to Sentry, and does not log success', async () => {
+  it('logs error, captures to Sentry, and throws EmailDeliveryError', async () => {
     const resendError = { message: 'Domain not verified', statusCode: 403 };
     vi.mocked(resendClient.emails.send).mockResolvedValue({
       data: null,
       error: resendError,
     } as Awaited<ReturnType<typeof resendClient.emails.send>>);
 
-    await sendVerificationEmail('user@example.com', 'token-123');
+    await expect(
+      sendVerificationEmail('user@example.com', 'token-123'),
+    ).rejects.toThrow(EmailDeliveryError);
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       { err: resendError, to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
@@ -97,14 +101,16 @@ describe('sendVerificationEmail when Resend succeeds', () => {
 // sendPasswordResetEmail — Resend returns { error }
 // ---------------------------------------------------------------------------
 describe('sendPasswordResetEmail when Resend returns error', () => {
-  it('logs error, captures to Sentry, and does not log success', async () => {
+  it('logs error, captures to Sentry, and throws EmailDeliveryError', async () => {
     const resendError = { message: 'Invalid API key', statusCode: 401 };
     vi.mocked(resendClient.emails.send).mockResolvedValue({
       data: null,
       error: resendError,
     } as Awaited<ReturnType<typeof resendClient.emails.send>>);
 
-    await sendPasswordResetEmail('user@example.com', 'token-456');
+    await expect(
+      sendPasswordResetEmail('user@example.com', 'token-456'),
+    ).rejects.toThrow(EmailDeliveryError);
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       { err: resendError, to: 'user@example.com', from: 'Quizzly AI <noreply@test.com>' },
@@ -135,5 +141,44 @@ describe('sendPasswordResetEmail when Resend succeeds', () => {
     );
     expect(mockLogger.error).not.toHaveBeenCalled();
     expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EMAIL_FROM not configured — early return without throwing
+// ---------------------------------------------------------------------------
+describe('sendVerificationEmail when EMAIL_FROM is not configured', () => {
+  it('warns and returns without sending or throwing', async () => {
+    const originalEmailFrom = env.EMAIL_FROM;
+    (env as { EMAIL_FROM: string }).EMAIL_FROM = '';
+    try {
+      await sendVerificationEmail('user@example.com', 'token-123');
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { to: 'user@example.com' },
+        'EMAIL_FROM not configured — skipping verification email',
+      );
+      expect(resendClient.emails.send).not.toHaveBeenCalled();
+    } finally {
+      (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+    }
+  });
+});
+
+describe('sendPasswordResetEmail when EMAIL_FROM is not configured', () => {
+  it('warns and returns without sending or throwing', async () => {
+    const originalEmailFrom = env.EMAIL_FROM;
+    (env as { EMAIL_FROM: string }).EMAIL_FROM = '';
+    try {
+      await sendPasswordResetEmail('user@example.com', 'token-456');
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { to: 'user@example.com' },
+        'EMAIL_FROM not configured — skipping password reset email',
+      );
+      expect(resendClient.emails.send).not.toHaveBeenCalled();
+    } finally {
+      (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+    }
   });
 });

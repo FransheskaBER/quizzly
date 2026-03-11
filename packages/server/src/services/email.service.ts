@@ -2,6 +2,7 @@ import pino from 'pino';
 import { resendClient } from '../config/resend.js';
 import { env } from '../config/env.js';
 import { Sentry } from '../config/sentry.js';
+import { EmailDeliveryError } from '../utils/errors.js';
 
 const logger = pino({ name: 'email-service' });
 
@@ -37,12 +38,14 @@ export const sendVerificationEmail = async (to: string, token: string): Promise<
     if (error) {
       logger.error({ err: error, to, from }, 'Failed to send verification email');
       Sentry.captureException(error, { extra: { to, from } });
-      return;
+      throw new EmailDeliveryError('Failed to send verification email');
     }
     logger.info({ id: data?.id, to }, 'Verification email sent');
   } catch (err) {
+    if (err instanceof EmailDeliveryError) throw err;
     logger.error({ err, to, from }, 'Failed to send verification email');
     Sentry.captureException(err, { extra: { to, from } });
+    throw new EmailDeliveryError('Failed to send verification email');
   }
 };
 
@@ -76,11 +79,13 @@ export const sendPasswordResetEmail = async (to: string, token: string): Promise
     if (error) {
       logger.error({ err: error, to, from }, 'Failed to send password reset email');
       Sentry.captureException(error, { extra: { to, from } });
-      return;
+      throw new EmailDeliveryError('Failed to send password reset email');
     }
     logger.info({ id: data?.id, to }, 'Password reset email sent');
   } catch (err) {
+    if (err instanceof EmailDeliveryError) throw err;
     logger.error({ err, to, from }, 'Failed to send password reset email');
     Sentry.captureException(err, { extra: { to, from } });
+    throw new EmailDeliveryError('Failed to send password reset email');
   }
 };

@@ -59,3 +59,8 @@ export class RateLimitError extends AppError {
   readonly statusCode = 429;
   readonly code = 'RATE_LIMITED';
 }
+
+export class EmailDeliveryError extends AppError {
+  readonly statusCode = 502;
+  readonly code = 'EMAIL_DELIVERY_ERROR';
+}
