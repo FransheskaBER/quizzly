@@ -45,6 +45,7 @@ export const quizSessionParamsSchema = z.object({
 
 export const anthropicKeySchema = z
   .string()
+  .trim()
   .min(MIN_ANTHROPIC_KEY_LENGTH, `API key must be at least ${MIN_ANTHROPIC_KEY_LENGTH} characters`)
   .refine((key) => key.startsWith(ANTHROPIC_KEY_PREFIX), {
     message: `API key must start with "${ANTHROPIC_KEY_PREFIX}"`,

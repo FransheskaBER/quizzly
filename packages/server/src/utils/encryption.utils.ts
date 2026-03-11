@@ -6,10 +6,16 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
+const EXPECTED_KEY_LENGTH = 32;
+
 const getEncryptionKey = (): Buffer => {
   const hex = env.API_KEY_ENCRYPTION_KEY;
   if (!hex) throw new Error('API_KEY_ENCRYPTION_KEY is not configured');
-  return Buffer.from(hex, 'hex');
+  const key = Buffer.from(hex, 'hex');
+  if (key.length !== EXPECTED_KEY_LENGTH) {
+    throw new Error(`API_KEY_ENCRYPTION_KEY must decode to ${EXPECTED_KEY_LENGTH} bytes, got ${key.length}`);
+  }
+  return key;
 };
 
 /** Encrypts plaintext with AES-256-GCM. Returns `base64(iv || authTag || ciphertext)`. */
