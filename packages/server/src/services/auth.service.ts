@@ -142,7 +142,16 @@ export const resendVerification = async (
     data: { verificationToken: verificationTokenHash, verificationTokenExpiresAt },
   });
 
-  await sendVerificationEmail(user.email, verificationToken);
+  // SECURITY: Catch email failure and return generic response to prevent email enumeration.
+  // Attacker must not distinguish "email doesn't exist/already verified" from
+  // "email exists, unverified, but delivery failed".
+  try {
+    await sendVerificationEmail(user.email, verificationToken);
+  } catch (err) {
+    logger.error({ err, email: user.email }, 'Verification email failed');
+    Sentry.captureException(err, { extra: { email: user.email } });
+    return genericResponse;
+  }
 
   return genericResponse;
 };
