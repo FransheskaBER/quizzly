@@ -14,6 +14,7 @@ const envSchema = z.object({
   AWS_REGION: isTest ? z.string().optional() : z.string().min(1),
   S3_BUCKET_NAME: isTest ? z.string().optional() : z.string().min(1),
   ANTHROPIC_API_KEY: isTest ? z.string().optional() : z.string().min(1),
+  API_KEY_ENCRYPTION_KEY: isTest ? z.string().optional() : z.string().length(64, 'Must be a 64-char hex string (32 bytes)'),
   RESEND_API_KEY: isTest ? z.string().optional() : z.string().min(1),
   EMAIL_FROM: isTest ? z.string().optional() : z.string().email(),
   SENTRY_DSN: z.string().optional(),

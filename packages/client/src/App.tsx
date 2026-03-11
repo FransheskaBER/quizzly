@@ -21,6 +21,7 @@ const CreateSessionPage = lazy(() => import('@/pages/sessions/CreateSessionPage'
 const SessionDashboardPage = lazy(() => import('@/pages/sessions/SessionDashboardPage'));
 const QuizTakingPage = lazy(() => import('@/pages/quiz/QuizTakingPage'));
 const QuizResultsPage = lazy(() => import('@/pages/quiz/QuizResultsPage'));
+const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 
 /**
  * Handles the "token in localStorage but user not yet in Redux" case on page reload.
@@ -81,6 +82,7 @@ export const App = () => {
               <Route path="/sessions/:id" element={withRouteBoundary(<SessionDashboardPage />)} />
               <Route path="/quiz/:id" element={withRouteBoundary(<QuizTakingPage />)} />
               <Route path="/quiz/:id/results" element={withRouteBoundary(<QuizResultsPage />)} />
+              <Route path="/profile" element={withRouteBoundary(<ProfilePage />)} />
             </Route>
 
             {/* Catch-all */}

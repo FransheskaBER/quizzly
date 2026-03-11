@@ -426,6 +426,7 @@ quizzly/
 │   │       │   ├── session.schema.ts
 │   │       │   ├── material.schema.ts
 │   │       │   ├── quiz.schema.ts
+│   │       │   ├── user.schema.ts
 │   │       │   └── common.schema.ts
 │   │       ├── types/
 │   │       │   ├── index.ts
@@ -462,7 +463,8 @@ quizzly/
 │   │       │   ├── auth.routes.ts
 │   │       │   ├── session.routes.ts
 │   │       │   ├── material.routes.ts
-│   │       │   └── quiz.routes.ts
+│   │       │   ├── quiz.routes.ts
+│   │       │   └── user.routes.ts
 │   │       ├── services/
 │   │       │   ├── auth.service.ts
 │   │       │   ├── session.service.ts
@@ -470,7 +472,8 @@ quizzly/
 │   │       │   ├── quiz.service.ts
 │   │       │   ├── llm.service.ts
 │   │       │   ├── email.service.ts
-│   │       │   └── s3.service.ts
+│   │       │   ├── s3.service.ts
+│   │       │   └── user.service.ts
 │   │       ├── prompts/
 │   │       │   ├── generation/
 │   │       │   │   ├── system.prompt.ts
@@ -487,7 +490,8 @@ quizzly/
 │   │       │   ├── token.utils.ts       # JWT sign/verify
 │   │       │   ├── password.utils.ts    # bcrypt hash/compare
 │   │       │   ├── sanitize.utils.ts    # Prompt injection defense
-│   │       │   └── tokenCount.utils.ts  # Approximate token counting
+│   │       │   ├── tokenCount.utils.ts  # Approximate token counting
+│   │       │   └── encryption.utils.ts  # AES-256-GCM encrypt/decrypt
 │   │       └── types/
 │   │           └── express.d.ts         # Express Request augmentation
 │   │
@@ -512,7 +516,8 @@ quizzly/
 │           │   ├── auth.api.ts
 │           │   ├── sessions.api.ts
 │           │   ├── materials.api.ts
-│           │   └── quizzes.api.ts
+│           │   ├── quizzes.api.ts
+│           │   └── user.api.ts
 │           ├── hooks/
 │           │   ├── useAuth.ts
 │           │   ├── useApiError.ts
@@ -528,6 +533,8 @@ quizzly/
 │           │   │   └── ResetPasswordPage.tsx
 │           │   ├── dashboard/
 │           │   │   └── HomeDashboardPage.tsx
+│           │   ├── profile/
+│           │   │   └── ProfilePage.tsx
 │           │   ├── sessions/
 │           │   │   ├── SessionListPage.tsx
 │           │   │   ├── CreateSessionPage.tsx
@@ -628,6 +635,8 @@ Merge to main → Render auto-deploys.
 | google_id | VARCHAR(255) | NULLABLE, UNIQUE | Future: BL-004 |
 | subscription_tier | VARCHAR(20) | NOT NULL, DEFAULT 'free' | Future: BL-012 |
 | free_trial_used_at | TIMESTAMPTZ | NULLABLE | Set on first quiz generation |
+| encrypted_api_key | TEXT | NULLABLE | AES-256-GCM ciphertext: base64(iv ‖ authTag ‖ ciphertext). Null when no BYOK key saved. |
+| api_key_hint | VARCHAR(20) | NULLABLE | Masked display: `sk-ant-...{last4}`. Set/cleared with encrypted_api_key. |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | |
 
@@ -786,6 +795,8 @@ model User {
   googleId                   String?   @unique @map("google_id") @db.VarChar(255)
   subscriptionTier           String    @default("free") @map("subscription_tier") @db.VarChar(20)
   freeTrialUsedAt            DateTime? @map("free_trial_used_at") @db.Timestamptz()
+  encryptedApiKey            String?   @map("encrypted_api_key") @db.Text
+  apiKeyHint                 String?   @map("api_key_hint") @db.VarChar(20)
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -1038,7 +1049,7 @@ Request: { "token": "abc123...", "password": "newSecurePass456" }
 ```
 Auth: Required
 
-200: { "id": "uuid", "email": "...", "username": "Alex", "emailVerified": true, "hasUsedFreeTrial": false, "createdAt": "..." }
+200: { "id": "uuid", "email": "...", "username": "Alex", "emailVerified": true, "hasUsedFreeTrial": false, "hasApiKey": false, "createdAt": "..." }
 401: UNAUTHORIZED
 ```
 
@@ -1156,7 +1167,7 @@ Auth: Required (must own session)
 ```
 Auth: Required (must own session)
 Rate Limit: 10/user/hour, 50/user/day
-Optional Header: X-Anthropic-Key (required after free trial; format: sk-ant-..., min 20 chars)
+BYOK: Server reads encrypted API key from DB for post-trial users. No client header needed.
 
 Query: ?difficulty=medium&format=mixed&count=10
 
@@ -1169,7 +1180,7 @@ Events:
 ├── { "type": "complete", "data": { "quizAttemptId": "uuid" } }
 └── { "type": "error", "message": "Generation failed..." }
 
-Pre-stream errors: 400 (INVALID_KEY_FORMAT), 401, 403 (TRIAL_EXHAUSTED), 404, 429
+Pre-stream errors: 401, 403 (TRIAL_EXHAUSTED), 404, 429
 ```
 
 #### GET /api/quizzes/:id
@@ -1201,7 +1212,7 @@ Request: { "answers": [{ "questionId": "uuid", "answer": "O(n log n)" }] }
 
 ```
 Auth: Required (must own, must be in_progress)
-Optional Header: X-Anthropic-Key (required for free-text grading after free trial)
+BYOK: Server reads encrypted API key from DB for free-text grading of post-trial quizzes.
 
 Request: { "answers": [{ "questionId": "uuid", "answer": "..." }] }
 
@@ -1213,7 +1224,7 @@ Events:
 ├── { "type": "complete", "data": { "quizAttemptId", "score": 75.00 } }
 └── { "type": "error", "message": "Grading failed..." }
 
-Pre-stream errors: 400 (unanswered questions, INVALID_KEY_FORMAT), 403 (TRIAL_EXHAUSTED), 409 (already submitted)
+Pre-stream errors: 400 (unanswered questions), 403 (TRIAL_EXHAUSTED), 409 (already submitted)
 ```
 
 #### GET /api/quizzes/:id/results
@@ -1239,12 +1250,67 @@ Auth: Required (must own, must be completed)
 ```
 Auth: Required (must own, status must be submitted_ungraded)
 Rate Limit: 3/quiz/hour
-Optional Header: X-Anthropic-Key (required for free-text grading after free trial)
+BYOK: Server reads encrypted API key from DB for free-text regrading of post-trial quizzes.
 
 Response: SSE stream (same as submit grading)
 ```
 
-### 5.6 Dashboard Endpoint
+### 5.6 User Endpoints
+
+#### GET /api/users/api-key/status
+
+```
+Auth: Required
+
+200: { "hasApiKey": true, "hint": "sk-ant-...abc3" }
+200: { "hasApiKey": false, "hint": null }
+```
+
+#### POST /api/users/api-key
+
+```
+Auth: Required
+
+Request: { "apiKey": "sk-ant-api03-..." }
+
+200: { "hasApiKey": true, "hint": "sk-ant-...abc3" }
+400: VALIDATION_ERROR (invalid format)
+
+Upsert — saves new or replaces existing. Validated with anthropicKeySchema.
+```
+
+#### DELETE /api/users/api-key
+
+```
+Auth: Required
+
+204: No Content (idempotent — 204 even if no key exists)
+```
+
+#### PATCH /api/users/profile
+
+```
+Auth: Required
+
+Request: { "username": "NewName" }
+
+200: { "id": "uuid", "email": "...", "username": "NewName", ... }
+400: VALIDATION_ERROR
+```
+
+#### PUT /api/users/password
+
+```
+Auth: Required
+
+Request: { "currentPassword": "oldPass", "newPassword": "newSecurePass" }
+
+200: { "message": "Password changed successfully." }
+400: VALIDATION_ERROR (weak password)
+401: UNAUTHORIZED (wrong current password)
+```
+
+### 5.7 Dashboard Endpoint
 
 #### GET /api/dashboard
 
@@ -1261,7 +1327,7 @@ Auth: Required
 All computed via SQL aggregation. Null values for new users.
 ```
 
-### 5.7 Health Endpoint
+### 5.8 Health Endpoint
 
 #### GET /api/health
 
@@ -1271,7 +1337,7 @@ Auth: None
 200: { "status": "ok", "uptime": 3600 }
 ```
 
-### 5.8 Endpoint Summary
+### 5.9 Endpoint Summary
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -1292,6 +1358,11 @@ Auth: None
 | POST | /api/sessions/:sid/materials/:id/process | Yes | Extract text |
 | POST | /api/sessions/:sid/materials/extract-url | Yes | Extract URL |
 | DELETE | /api/sessions/:sid/materials/:id | Yes | Delete material |
+| GET | /api/users/api-key/status | Yes | API key status |
+| POST | /api/users/api-key | Yes | Save API key |
+| DELETE | /api/users/api-key | Yes | Delete API key |
+| PATCH | /api/users/profile | Yes | Update profile |
+| PUT | /api/users/password | Yes | Change password |
 | GET | /api/sessions/:sid/quizzes/generate | Yes | Generate quiz (SSE) |
 | GET | /api/quizzes/:id | Yes | Quiz for taking |
 | PATCH | /api/quizzes/:id/answers | Yes | Save answers |
@@ -1300,7 +1371,7 @@ Auth: None
 | POST | /api/quizzes/:id/regrade | Yes | Retry grading (SSE) |
 | GET | /api/health | No | Health check |
 
-**Total: 24 endpoints.**
+**Total: 29 endpoints.**
 
 ---
 
@@ -1352,6 +1423,8 @@ SIMPLE OWNERSHIP:
 
 **Header Redaction:** pino-http uses a custom request serializer that strips `x-anthropic-key` from logged headers. User-provided API keys must never appear in logs.
 
+**API Key Encryption at Rest:** User-provided Anthropic API keys are encrypted with AES-256-GCM before storage. Encryption key (`API_KEY_ENCRYPTION_KEY`, 32 bytes hex-encoded) lives in Render env vars — never in the database. Storage format: `base64(iv || authTag || ciphertext)` in a single TEXT column. A separate `api_key_hint` column stores a masked display value (`sk-ant-...{last4}`) so the full key is never decrypted for status checks. Generate key: `openssl rand -hex 32`.
+
 **Input Validation:** Zod on every endpoint (body, params, query). Strings trimmed, email lowercased. Max lengths enforced.
 
 **Injection Prevention:** SQL — Prisma parameterizes. XSS — React escapes, sanitized react-markdown. Prompt injection — 4-layer defense.
@@ -1364,7 +1437,7 @@ SIMPLE OWNERSHIP:
 - Forgot password: 3/email/hour
 - Quiz generation: 10/user/hour, 50/user/day
 
-**Secrets:** Render env vars. .env.example committed. Validated on startup via Zod.
+**Secrets:** Render env vars. .env.example committed. Validated on startup via Zod. Includes `API_KEY_ENCRYPTION_KEY` for BYOK key encryption.
 
 **Database:** SSL required. Prisma ORM only — no raw SQL.
 
@@ -1825,5 +1898,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-08] Updated Sections 4, 5, 7 per specs/features/free-trial-limit/RFC.md
 - [2026-03-08] Updated Sections 5, 6 per specs/features/byok-api-key/SPEC.md
 - [2026-03-09] Updated Section 7 per specs/features/error-handling-audit/RFC.md
+- [2026-03-11] Updated Sections 3.5, 4.2, 4.3, 5.2, 5.5, 5.6–5.9, 6.4 per specs/features/byok-api-key-storage/RFC.md
 
 *End of Technical Design Document*

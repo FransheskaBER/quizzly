@@ -5,6 +5,7 @@ import { sessionRouter } from './session.routes.js';
 import { dashboardRouter } from './dashboard.routes.js';
 import { materialRouter } from './material.routes.js';
 import { quizRouter, quizTakingRouter } from './quiz.routes.js';
+import { userRouter } from './user.routes.js';
 import { testRouter } from './test.routes.js';
 import { devRouter } from './dev.routes.js';
 
@@ -22,6 +23,7 @@ router.use('/sessions', sessionRouter);
 router.use('/sessions', materialRouter);
 router.use('/sessions', quizRouter);
 router.use('/quizzes', quizTakingRouter);
+router.use('/users', userRouter);
 router.use('/dashboard', dashboardRouter);
 
 export { router as apiRouter };
