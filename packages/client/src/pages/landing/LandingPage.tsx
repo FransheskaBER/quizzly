@@ -128,11 +128,11 @@ const LandingPage = () => {
             7 types of exercises. Not definitions. Not recall.
           </h2>
           <div className={styles.exerciseTypesGrid}>
-            {EXERCISE_TYPES.map((type) => (
-              <div key={type.name} className={styles.exerciseTypeCard}>
-                <h3 className={styles.exerciseTypeName}>{type.name}</h3>
+            {EXERCISE_TYPES.map((exerciseType) => (
+              <div key={exerciseType.name} className={styles.exerciseTypeCard}>
+                <h3 className={styles.exerciseTypeName}>{exerciseType.name}</h3>
                 <p className={styles.exerciseTypeDescription}>
-                  {type.description}
+                  {exerciseType.description}
                 </p>
               </div>
             ))}
