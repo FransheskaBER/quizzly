@@ -11,7 +11,10 @@ describe('encrypt', () => {
     const ciphertext = encrypt('sk-ant-test-key-1234567890');
 
     expect(typeof ciphertext).toBe('string');
-    expect(() => Buffer.from(ciphertext, 'base64')).not.toThrow();
+    expect(ciphertext).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
+    // iv (12) + authTag (16) + at least 1 byte ciphertext = 29 bytes minimum
+    const decoded = Buffer.from(ciphertext, 'base64');
+    expect(decoded.length).toBeGreaterThanOrEqual(29);
   });
 
   it('produces different ciphertexts for the same plaintext (random IV)', () => {
