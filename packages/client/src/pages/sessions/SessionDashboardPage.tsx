@@ -270,7 +270,7 @@ const SessionDashboardPage = () => {
                 onGenerate={generate}
                 isDisabled={false}
                 error={null}
-                isByok={meData?.hasApiKey === true}
+                isByok={meData?.hasUsedFreeTrial === true && meData?.hasApiKey === true}
               />
             ) : (
               <QuizProgress

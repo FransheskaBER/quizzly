@@ -87,7 +87,14 @@ const resolveUserApiKey = async (userId: string): Promise<string | undefined> =>
     select: { encryptedApiKey: true },
   });
   if (!user?.encryptedApiKey) return undefined;
-  return decrypt(user.encryptedApiKey);
+  try {
+    return decrypt(user.encryptedApiKey);
+  } catch (err) {
+    logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+    throw new BadRequestError(
+      'Could not read your saved API key. Please re-save it in your profile.',
+    );
+  }
 };
 
 export const prepareGeneration = async (
@@ -135,7 +142,17 @@ export const prepareGeneration = async (
   const materialsText = session.materials.map((m) => m.extractedText).join('\n\n');
 
   // Decrypt the user's API key for BYOK generations; free trial uses the server key.
-  const userApiKey = isFreeTrialGeneration ? undefined : decrypt(user.encryptedApiKey!);
+  let userApiKey: string | undefined;
+  if (!isFreeTrialGeneration) {
+    try {
+      userApiKey = decrypt(user.encryptedApiKey!);
+    } catch (err) {
+      logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+      throw new BadRequestError(
+        'Could not read your saved API key. Please re-save it in your profile.',
+      );
+    }
+  }
 
   return {
     sessionSubject: session.subject,
