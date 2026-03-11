@@ -1,19 +1,5 @@
-import { prisma } from '../config/database.js';
-import { hashPassword, comparePassword } from '../utils/password.utils.js';
-import {
-  generateAccessToken,
-  generateVerificationToken,
-  generateResetToken,
-  hashToken,
-} from '../utils/token.utils.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from './email.service.js';
-import {
-  ConflictError,
-  UnauthorizedError,
-  EmailNotVerifiedError,
-  BadRequestError,
-  NotFoundError,
-} from '../utils/errors.js';
+import pino from 'pino';
+
 import {
   VERIFICATION_TOKEN_EXPIRY_HOURS,
   RESET_TOKEN_EXPIRY_HOURS,
@@ -29,6 +15,26 @@ import type {
   UserResponse,
   MessageResponse,
 } from '@skills-trainer/shared';
+
+import { prisma } from '../config/database.js';
+import { Sentry } from '../config/sentry.js';
+import { hashPassword, comparePassword } from '../utils/password.utils.js';
+import {
+  generateAccessToken,
+  generateVerificationToken,
+  generateResetToken,
+  hashToken,
+} from '../utils/token.utils.js';
+import {
+  ConflictError,
+  UnauthorizedError,
+  EmailNotVerifiedError,
+  BadRequestError,
+  NotFoundError,
+} from '../utils/errors.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from './email.service.js';
+
+const logger = pino({ name: 'auth.service' });
 
 export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
@@ -53,8 +59,7 @@ export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
     },
   });
 
-  // Fire-and-forget — sendVerificationEmail catches and logs internally
-  void sendVerificationEmail(user.email, verificationToken);
+  await sendVerificationEmail(user.email, verificationToken);
 
   return { message: 'Account created. Please check your email to verify.' };
 };
@@ -137,8 +142,16 @@ export const resendVerification = async (
     data: { verificationToken: verificationTokenHash, verificationTokenExpiresAt },
   });
 
-  // Fire-and-forget — sendVerificationEmail catches, logs, and reports to Sentry internally
-  void sendVerificationEmail(user.email, verificationToken);
+  // SECURITY: Catch email failure and return generic response to prevent email enumeration.
+  // Attacker must not distinguish "email doesn't exist/already verified" from
+  // "email exists, unverified, but delivery failed".
+  try {
+    await sendVerificationEmail(user.email, verificationToken);
+  } catch (err) {
+    logger.error({ err, email: user.email }, 'Verification email failed');
+    Sentry.captureException(err, { extra: { email: user.email } });
+    return genericResponse;
+  }
 
   return genericResponse;
 };
@@ -165,8 +178,15 @@ export const forgotPassword = async (data: ForgotPasswordRequest): Promise<Messa
     },
   });
 
-  // Fire-and-forget — sendPasswordResetEmail catches, logs, and reports to Sentry internally
-  void sendPasswordResetEmail(user.email, token);
+  // SECURITY: Catch email failure and return generic response to prevent email enumeration.
+  // Attacker must not distinguish "email doesn't exist" from "email exists but delivery failed".
+  try {
+    await sendPasswordResetEmail(user.email, token);
+  } catch (err) {
+    logger.error({ err, email: user.email }, 'Password reset email failed');
+    Sentry.captureException(err, { extra: { email: user.email } });
+    return genericResponse;
+  }
 
   return genericResponse;
 };

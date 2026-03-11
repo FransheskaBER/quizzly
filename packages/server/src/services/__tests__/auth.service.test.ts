@@ -38,6 +38,7 @@ import {
   EmailNotVerifiedError,
   BadRequestError,
   NotFoundError,
+  EmailDeliveryError,
 } from '../../utils/errors.js';
 
 // Base user record that matches the Prisma User shape
@@ -125,6 +126,21 @@ describe('signup', () => {
     const expiry = (createData.verificationTokenExpiresAt as Date).getTime();
     expect(expiry).toBeGreaterThan(before + 23 * 60 * 60 * 1000);
     expect(expiry).toBeLessThan(after + 25 * 60 * 60 * 1000);
+  });
+
+  it('throws EmailDeliveryError when email delivery fails (account still created)', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue({ ...mockUser, emailVerified: false });
+    vi.mocked(sendVerificationEmail).mockRejectedValueOnce(
+      new EmailDeliveryError('Failed to send verification email'),
+    );
+
+    await expect(
+      authService.signup({ email: 'test@example.com', username: 'testuser', password: 'Password123!' }),
+    ).rejects.toBeInstanceOf(EmailDeliveryError);
+
+    // Account was still created before email was attempted
+    expect(prisma.user.create).toHaveBeenCalled();
   });
 
   it('throws ConflictError when email is already registered', async () => {
@@ -305,6 +321,19 @@ describe('resendVerification', () => {
     expect(sendVerificationEmail).not.toHaveBeenCalled();
   });
 
+  it('returns generic message when email delivery fails (enumeration protection)', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: false });
+    vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, emailVerified: false });
+    vi.mocked(sendVerificationEmail).mockRejectedValueOnce(
+      new EmailDeliveryError('Failed to send verification email'),
+    );
+
+    const result = await authService.resendVerification({ email: 'test@example.com' });
+
+    // Must return generic response, not throw — prevents email enumeration
+    expect(result.message).toBeTruthy();
+  });
+
   it('returns generic message without emailing when user is already verified', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: true });
 
@@ -351,6 +380,19 @@ describe('forgotPassword', () => {
     expect(rawToken).not.toBe(storedHash);
     // SHA-256 hash is always 64 hex chars
     expect(storedHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns generic message when email delivery fails (enumeration protection)', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
+    vi.mocked(prisma.passwordReset.create).mockResolvedValue({} as never);
+    vi.mocked(sendPasswordResetEmail).mockRejectedValueOnce(
+      new EmailDeliveryError('Failed to send password reset email'),
+    );
+
+    const result = await authService.forgotPassword({ email: 'test@example.com' });
+
+    // Must return generic response, not throw — prevents email enumeration
+    expect(result.message).toBeTruthy();
   });
 
   it('returns generic message without any DB write or email when user is not found', async () => {

@@ -315,11 +315,16 @@ export const getQuiz = async (
   assertOwnership(attempt.userId, userId);
 
   // Stamp startedAt the first time the user opens this quiz for taking.
-  // Fire-and-forget — don't delay the response for a best-effort timestamp.
   if (attempt.status === QuizStatus.IN_PROGRESS && attempt.startedAt === null) {
-    prisma.quizAttempt
-      .update({ where: { id: quizAttemptId }, data: { startedAt: new Date() } })
-      .catch((err: unknown) => logger.error({ err, quizAttemptId }, 'Failed to set startedAt'));
+    try {
+      await prisma.quizAttempt.update({
+        where: { id: quizAttemptId },
+        data: { startedAt: new Date() },
+      });
+    } catch (err) {
+      logger.error({ err, quizAttemptId }, 'Failed to set startedAt');
+      Sentry.captureException(err, { extra: { quizAttemptId } });
+    }
   }
 
   return {
@@ -544,11 +549,17 @@ export const executeGrading = async (
     timedOut = true;
     writer({ type: 'error', message: 'Grading timed out. You can retry grading.' });
     logger.warn({ quizAttemptId }, 'Grading timed out');
-    prisma.quizAttempt
-      .update({ where: { id: quizAttemptId }, data: { status: QuizStatus.SUBMITTED_UNGRADED } })
-      .catch((err: unknown) =>
-        logger.error({ err, quizAttemptId }, 'Failed to set submitted_ungraded after timeout'),
-      );
+    void (async () => {
+      try {
+        await prisma.quizAttempt.update({
+          where: { id: quizAttemptId },
+          data: { status: QuizStatus.SUBMITTED_UNGRADED },
+        });
+      } catch (err) {
+        logger.error({ err, quizAttemptId }, 'Failed to set submitted_ungraded after timeout');
+        Sentry.captureException(err, { extra: { quizAttemptId } });
+      }
+    })();
   }, SSE_SERVER_TIMEOUT_MS);
 
   try {
@@ -669,11 +680,15 @@ export const executeGrading = async (
       writer({ type: 'error', message: 'Grading failed. You can retry grading.' });
     }
 
-    await prisma.quizAttempt
-      .update({ where: { id: quizAttemptId }, data: { status: QuizStatus.SUBMITTED_UNGRADED } })
-      .catch((updateErr: unknown) =>
-        logger.error({ updateErr, quizAttemptId }, 'Failed to set submitted_ungraded after error'),
-      );
+    try {
+      await prisma.quizAttempt.update({
+        where: { id: quizAttemptId },
+        data: { status: QuizStatus.SUBMITTED_UNGRADED },
+      });
+    } catch (updateErr) {
+      logger.error({ updateErr, quizAttemptId }, 'Failed to set submitted_ungraded after error');
+      Sentry.captureException(updateErr, { extra: { quizAttemptId } });
+    }
   } finally {
     clearTimeout(timeoutId);
   }

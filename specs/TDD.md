@@ -1412,7 +1412,8 @@ ERROR CLASS HIERARCHY:
 │   ├── ForbiddenError (403, FORBIDDEN)
 │   ├── NotFoundError (404, NOT_FOUND)
 │   ├── ConflictError (409, CONFLICT)
-│   └── RateLimitError (429, RATE_LIMITED)
+│   ├── RateLimitError (429, RATE_LIMITED)
+│   └── EmailDeliveryError (502, EMAIL_DELIVERY_ERROR)
 
 GLOBAL ERROR MIDDLEWARE (single exit point):
 ├── AppError → res.status(err.statusCode).json({ error: err.toResponse() })
@@ -1443,7 +1444,7 @@ GLOBAL ERROR MIDDLEWARE (single exit point):
 
 | What Can Fail | System Response | Recovery |
 |---|---|---|
-| Resend email service down | Log to Sentry. Return 200. | User clicks "Resend". If still down: "Verification email delayed." |
+| Resend email service down | Throw `EmailDeliveryError` (502). Sentry alert. Account remains in DB. Forgot-password returns generic response (enumeration protection). | User clicks "Resend" from login page. If still down: 502 returned. |
 | Expired verification token | 400: "Link has expired" | "Resend verification email" button |
 | Double-click verification | First: 200. Second: 409 "Already verified" | Both safe. Redirect to login. |
 | Expired reset token | 400: "Link has expired" | "Request new reset link" button |
@@ -1493,6 +1494,7 @@ TIMEOUT: 120s server-side. 30s client-side no-event warning.
 2. **4xx = user's fault** (tell them how to fix). **5xx = our fault** (generic message, Sentry alert).
 3. **Log everything:** request ID, user ID, endpoint, timestamp. Structured JSON via pino.
 4. **Sentry alerts:** any 5xx, 10+ rate limit hits/5min, 3+ consecutive LLM failures.
+5. **No fire-and-forget.** All async operations must be awaited with try/catch. Best-effort operations use await + try/catch + Sentry capture, not `.catch()` chains.
 
 ---
 
@@ -1822,5 +1824,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 ### Update Log
 - [2026-03-08] Updated Sections 4, 5, 7 per specs/features/free-trial-limit/RFC.md
 - [2026-03-08] Updated Sections 5, 6 per specs/features/byok-api-key/SPEC.md
+- [2026-03-09] Updated Section 7 per specs/features/error-handling-audit/RFC.md
 
 *End of Technical Design Document*
