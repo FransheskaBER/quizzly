@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
+import { z } from 'zod';
 
 import {
   updateProfileSchema,
@@ -11,7 +12,6 @@ import {
 } from '@skills-trainer/shared';
 import type {
   UpdateProfileRequest,
-  ChangePasswordRequest,
   SaveApiKeyRequest,
 } from '@skills-trainer/shared';
 
@@ -30,6 +30,16 @@ import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import { useAppDispatch } from '@/store/store';
 import styles from './ProfilePage.module.css';
+
+/** Client-side schema that adds a confirm field and validates it matches newPassword. */
+const changePasswordFormSchema = changePasswordSchema
+  .extend({ confirmNewPassword: z.string().min(1, 'Please confirm your new password') })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmNewPassword'],
+  });
+
+type ChangePasswordFormValues = z.infer<typeof changePasswordFormSchema>;
 
 const UsernameSection = () => {
   const { data: meData } = useGetMeQuery();
@@ -86,15 +96,16 @@ const PasswordSection = () => {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ChangePasswordRequest>({
-    resolver: zodResolver(changePasswordSchema),
+  } = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordFormSchema),
   });
 
-  const onSubmit = async (data: ChangePasswordRequest): Promise<void> => {
+  const onSubmit = async (data: ChangePasswordFormValues): Promise<void> => {
     setSuccessMessage(null);
     setErrorMessage(null);
     try {
-      const result = await changePassword(data).unwrap();
+      const { currentPassword, newPassword } = data;
+      const result = await changePassword({ currentPassword, newPassword }).unwrap();
       setSuccessMessage(result.message);
       reset();
     } catch (err) {
@@ -117,6 +128,12 @@ const PasswordSection = () => {
           type="password"
           {...register('newPassword')}
           error={errors.newPassword?.message}
+        />
+        <FormField
+          label="Confirm New Password"
+          type="password"
+          {...register('confirmNewPassword')}
+          error={errors.confirmNewPassword?.message}
         />
         <p className={styles.hint}>Minimum {PASSWORD_MIN_LENGTH} characters</p>
         <FormError message={errorMessage} />
