@@ -5,7 +5,6 @@ import type { GenerateQuizQuery, Question } from '@skills-trainer/shared';
 import { api, API_BASE_URL } from '@/store/api';
 import { authApi } from '@/api/auth.api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
-import { getApiKey } from '@/store/apiKeyStore';
 import {
   generationStarted,
   questionsBatchReceived,
@@ -116,12 +115,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
     }
   };
 
-  // Build extra headers at render time; the ref inside useSSEStream ensures the
-  // latest value is used when fetch fires. getApiKey() reads the module-level store.
-  const apiKey = getApiKey();
-  const extraHeaders = apiKey ? { 'X-Anthropic-Key': apiKey } : undefined;
-
-  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token, extraHeaders });
+  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token });
 
   // Keep close in a ref so the unmount effect always calls the latest version.
   const closeRef = useRef(close);

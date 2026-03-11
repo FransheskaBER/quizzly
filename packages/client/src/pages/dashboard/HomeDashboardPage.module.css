@@ -14,8 +14,12 @@
 
 .topBar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-md);
+}
+
+.profileLink {
+  margin-left: auto;
 }
 
 .appName {

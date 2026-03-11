@@ -16,6 +16,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
+import { decrypt } from '../utils/encryption.utils.js';
 import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from './llm.service.js';
 import type { FreeTextAnswer } from './llm.service.js';
@@ -33,7 +34,7 @@ interface PreparedGeneration {
   materialsText: string;
   materialsUsed: boolean;
   isFreeTrialGeneration: boolean;
-  anthropicApiKey?: string;
+  userApiKey?: string;
 }
 
 interface GenerationParams {
@@ -67,7 +68,7 @@ export interface GradingContext {
   sessionSubject: string;
   questions: GradingQuestion[];
   answers: GradingAnswer[];
-  anthropicApiKey?: string;
+  userApiKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,14 +80,23 @@ export interface GradingContext {
  * Throws AppError subclasses on failure so asyncHandler returns a JSON error
  * before any SSE headers are written.
  */
+/** Fetches and decrypts the user's saved API key. Returns undefined if no key saved. */
+const resolveUserApiKey = async (userId: string): Promise<string | undefined> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { encryptedApiKey: true },
+  });
+  if (!user?.encryptedApiKey) return undefined;
+  return decrypt(user.encryptedApiKey);
+};
+
 export const prepareGeneration = async (
   sessionId: string,
   userId: string,
-  anthropicApiKey?: string,
 ): Promise<PreparedGeneration> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { freeTrialUsedAt: true },
+    select: { freeTrialUsedAt: true, encryptedApiKey: true },
   });
 
   if (!user) throw new NotFoundError('User not found');
@@ -94,9 +104,9 @@ export const prepareGeneration = async (
   const isTrialUsed = user.freeTrialUsedAt !== null;
   const isFreeTrialGeneration = !isTrialUsed;
 
-  if (isTrialUsed && !anthropicApiKey) {
+  if (isTrialUsed && !user.encryptedApiKey) {
     throw new TrialExhaustedError(
-      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
+      'Free trial generation used. Save your Anthropic API key in your profile to generate more quizzes.',
     );
   }
 
@@ -124,14 +134,16 @@ export const prepareGeneration = async (
   const materialsUsed = session.materials.length > 0;
   const materialsText = session.materials.map((m) => m.extractedText).join('\n\n');
 
+  // Decrypt the user's API key for BYOK generations; free trial uses the server key.
+  const userApiKey = isFreeTrialGeneration ? undefined : decrypt(user.encryptedApiKey!);
+
   return {
     sessionSubject: session.subject,
     sessionGoal: session.goal,
     materialsText,
     materialsUsed,
     isFreeTrialGeneration,
-    // Only pass the user's key for BYOK generations; free trial uses the server key.
-    anthropicApiKey: isFreeTrialGeneration ? undefined : anthropicApiKey,
+    userApiKey,
   };
 };
 
@@ -159,7 +171,7 @@ export const executeGeneration = async (
     materialsText,
     materialsUsed,
     isFreeTrialGeneration,
-    anthropicApiKey,
+    userApiKey,
   } = params;
 
   const questionCount = isFreeTrialGeneration ? FREE_TRIAL_QUESTION_COUNT : requestedCount;
@@ -202,7 +214,7 @@ export const executeGeneration = async (
         materialsText: materialsText || null,
       },
       () => {},
-      anthropicApiKey,
+      userApiKey,
     );
 
     let questionsGenerated = 0;
@@ -403,7 +415,6 @@ export const prepareGrading = async (
   quizAttemptId: string,
   userId: string,
   answers: Array<{ questionId: string; answer: string }>,
-  anthropicApiKey?: string,
 ): Promise<GradingContext> => {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: quizAttemptId },
@@ -426,10 +437,14 @@ export const prepareGrading = async (
 
   // BYOK quizzes require the user's key for free-text grading
   const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
-  if (!attempt.isFreeTrial && hasFreeText && !anthropicApiKey) {
-    throw new TrialExhaustedError(
-      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
-    );
+  let userApiKey: string | undefined;
+  if (!attempt.isFreeTrial && hasFreeText) {
+    userApiKey = await resolveUserApiKey(userId);
+    if (!userApiKey) {
+      throw new TrialExhaustedError(
+        'Free trial generation used. Save your Anthropic API key in your profile to grade free-text answers.',
+      );
+    }
   }
 
   // Apply any final answers sent with the submit payload
@@ -470,7 +485,7 @@ export const prepareGrading = async (
       questionId: a.questionId,
       userAnswer: a.userAnswer,
     })),
-    anthropicApiKey,
+    userApiKey,
   };
 };
 
@@ -482,7 +497,6 @@ export const prepareGrading = async (
 export const prepareRegrade = async (
   quizAttemptId: string,
   userId: string,
-  anthropicApiKey?: string,
 ): Promise<GradingContext> => {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: quizAttemptId },
@@ -502,10 +516,14 @@ export const prepareRegrade = async (
 
   // BYOK quizzes require the user's key for free-text grading
   const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
-  if (!attempt.isFreeTrial && hasFreeText && !anthropicApiKey) {
-    throw new TrialExhaustedError(
-      'Free trial generation used. Provide your own Anthropic API key to generate more quizzes.',
-    );
+  let userApiKey: string | undefined;
+  if (!attempt.isFreeTrial && hasFreeText) {
+    userApiKey = await resolveUserApiKey(userId);
+    if (!userApiKey) {
+      throw new TrialExhaustedError(
+        'Free trial generation used. Save your Anthropic API key in your profile to grade free-text answers.',
+      );
+    }
   }
 
   return {
@@ -523,7 +541,7 @@ export const prepareRegrade = async (
       questionId: a.questionId,
       userAnswer: a.userAnswer,
     })),
-    anthropicApiKey,
+    userApiKey,
   };
 };
 
@@ -541,7 +559,7 @@ export const executeGrading = async (
   context: GradingContext,
   writer: SseWriter,
 ): Promise<void> => {
-  const { quizAttemptId, sessionSubject, questions, answers, anthropicApiKey } = context;
+  const { quizAttemptId, sessionSubject, questions, answers, userApiKey } = context;
   const now = new Date();
   let timedOut = false;
 
@@ -605,7 +623,7 @@ export const executeGrading = async (
       const gradedResults = await llmGradeAnswers(
         { subject: sessionSubject, answers: freeTextPayload },
         () => {},
-        anthropicApiKey,
+        userApiKey,
       );
 
       for (const result of gradedResults) {

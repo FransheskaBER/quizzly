@@ -54,6 +54,8 @@ const mockUser = {
   googleId: null,
   subscriptionTier: 'free',
   freeTrialUsedAt: null,
+  encryptedApiKey: null,
+  apiKeyHint: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
 };
@@ -466,6 +468,7 @@ describe('getMe', () => {
       username: mockUser.username,
       emailVerified: mockUser.emailVerified,
       hasUsedFreeTrial: false,
+      hasApiKey: false,
       createdAt: mockUser.createdAt.toISOString(),
     });
   });

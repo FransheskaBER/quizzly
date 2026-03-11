@@ -116,3 +116,16 @@ export type SseErrorEvent = z.infer<typeof sseErrorEventSchema>;
 export type SseGradedEvent = z.infer<typeof sseGradedEventSchema>;
 export type SseGradeCompleteEvent = z.infer<typeof sseGradeCompleteEventSchema>;
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
+
+// User
+import type {
+  saveApiKeySchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  apiKeyStatusResponseSchema,
+} from '../schemas/user.schema.js';
+
+export type SaveApiKeyRequest = z.infer<typeof saveApiKeySchema>;
+export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordRequest = z.infer<typeof changePasswordSchema>;
+export type ApiKeyStatusResponse = z.infer<typeof apiKeyStatusResponseSchema>;

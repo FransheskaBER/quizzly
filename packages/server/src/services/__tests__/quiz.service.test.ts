@@ -37,6 +37,11 @@ vi.mock('../../config/sentry.js', () => ({
   Sentry: { captureException: vi.fn() },
 }));
 
+vi.mock('../../utils/encryption.utils.js', () => ({
+  encrypt: vi.fn((plaintext: string) => `encrypted-${plaintext}`),
+  decrypt: vi.fn((ciphertext: string) => ciphertext.replace('encrypted-', '')),
+}));
+
 import { prisma } from '../../config/database.js';
 import { Sentry } from '../../config/sentry.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from '../llm.service.js';
@@ -246,8 +251,8 @@ beforeEach(() => {
 
 describe('prepareGeneration', () => {
   beforeEach(() => {
-    // Default: trial not used
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ freeTrialUsedAt: null } as never);
+    // Default: trial not used, no saved API key
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ freeTrialUsedAt: null, encryptedApiKey: null } as never);
   });
 
   it('returns sessionSubject, sessionGoal, concatenated materialsText, and materialsUsed:true', async () => {
@@ -347,32 +352,34 @@ describe('prepareGeneration', () => {
     );
   });
 
-  it('allows generation with BYOK key when trial is used', async () => {
+  it('allows generation with saved BYOK key when trial is used', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       freeTrialUsedAt: new Date('2026-01-01'),
+      encryptedApiKey: 'encrypted-sk-ant-test-key-1234567890',
     } as never);
     vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
     vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
 
-    const result = await prepareGeneration(SESSION_ID, USER_ID, 'sk-ant-test-key-1234567890');
+    const result = await prepareGeneration(SESSION_ID, USER_ID);
 
     expect(result.isFreeTrialGeneration).toBe(false);
-    expect(result.anthropicApiKey).toBe('sk-ant-test-key-1234567890');
+    expect(result.userApiKey).toBe('sk-ant-test-key-1234567890');
   });
 
-  it('ignores provided API key when trial is not used (uses server key)', async () => {
+  it('uses server key when trial is not used (no userApiKey)', async () => {
     vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
     vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
 
-    const result = await prepareGeneration(SESSION_ID, USER_ID, 'sk-ant-test-key-1234567890');
+    const result = await prepareGeneration(SESSION_ID, USER_ID);
 
     expect(result.isFreeTrialGeneration).toBe(true);
-    expect(result.anthropicApiKey).toBeUndefined();
+    expect(result.userApiKey).toBeUndefined();
   });
 
-  it('throws TrialExhaustedError when trial is used and no API key provided', async () => {
+  it('throws TrialExhaustedError when trial is used and no saved API key', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       freeTrialUsedAt: new Date('2026-01-01'),
+      encryptedApiKey: null,
     } as never);
 
     await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(TrialExhaustedError);
@@ -555,11 +562,11 @@ describe('executeGeneration', () => {
     );
   });
 
-  it('passes anthropicApiKey to LLM service for BYOK generation', async () => {
+  it('passes userApiKey to LLM service for BYOK generation', async () => {
     const writer = vi.fn();
     const byokKey = 'sk-ant-byok-test-key-123';
     await executeGeneration(
-      { ...BASE_EXECUTION_PARAMS, isFreeTrialGeneration: false, anthropicApiKey: byokKey },
+      { ...BASE_EXECUTION_PARAMS, isFreeTrialGeneration: false, userApiKey: byokKey },
       writer,
     );
 
@@ -1176,7 +1183,7 @@ describe('executeGrading', () => {
     });
   });
 
-  it('passes anthropicApiKey to LLM grading service for BYOK', async () => {
+  it('passes userApiKey to LLM grading service for BYOK', async () => {
     const byokKey = 'sk-ant-byok-grading-key-99';
     const byokFreeTextContext: GradingContext = {
       quizAttemptId: ATTEMPT_ID,
@@ -1193,7 +1200,7 @@ describe('executeGrading', () => {
       answers: [
         { id: ANSWER_ID, questionId: QUESTION_ID, userAnswer: 'It adds types to JS.' },
       ],
-      anthropicApiKey: byokKey,
+      userApiKey: byokKey,
     };
 
     vi.mocked(llmGradeAnswers).mockResolvedValue([
@@ -1212,7 +1219,7 @@ describe('executeGrading', () => {
   });
 
   it('grades MCQ-only quiz without API key even post-trial', async () => {
-    // MCQ context with no anthropicApiKey — should still succeed
+    // MCQ context with no userApiKey — should still succeed
     const writer = vi.fn();
     await executeGrading(mockGradingContext, writer);
 
