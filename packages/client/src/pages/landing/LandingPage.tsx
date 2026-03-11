@@ -163,7 +163,7 @@ const LandingPage = () => {
       {/* Who It's For */}
       <section className={styles.audience}>
         <div className={styles.audienceInner}>
-          <h2 className={styles.audienceHeading}>Who it's for</h2>
+          <h2 className={styles.audienceHeading}>Who It's For</h2>
           <div className={styles.audienceGrid}>
             {AUDIENCES.map((persona) => (
               <div key={persona.title} className={styles.audienceCard}>
