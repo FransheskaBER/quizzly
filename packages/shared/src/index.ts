@@ -121,6 +121,13 @@ export {
   dashboardResponseSchema,
 } from './schemas/quiz.schema.js';
 
+export {
+  saveApiKeySchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  apiKeyStatusResponseSchema,
+} from './schemas/user.schema.js';
+
 // Types
 export type {
   ApiErrorResponse,
@@ -177,4 +184,8 @@ export type {
   SseGradedEvent,
   SseGradeCompleteEvent,
   DashboardResponse,
+  SaveApiKeyRequest,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  ApiKeyStatusResponse,
 } from './types/index.js';

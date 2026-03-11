@@ -19,6 +19,8 @@ model User {
   googleId                   String?   @unique @map("google_id") @db.VarChar(255)
   subscriptionTier           String    @default("free") @map("subscription_tier") @db.VarChar(20)
   freeTrialUsedAt            DateTime? @map("free_trial_used_at") @db.Timestamptz()
+  encryptedApiKey            String?   @map("encrypted_api_key") @db.Text
+  apiKeyHint                 String?   @map("api_key_hint") @db.VarChar(20)
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 

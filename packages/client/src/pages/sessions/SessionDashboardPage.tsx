@@ -14,10 +14,8 @@ import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import { useQuizGeneration } from '@/hooks/useQuizGeneration';
-import { useApiKey } from '@/store/apiKeyStore';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
-import { ApiKeyInput } from '@/components/quiz/ApiKeyInput';
 import { formatDate, formatScore } from '@/utils/formatters';
 import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '@skills-trainer/shared';
 import { api } from '@/store/api';
@@ -75,7 +73,6 @@ const SessionDashboardPage = () => {
     pollingInterval: pollingActive ? SESSION_POLL_INTERVAL_MS : 0,
   });
   const { data: meData } = useGetMeQuery();
-  const savedApiKey = useApiKey();
   const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
   const [submitQuiz] = useSubmitQuizMutation();
@@ -263,14 +260,17 @@ const SessionDashboardPage = () => {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Generate Quiz</h2>
           <ComponentErrorBoundary>
-            {meData?.hasUsedFreeTrial && !savedApiKey ? (
-              <ApiKeyInput />
+            {meData?.hasUsedFreeTrial && !meData?.hasApiKey ? (
+              <p>
+                To generate more quizzes, save your Anthropic API key in your{' '}
+                <Link to="/profile">profile</Link>.
+              </p>
             ) : generationStatus === 'idle' ? (
               <QuizPreferences
                 onGenerate={generate}
                 isDisabled={false}
                 error={null}
-                isByok={meData?.hasUsedFreeTrial === true && savedApiKey !== null}
+                isByok={meData?.hasUsedFreeTrial === true && meData?.hasApiKey === true}
               />
             ) : (
               <QuizProgress

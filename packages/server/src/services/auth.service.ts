@@ -235,6 +235,7 @@ export const getMe = async (userId: string): Promise<UserResponse> => {
     username: user.username,
     emailVerified: user.emailVerified,
     hasUsedFreeTrial: user.freeTrialUsedAt !== null,
+    hasApiKey: user.encryptedApiKey !== null,
     createdAt: user.createdAt.toISOString(),
   };
 };

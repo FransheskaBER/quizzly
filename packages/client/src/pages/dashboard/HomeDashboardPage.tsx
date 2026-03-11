@@ -27,6 +27,7 @@ const HomeDashboardPage = () => {
       <div className={styles.inner}>
         <div className={styles.topBar}>
           <span className={styles.appName}>Quizzly</span>
+          <Link to="/profile" className={styles.profileLink}>Profile</Link>
           <button type="button" className={styles.logoutBtn} onClick={logout}>Log out</button>
         </div>
         <h1 className={styles.greeting}>
