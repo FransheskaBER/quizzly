@@ -321,16 +321,17 @@ describe('resendVerification', () => {
     expect(sendVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it('throws EmailDeliveryError when email delivery fails', async () => {
+  it('returns generic message when email delivery fails (enumeration protection)', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: false });
     vi.mocked(prisma.user.update).mockResolvedValue({ ...mockUser, emailVerified: false });
     vi.mocked(sendVerificationEmail).mockRejectedValueOnce(
       new EmailDeliveryError('Failed to send verification email'),
     );
 
-    await expect(
-      authService.resendVerification({ email: 'test@example.com' }),
-    ).rejects.toBeInstanceOf(EmailDeliveryError);
+    const result = await authService.resendVerification({ email: 'test@example.com' });
+
+    // Must return generic response, not throw — prevents email enumeration
+    expect(result.message).toBeTruthy();
   });
 
   it('returns generic message without emailing when user is already verified', async () => {

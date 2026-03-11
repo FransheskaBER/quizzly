@@ -151,16 +151,17 @@ describe('sendVerificationEmail when EMAIL_FROM is not configured', () => {
   it('warns and returns without sending or throwing', async () => {
     const originalEmailFrom = env.EMAIL_FROM;
     (env as { EMAIL_FROM: string }).EMAIL_FROM = '';
+    try {
+      await sendVerificationEmail('user@example.com', 'token-123');
 
-    await sendVerificationEmail('user@example.com', 'token-123');
-
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      { to: 'user@example.com' },
-      'EMAIL_FROM not configured — skipping verification email',
-    );
-    expect(resendClient.emails.send).not.toHaveBeenCalled();
-
-    (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { to: 'user@example.com' },
+        'EMAIL_FROM not configured — skipping verification email',
+      );
+      expect(resendClient.emails.send).not.toHaveBeenCalled();
+    } finally {
+      (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+    }
   });
 });
 
@@ -168,15 +169,16 @@ describe('sendPasswordResetEmail when EMAIL_FROM is not configured', () => {
   it('warns and returns without sending or throwing', async () => {
     const originalEmailFrom = env.EMAIL_FROM;
     (env as { EMAIL_FROM: string }).EMAIL_FROM = '';
+    try {
+      await sendPasswordResetEmail('user@example.com', 'token-456');
 
-    await sendPasswordResetEmail('user@example.com', 'token-456');
-
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      { to: 'user@example.com' },
-      'EMAIL_FROM not configured — skipping password reset email',
-    );
-    expect(resendClient.emails.send).not.toHaveBeenCalled();
-
-    (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { to: 'user@example.com' },
+        'EMAIL_FROM not configured — skipping password reset email',
+      );
+      expect(resendClient.emails.send).not.toHaveBeenCalled();
+    } finally {
+      (env as { EMAIL_FROM: string }).EMAIL_FROM = originalEmailFrom;
+    }
   });
 });
