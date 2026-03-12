@@ -1,11 +1,15 @@
 import type { Request, Response, NextFunction } from 'express';
+import pino from 'pino';
 import type { ZodSchema } from 'zod';
+import { Sentry } from '../config/sentry.js';
 
 interface ValidateSchemas {
   body?: ZodSchema;
   params?: ZodSchema;
   query?: ZodSchema;
 }
+
+const logger = pino({ name: 'validate.middleware' });
 
 /**
  * Validates req.body/params/query against Zod schema(s).
@@ -18,6 +22,15 @@ interface ValidateSchemas {
  */
 export const validate = (schema: ZodSchema | ValidateSchemas) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
+    const schemaTargets =
+      'parse' in schema
+        ? ['body']
+        : [
+            ...(schema.body ? ['body'] : []),
+            ...(schema.params ? ['params'] : []),
+            ...(schema.query ? ['query'] : []),
+          ];
+
     try {
       if ('parse' in schema) {
         // Single schema — applies to body
@@ -31,6 +44,19 @@ export const validate = (schema: ZodSchema | ValidateSchemas) => {
       }
       next();
     } catch (err) {
+      logger.warn(
+        { err, requestId: req.requestId, method: req.method, path: req.path, schemaTargets },
+        'Request validation failed',
+      );
+      Sentry.captureException(err, {
+        extra: {
+          requestId: req.requestId,
+          method: req.method,
+          path: req.path,
+          schemaTargets,
+          operation: 'validate.middleware.parse',
+        },
+      });
       next(err);
     }
   };

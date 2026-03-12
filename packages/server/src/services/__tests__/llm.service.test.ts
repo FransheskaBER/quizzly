@@ -25,6 +25,9 @@ vi.mock('../../config/anthropic.js', () => ({
     },
   },
 }));
+vi.mock('../../config/sentry.js', () => ({
+  Sentry: { captureException: vi.fn() },
+}));
 
 // Prevent real sanitization side-effects in LLM service tests
 vi.mock('../../utils/sanitize.utils.js', () => ({
@@ -33,6 +36,7 @@ vi.mock('../../utils/sanitize.utils.js', () => ({
 }));
 
 import anthropic from '../../config/anthropic.js';
+import { Sentry } from '../../config/sentry.js';
 import {
   LLM_GENERATION_TEMPERATURE,
   LLM_GRADING_TEMPERATURE,
@@ -166,6 +170,7 @@ describe('generateQuiz', () => {
 
     expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
     expect(result).toHaveLength(1);
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 
   it('retries when the questions block is missing entirely', async () => {
@@ -501,5 +506,6 @@ describe('BYOK — per-request client', () => {
     await expect(
       generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-bad-key-456'),
     ).rejects.toThrow('Invalid API key. Please check your key and try again.');
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });
