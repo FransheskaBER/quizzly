@@ -12,7 +12,7 @@ const { mockCreateSession, mockNavigate, mockShowError, mockShowSuccess, mockCap
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     useNavigate: () => mockNavigate,

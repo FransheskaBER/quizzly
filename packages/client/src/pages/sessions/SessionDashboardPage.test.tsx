@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SessionDetailResponse } from '@skills-trainer/shared';
+import type { QuizSubmitFailure } from '@/store/slices/quizSubmit.slice';
 
 // ---------------------------------------------------------------------------
 // Mocks — must come before the component import
@@ -19,7 +20,7 @@ const {
   mockCaptureException,
 } = vi.hoisted(() => ({
   mockDispatch: vi.fn(),
-  mockUseAppSelector: vi.fn(() => []),
+  mockUseAppSelector: vi.fn((): QuizSubmitFailure[] => []),
   mockShowError: vi.fn(),
   mockShowSuccess: vi.fn(),
   mockSubmitQuiz: vi.fn(),
@@ -264,8 +265,13 @@ describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
   it('captures retry submission failures with session and attempt metadata', async () => {
     const user = userEvent.setup();
     mockUseAppSelector.mockReturnValue([
-      { quizAttemptId: 'qa-1', sessionId: 'session-1', message: 'Failed', createdAt: new Date().toISOString() },
-    ]);
+      {
+        quizAttemptId: 'qa-1',
+        sessionId: 'session-1',
+        message: 'Failed',
+        createdAt: new Date().toISOString(),
+      },
+    ] as QuizSubmitFailure[]);
     mockSubmitQuiz.mockReturnValue({
       unwrap: vi.fn().mockRejectedValue(new Error('retry failed')),
     });
