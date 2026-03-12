@@ -4,6 +4,7 @@ import pino from 'pino';
 import type { Readable } from 'stream';
 import { MAX_FILE_SIZE_BYTES } from '@skills-trainer/shared';
 import { s3Client, bucketName } from '../config/s3.js';
+import { Sentry } from '../config/sentry.js';
 
 const logger = pino({ name: 's3-service' });
 
@@ -35,6 +36,9 @@ export const generateUploadUrl = async (input: {
     return { uploadUrl, expiresIn: UPLOAD_EXPIRES_IN };
   } catch (err) {
     logger.error({ err, key: input.key, bucket: bucketName }, 'Failed to generate upload URL');
+    Sentry.captureException(err, {
+      extra: { key: input.key, bucket: bucketName, operation: 's3.generateUploadUrl' },
+    });
     throw err;
   }
 };
@@ -52,6 +56,9 @@ export const generateDownloadUrl = async (input: {
     return { downloadUrl, expiresIn: DOWNLOAD_EXPIRES_IN };
   } catch (err) {
     logger.error({ err, key: input.key, bucket: bucketName }, 'Failed to generate download URL');
+    Sentry.captureException(err, {
+      extra: { key: input.key, bucket: bucketName, operation: 's3.generateDownloadUrl' },
+    });
     throw err;
   }
 };
@@ -118,6 +125,7 @@ export const deleteObject = async (key: string): Promise<void> => {
     }
 
     logger.error({ err, key }, 'Failed to delete S3 object');
+    Sentry.captureException(err, { extra: { key, bucket: bucketName, operation: 's3.deleteObject' } });
     throw err;
   }
 };

@@ -16,6 +16,9 @@ const { mockLogger } = vi.hoisted(() => {
 });
 
 vi.mock('pino', () => ({ default: () => mockLogger }));
+vi.mock('../../config/sentry.js', () => ({
+  Sentry: { captureException: vi.fn() },
+}));
 
 vi.mock('../../config/database.js', () => ({
   prisma: {
@@ -49,6 +52,7 @@ vi.mock('@mozilla/readability', () => ({
 }));
 
 import { prisma } from '../../config/database.js';
+import { Sentry } from '../../config/sentry.js';
 import { extractUrl } from '../material.service.js';
 import { BadRequestError } from '../../utils/errors.js';
 import { MaterialStatus } from '@skills-trainer/shared';
@@ -96,6 +100,12 @@ describe('extractUrl — fetch error handling', () => {
       expect.objectContaining({ url: 'https://example.com/page' }),
       'URL fetch failed — network error or timeout',
     );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      networkError,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'material.fetchAndExtractUrl.fetch' }),
+      }),
+    );
 
     vi.unstubAllGlobals();
   });
@@ -112,6 +122,12 @@ describe('extractUrl — fetch error handling', () => {
       expect.objectContaining({ url: 'https://example.com/page' }),
       'URL fetch failed — network error or timeout',
     );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      abortError,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'material.fetchAndExtractUrl.fetch' }),
+      }),
+    );
 
     vi.unstubAllGlobals();
   });
@@ -127,6 +143,12 @@ describe('extractUrl — fetch error handling', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://example.com/page' }),
       'Unexpected error fetching URL',
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      unexpectedError,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'material.fetchAndExtractUrl.fetch' }),
+      }),
     );
 
     vi.unstubAllGlobals();
@@ -168,6 +190,12 @@ describe('processMaterial — S3 download error', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ s3Key: 'sessions/abc/notes.pdf', materialId: 'material-uuid-1' }),
       'Failed to download material from S3',
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'material.processMaterial.download' }),
+      }),
     );
   });
 });

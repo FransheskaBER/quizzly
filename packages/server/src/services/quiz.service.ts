@@ -14,10 +14,10 @@ import pino from 'pino';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '../config/database.js';
-import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
 import { decrypt } from '../utils/encryption.utils.js';
 import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
+import { captureExceptionOnce } from '../utils/sentry.utils.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from './llm.service.js';
 import type { FreeTextAnswer } from './llm.service.js';
 import type { SseWriter } from '../utils/sse.utils.js';
@@ -91,6 +91,7 @@ const resolveUserApiKey = async (userId: string): Promise<string | undefined> =>
     return decrypt(user.encryptedApiKey);
   } catch (err) {
     logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+    captureExceptionOnce(err, { extra: { userId, operation: 'quiz.resolveUserApiKey.decrypt' } });
     throw new BadRequestError(
       'Could not read your saved API key. Please re-save it in your profile.',
     );
@@ -148,6 +149,7 @@ export const prepareGeneration = async (
       userApiKey = decrypt(user.encryptedApiKey!);
     } catch (err) {
       logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+      captureExceptionOnce(err, { extra: { userId, operation: 'quiz.prepareGeneration.decrypt' } });
       throw new BadRequestError(
         'Could not read your saved API key. Please re-save it in your profile.',
       );
@@ -303,7 +305,7 @@ export const executeGeneration = async (
     }
   } catch (err) {
     logger.error({ err, sessionId }, 'Quiz generation failed');
-    Sentry.captureException(err, { extra: { sessionId } });
+    captureExceptionOnce(err, { extra: { sessionId } });
 
     if (!timedOut) {
       writer({ type: 'error', message: 'Generation failed. Please try again.' });
@@ -352,7 +354,7 @@ export const getQuiz = async (
       });
     } catch (err) {
       logger.error({ err, quizAttemptId }, 'Failed to set startedAt');
-      Sentry.captureException(err, { extra: { quizAttemptId } });
+      captureExceptionOnce(err, { extra: { quizAttemptId } });
     }
   }
 
@@ -592,7 +594,7 @@ export const executeGrading = async (
         });
       } catch (err) {
         logger.error({ err, quizAttemptId }, 'Failed to set submitted_ungraded after timeout');
-        Sentry.captureException(err, { extra: { quizAttemptId } });
+        captureExceptionOnce(err, { extra: { quizAttemptId } });
       }
     })();
   }, SSE_SERVER_TIMEOUT_MS);
@@ -709,7 +711,7 @@ export const executeGrading = async (
     writer({ type: 'complete', data: { quizAttemptId, score: finalScore } });
   } catch (err) {
     logger.error({ err, quizAttemptId }, 'Quiz grading failed');
-    Sentry.captureException(err, { extra: { quizAttemptId } });
+    captureExceptionOnce(err, { extra: { quizAttemptId } });
 
     if (!timedOut) {
       writer({ type: 'error', message: 'Grading failed. You can retry grading.' });
@@ -722,7 +724,7 @@ export const executeGrading = async (
       });
     } catch (updateErr) {
       logger.error({ updateErr, quizAttemptId }, 'Failed to set submitted_ungraded after error');
-      Sentry.captureException(updateErr, { extra: { quizAttemptId } });
+      captureExceptionOnce(updateErr, { extra: { quizAttemptId } });
     }
   } finally {
     clearTimeout(timeoutId);

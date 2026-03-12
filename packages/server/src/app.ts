@@ -73,9 +73,8 @@ export const createApp = () => {
     });
   });
 
-  // errorHandler calls Sentry.captureException only for 5xx — using a single
-  // manual capture path avoids the duplicate events that Sentry.setupExpressErrorHandler
-  // would cause (it captures before our 4xx filtering runs).
+  // Use a single manual capture path in errorHandler so telemetry context is
+  // consistent across mapped 4xx and unhandled 5xx branches.
   app.use(errorHandler);
 
   return app;

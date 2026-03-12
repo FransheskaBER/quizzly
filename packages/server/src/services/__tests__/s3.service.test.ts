@@ -16,6 +16,9 @@ const { mockLogger } = vi.hoisted(() => {
 });
 
 vi.mock('pino', () => ({ default: () => mockLogger }));
+vi.mock('../../config/sentry.js', () => ({
+  Sentry: { captureException: vi.fn() },
+}));
 
 vi.mock('../../config/s3.js', () => ({
   s3Client: { send: vi.fn() },
@@ -33,6 +36,7 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 import { s3Client } from '../../config/s3.js';
+import { Sentry } from '../../config/sentry.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { MAX_FILE_SIZE_BYTES } from '@skills-trainer/shared';
@@ -88,6 +92,12 @@ describe('generateUploadUrl', () => {
       expect.objectContaining({ err: s3Error, key: 'sessions/abc/notes.pdf', bucket: 'test-bucket' }),
       'Failed to generate upload URL',
     );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      s3Error,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 's3.generateUploadUrl' }),
+      }),
+    );
   });
 });
 
@@ -129,6 +139,12 @@ describe('generateDownloadUrl', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ err: s3Error, key: 'sessions/abc/notes.pdf', bucket: 'test-bucket' }),
       'Failed to generate download URL',
+    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      s3Error,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 's3.generateDownloadUrl' }),
+      }),
     );
   });
 });
@@ -262,5 +278,11 @@ describe('deleteObject', () => {
     (s3Client.send as Mock).mockRejectedValue(networkError);
 
     await expect(s3Service.deleteObject('sessions/abc/notes.pdf')).rejects.toThrow('NetworkingError');
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      networkError,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 's3.deleteObject' }),
+      }),
+    );
   });
 });
