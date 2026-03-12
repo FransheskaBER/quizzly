@@ -152,8 +152,8 @@ describe('SessionDashboardPage — Generate Quiz section (AC4)', () => {
 
     renderPage();
 
-    expect(screen.getByText(/to generate more quizzes/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/profile');
+    expect(screen.getByText('To generate more quizzes, add your Anthropic key.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /add api key/i })).toHaveAttribute('href', '/profile');
   });
 
   it('hides QuizPreferences when free trial used and no API key (AC4)', () => {

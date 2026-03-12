@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
+
 import { useGetDashboardQuery } from '@/api/dashboard.api';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
+import { Button } from '@/components/common/Button';
 import { formatScore } from '@/utils/formatters';
 import styles from './HomeDashboardPage.module.css';
 
@@ -27,8 +29,10 @@ const HomeDashboardPage = () => {
       <div className={styles.inner}>
         <div className={styles.topBar}>
           <span className={styles.appName}>Quizzly</span>
-          <Link to="/profile" className={styles.profileLink}>Profile</Link>
-          <button type="button" className={styles.logoutBtn} onClick={logout}>Log out</button>
+          <div className={styles.topBarActions}>
+            <Button to="/profile" variant="ghost" size="sm">Your API Key</Button>
+            <Button variant="ghost" size="sm" onClick={logout}>Log out</Button>
+          </div>
         </div>
         <h1 className={styles.greeting}>
           {data?.totalSessions === 0 ? 'Welcome' : 'Welcome back'}, {data?.username}

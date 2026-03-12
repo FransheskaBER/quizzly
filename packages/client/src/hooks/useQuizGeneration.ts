@@ -70,7 +70,10 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
   const onEvent = (event: GenericSSEEvent): void => {
     if (event.type === 'progress' && typeof event.message === 'string') {
       // Progress messages are high-frequency local state — not stored in Redux.
-      setProgressMessage(event.message);
+      const displayMessage = event.message === 'Analyzing materials...'
+        ? 'Generating your quiz...'
+        : event.message;
+      setProgressMessage(displayMessage);
       return;
     }
 

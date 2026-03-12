@@ -544,7 +544,7 @@ quizzly/
 │           │       └── QuizResultsPage.tsx
 │           ├── components/
 │           │   ├── common/
-│           │   │   ├── Button.tsx / Button.module.css
+│           │   │   ├── Button.tsx / Button.module.css  # Shared button; `to` prop renders React Router Link
 │           │   │   ├── Input.tsx / Input.module.css
 │           │   │   ├── Modal.tsx / Modal.module.css
 │           │   │   ├── LoadingSpinner.tsx / LoadingSpinner.module.css
@@ -1287,29 +1287,6 @@ Auth: Required
 204: No Content (idempotent — 204 even if no key exists)
 ```
 
-#### PATCH /api/users/profile
-
-```
-Auth: Required
-
-Request: { "username": "NewName" }
-
-200: { "id": "uuid", "email": "...", "username": "NewName", ... }
-400: VALIDATION_ERROR
-```
-
-#### PUT /api/users/password
-
-```
-Auth: Required
-
-Request: { "currentPassword": "oldPass", "newPassword": "newSecurePass" }
-
-200: { "message": "Password changed successfully." }
-400: VALIDATION_ERROR (weak password)
-401: UNAUTHORIZED (wrong current password)
-```
-
 ### 5.7 Dashboard Endpoint
 
 #### GET /api/dashboard
@@ -1361,8 +1338,6 @@ Auth: None
 | GET | /api/users/api-key/status | Yes | API key status |
 | POST | /api/users/api-key | Yes | Save API key |
 | DELETE | /api/users/api-key | Yes | Delete API key |
-| PATCH | /api/users/profile | Yes | Update profile |
-| PUT | /api/users/password | Yes | Change password |
 | GET | /api/sessions/:sid/quizzes/generate | Yes | Generate quiz (SSE) |
 | GET | /api/quizzes/:id | Yes | Quiz for taking |
 | PATCH | /api/quizzes/:id/answers | Yes | Save answers |
@@ -1898,6 +1873,7 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-08] Updated Sections 4, 5, 7 per specs/features/free-trial-limit/RFC.md
 - [2026-03-08] Updated Sections 5, 6 per specs/features/byok-api-key/SPEC.md
 - [2026-03-09] Updated Section 7 per specs/features/error-handling-audit/RFC.md
+- [2026-03-12] Updated Section 5 per specs/features/profile-refactor-api-key/RFC.md
 - [2026-03-11] Updated Sections 3.5, 4.2, 4.3, 5.2, 5.5, 5.6–5.9, 6.4 per specs/features/byok-api-key-storage/RFC.md
 
 *End of Technical Design Document*
