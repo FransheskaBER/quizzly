@@ -197,6 +197,7 @@ export const executeGeneration = async (
   const answerFormat = isFreeTrialGeneration ? AnswerFormat.MCQ : requestedFormat;
 
   let quizAttemptId: string | null = null;
+  let generationCommitted = false;
   let timedOut = false;
 
   const timeoutId = setTimeout(() => {
@@ -241,7 +242,9 @@ export const executeGeneration = async (
       const hasExactTrialCount = questions.length === FREE_TRIAL_QUESTION_COUNT;
       const hasOnlyMcqQuestions = questions.every((q) => q.questionType === QuestionType.MCQ);
       if (!hasExactTrialCount || !hasOnlyMcqQuestions) {
-        throw new Error('Free trial generation must return exactly 5 multiple-choice questions');
+        throw new Error(
+          `Free trial generation must return exactly ${FREE_TRIAL_QUESTION_COUNT} multiple-choice questions`,
+        );
       }
     }
 
@@ -308,6 +311,7 @@ export const executeGeneration = async (
         ? [prisma.user.update({ where: { id: userId }, data: { freeTrialUsedAt: new Date() } })]
         : []),
     ]);
+    generationCommitted = true;
 
     if (!timedOut) {
       writer({ type: 'complete', data: { quizAttemptId: quizAttempt.id } });
@@ -320,16 +324,26 @@ export const executeGeneration = async (
       writer({ type: 'error', message: 'Generation failed. Please try again.' });
     }
 
-    // QuizStatus has no FAILED value. Remove failed attempts so users can retry
-    // immediately without hitting the "already generating" guard.
-    if (quizAttemptId) {
+    // QuizStatus has no FAILED value. Remove only uncommitted GENERATING attempts
+    // so users can retry immediately without deleting successful generations.
+    if (quizAttemptId && !generationCommitted) {
       try {
-        await prisma.quizAttempt.delete({ where: { id: quizAttemptId } });
-        logger.info({ quizAttemptId }, 'Deleted failed quiz attempt');
+        const deleted = await prisma.quizAttempt.deleteMany({
+          where: { id: quizAttemptId, status: QuizStatus.GENERATING },
+        });
+        logger.info(
+          { quizAttemptId, deletedCount: deleted.count },
+          'Cleaned up failed generating attempt',
+        );
       } catch (cleanupErr) {
         logger.error({ cleanupErr, quizAttemptId }, 'Failed to clean up quiz attempt after failure');
         captureExceptionOnce(cleanupErr, { extra: { quizAttemptId } });
       }
+    } else if (quizAttemptId && generationCommitted) {
+      logger.info(
+        { quizAttemptId },
+        'Skipping cleanup because generation already committed and quiz is recoverable',
+      );
     }
   } finally {
     clearTimeout(timeoutId);
