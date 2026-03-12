@@ -28,7 +28,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
 
   it('rate-limits 401 hydration telemetry and includes unauthorized context', async () => {
     const onQueryStarted = (
-      authApi.endpoints as {
+      authApi.endpoints as unknown as {
         getMe: {
           onQueryStarted: (
             args: void,
@@ -36,7 +36,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
               dispatch: () => void;
               queryFulfilled: Promise<unknown>;
               getState: () => unknown;
-            },
+            }
           ) => Promise<void>;
         };
       }

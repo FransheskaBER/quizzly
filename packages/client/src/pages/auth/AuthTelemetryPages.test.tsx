@@ -22,7 +22,8 @@ const {
   mockShowError: vi.fn(),
   mockShowSuccess: vi.fn(),
   mockCaptureException: vi.fn(),
-  mockParseApiError: vi.fn(() => ({ code: 'INTERNAL_SERVER_ERROR', message: 'failure' })),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mock accepts error arg for type compatibility
+  mockParseApiError: vi.fn((err?: unknown) => ({ code: 'INTERNAL_SERVER_ERROR', message: 'failure' })),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -41,7 +42,7 @@ vi.mock('@/config/sentry', () => ({
   Sentry: { captureException: mockCaptureException },
 }));
 vi.mock('@/hooks/useApiError', () => ({
-  parseApiError: (...args: unknown[]) => mockParseApiError(...args),
+  parseApiError: (error: unknown) => (mockParseApiError as (err: unknown) => ReturnType<typeof mockParseApiError>)(error),
 }));
 
 import SignupPage from './SignupPage';
