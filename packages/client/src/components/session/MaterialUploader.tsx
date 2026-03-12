@@ -14,6 +14,8 @@ import {
 import { uploadToS3 } from '@/utils/uploadToS3';
 import { MaterialListItem } from './MaterialListItem';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
 import { Button } from '@/components/common/Button';
 import styles from './MaterialUploader.module.css';
@@ -23,7 +25,6 @@ interface UploadEntry {
   fileName: string;
   progress: number;
   status: 'uploading' | 'processing' | 'error';
-  error: string | null;
 }
 
 interface MaterialUploaderProps {
@@ -32,6 +33,7 @@ interface MaterialUploaderProps {
 }
 
 export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps) => {
+  const { showError, showSuccess } = useToast();
   const [activeTab, setActiveTab] = useState<'file' | 'url'>('file');
   const [urlInput, setUrlInput] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
     const localId = crypto.randomUUID();
     setUploads((prev) => [
       ...prev,
-      { localId, fileName: file.name, progress: 0, status: 'uploading', error: null },
+      { localId, fileName: file.name, progress: 0, status: 'uploading' },
     ]);
 
     try {
@@ -100,11 +102,12 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
       // newly processed material will appear in the materials list automatically.
       setUploads((prev) => prev.filter((u) => u.localId !== localId));
     } catch (err) {
-      const { message } = parseApiError(err);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'upload-material', status);
+      showError(userMessage.title, userMessage.description);
       setUploads((prev) =>
-        prev.map((u) =>
-          u.localId === localId ? { ...u, status: 'error', error: message } : u,
-        ),
+        prev.map((u) => (u.localId === localId ? { ...u, status: 'error' } : u)),
       );
     }
   };
@@ -152,18 +155,25 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
       await extractUrl({ sessionId, url: trimmed }).unwrap();
       setUrlInput('');
     } catch (err) {
-      const { message } = parseApiError(err);
-      setUrlError(message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'upload-material', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
   const handleDelete = async (materialId: string): Promise<void> => {
     try {
       await deleteMaterial({ sessionId, materialId }).unwrap();
+      showSuccess('Removed that material');
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete material:', err);
       Sentry.captureException(err, { extra: { sessionId, materialId } });
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'delete-material', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -267,9 +277,6 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
                 )}
                 {u.status === 'processing' && (
                   <span className={styles.uploadStatus}>Processing…</span>
-                )}
-                {u.status === 'error' && u.error && (
-                  <span className={styles.uploadError}>{u.error}</span>
                 )}
               </div>
               {u.status === 'error' && (

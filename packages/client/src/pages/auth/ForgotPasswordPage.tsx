@@ -6,8 +6,9 @@ import { forgotPasswordSchema } from '@skills-trainer/shared';
 import type { ForgotPasswordRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
@@ -15,8 +16,8 @@ import styles from './ForgotPasswordPage.module.css';
 
 const ForgotPasswordPage = () => {
   const { forgotPassword } = useAuth();
+  const { showError } = useToast();
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -25,13 +26,14 @@ const ForgotPasswordPage = () => {
   } = useForm<ForgotPasswordRequest>({ resolver: zodResolver(forgotPasswordSchema) });
 
   const onSubmit = async (data: ForgotPasswordRequest) => {
-    setFormError(null);
     try {
       await forgotPassword(data.email);
       setSubmittedEmail(data.email);
     } catch (err) {
-      const { message } = parseApiError(err);
-      setFormError(message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'forgot-password', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -67,8 +69,6 @@ const ForgotPasswordPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-          <FormError message={formError} />
-
           <FormField
             id="email"
             label="Email"

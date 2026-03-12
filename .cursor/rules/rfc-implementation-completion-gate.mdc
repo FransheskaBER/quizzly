@@ -1,0 +1,15 @@
+---
+description: Enforce acceptance criteria and test mapping before marking RFC/SPEC work complete.
+alwaysApply: true
+---
+
+# RFC Implementation Completion Gate
+
+When implementing from `specs/features/*/SPEC.md` or `specs/features/*/RFC.md`, do not treat work as complete until all of the following are true:
+
+1. Every acceptance criterion is explicitly checked against the implementation.
+2. Every acceptance criterion is covered by at least one test (unit, integration, component, or E2E).
+3. If API error/status contracts are specified, each required error status has corresponding test coverage.
+4. Any frontend mutation-path UX requirements (success/error display rules) are verified per call site, not assumed globally.
+
+If any criterion lacks implementation or test coverage, report it as a gap and keep feature status as incomplete.

@@ -13,6 +13,8 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { useQuizGeneration } from '@/hooks/useQuizGeneration';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
@@ -59,6 +61,7 @@ const SessionDashboardPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showError, showSuccess } = useToast();
   const dispatch = useAppDispatch();
   const justSubmittedQuizId = (location.state as { justSubmittedQuizId?: string } | null)?.justSubmittedQuizId ?? null;
 
@@ -73,7 +76,7 @@ const SessionDashboardPage = () => {
     pollingInterval: pollingActive ? SESSION_POLL_INTERVAL_MS : 0,
   });
   const { data: meData } = useGetMeQuery();
-  const [updateSession, { isLoading: isUpdating, error: updateError }] = useUpdateSessionMutation();
+  const [updateSession, { isLoading: isUpdating }] = useUpdateSessionMutation();
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
   const [submitQuiz] = useSubmitQuizMutation();
 
@@ -179,11 +182,15 @@ const SessionDashboardPage = () => {
         dispatch(submitFailureCleared(quizAttemptId));
         dispatch(api.util.invalidateTags([{ type: 'Session', id: session.id }]));
       } else {
+        const { code } = parseApiError(err);
+        const status = extractHttpStatus(err);
+        const userMessage = getUserMessage(code, 'submit-quiz', status);
+        showError(userMessage.title, userMessage.description);
         dispatch(
           submitFailureReported({
             quizAttemptId,
             sessionId: session.id,
-            message: parseApiError(err).message,
+            message: userMessage.description,
             createdAt: new Date().toISOString(),
           }),
         );
@@ -194,18 +201,30 @@ const SessionDashboardPage = () => {
   };
 
   const handleUpdate = async (data: CreateSessionRequest) => {
-    await updateSession({ id: session.id, data }).unwrap();
-    setIsEditing(false);
+    try {
+      await updateSession({ id: session.id, data }).unwrap();
+      showSuccess('Saved your changes');
+      setIsEditing(false);
+    } catch (err) {
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'update-session', status);
+      showError(userMessage.title, userMessage.description);
+    }
   };
 
   const handleDelete = async () => {
-    await deleteSession(session.id).unwrap();
-    navigate('/sessions');
+    try {
+      await deleteSession(session.id).unwrap();
+      showSuccess('Deleted that session');
+      navigate('/sessions');
+    } catch (err) {
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'delete-session', status);
+      showError(userMessage.title, userMessage.description);
+    }
   };
-
-  const { message: updateErrorMessage } = updateError
-    ? parseApiError(updateError)
-    : { message: undefined };
 
   return (
     <div className={styles.page}>
@@ -224,7 +243,6 @@ const SessionDashboardPage = () => {
               onSubmit={handleUpdate}
               onCancel={() => setIsEditing(false)}
               isLoading={isUpdating}
-              error={updateErrorMessage}
             />
           ) : (
             <div className={styles.sessionHeader}>

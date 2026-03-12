@@ -2,19 +2,28 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCreateSessionMutation } from '@/api/sessions.api';
 import { SessionForm } from '@/components/session/SessionForm';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import type { CreateSessionRequest } from '@skills-trainer/shared';
 import styles from './CreateSessionPage.module.css';
 
 const CreateSessionPage = () => {
   const navigate = useNavigate();
-  const [createSession, { isLoading, error }] = useCreateSessionMutation();
+  const { showError, showSuccess } = useToast();
+  const [createSession, { isLoading }] = useCreateSessionMutation();
 
   const handleSubmit = async (data: CreateSessionRequest) => {
-    const result = await createSession(data).unwrap();
-    navigate(`/sessions/${result.id}`);
+    try {
+      const result = await createSession(data).unwrap();
+      showSuccess('Created your session', `"${result.name}" is ready to go.`);
+      navigate(`/sessions/${result.id}`);
+    } catch (err) {
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'create-session', status);
+      showError(userMessage.title, userMessage.description);
+    }
   };
-
-  const { message: errorMessage } = error ? parseApiError(error) : { message: undefined };
 
   return (
     <div className={styles.page}>
@@ -30,7 +39,6 @@ const CreateSessionPage = () => {
           mode="create"
           onSubmit={handleSubmit}
           isLoading={isLoading}
-          error={errorMessage}
         />
       </div>
     </div>

@@ -6,19 +6,20 @@ import { loginSchema } from '@skills-trainer/shared';
 import type { LoginRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import styles from './LoginPage.module.css';
 
 const LoginPage = () => {
   const { login, resendVerification } = useAuth();
+  const { showError } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/dashboard';
 
-  const [formError, setFormError] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
 
@@ -29,18 +30,18 @@ const LoginPage = () => {
   } = useForm<LoginRequest>({ resolver: zodResolver(loginSchema) });
 
   const onSubmit = async (data: LoginRequest) => {
-    setFormError(null);
     setUnverifiedEmail(null);
     try {
       await login(data);
       navigate(from, { replace: true });
     } catch (err) {
-      const { code, message } = parseApiError(err);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
       if (code === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(data.email);
-      } else {
-        setFormError(message);
       }
+      const userMessage = getUserMessage(code, 'login', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -54,6 +55,10 @@ const LoginPage = () => {
       // eslint-disable-next-line no-console
       console.error('Failed to resend verification email:', err);
       Sentry.captureException(err, { extra: { email: unverifiedEmail } });
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'resend-verification', status);
+      showError(userMessage.title, userMessage.description);
       setResendStatus('idle');
     }
   };
@@ -67,8 +72,6 @@ const LoginPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-          <FormError message={formError} />
-
           {unverifiedEmail && (
             <div className={styles.resendBox}>
               <span>Please verify your email before logging in.</span>
