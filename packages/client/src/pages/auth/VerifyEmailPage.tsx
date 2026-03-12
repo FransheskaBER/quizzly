@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useVerifyEmailMutation } from '@/api/auth.api';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Sentry } from '@/config/sentry';
 import styles from './VerifyEmailPage.module.css';
 
 type VerifyState = 'loading' | 'success' | 'already-verified' | 'error' | 'no-token';
@@ -29,8 +30,18 @@ const VerifyEmailPage = () => {
         await verifyEmail({ token }).unwrap();
         if (!cancelled) setState('success');
       } catch (err) {
+        const { code } = parseApiError(err);
+        const outcomeBranch = code === 'CONFLICT' ? 'already-verified' : 'error';
+        const context = {
+          operation: 'verifyEmail',
+          route: '/verify-email',
+          hasToken: Boolean(token),
+          outcomeBranch,
+        };
+        // eslint-disable-next-line no-console
+        console.error('Verify email failed:', err, context);
+        Sentry.captureException(err, { extra: context });
         if (!cancelled) {
-          const { code } = parseApiError(err);
           if (code === 'CONFLICT') {
             setState('already-verified');
           } else {

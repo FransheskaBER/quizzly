@@ -102,6 +102,16 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
       // newly processed material will appear in the materials list automatically.
       setUploads((prev) => prev.filter((u) => u.localId !== localId));
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Material upload failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'uploadFile',
+          sessionId,
+          fileName: file.name,
+          fileSize: file.size,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'upload-material', status);
@@ -141,7 +151,7 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
 
     try {
       new URL(trimmed);
-    } catch {
+    } catch (_err) {
       setUrlError('Enter a valid URL (e.g. https://example.com/article).');
       return;
     }
@@ -155,6 +165,15 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
       await extractUrl({ sessionId, url: trimmed }).unwrap();
       setUrlInput('');
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Material URL extraction failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'handleUrlSubmit',
+          sessionId,
+          url: trimmed,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'upload-material', status);
