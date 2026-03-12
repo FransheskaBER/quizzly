@@ -2,7 +2,16 @@ import pino from 'pino';
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
 import type { ZodType, ZodTypeDef } from 'zod';
+import {
+  llmQuizOutputSchema,
+  llmGradedAnswersOutputSchema,
+  type LlmGeneratedQuestion,
+  type LlmGradedAnswer,
+  type QuizDifficulty,
+  type AnswerFormat,
+} from '@skills-trainer/shared';
 import defaultClient from '../config/anthropic.js';
+import { Sentry } from '../config/sentry.js';
 import {
   LLM_MODEL,
   LLM_MAX_TOKENS,
@@ -17,14 +26,6 @@ import { buildGradingSystemPrompt } from '../prompts/grading/system.prompt.js';
 import { buildGradingUserMessage } from '../prompts/grading/user.prompt.js';
 import { sanitizeForPrompt, logSuspiciousPatterns } from '../utils/sanitize.utils.js';
 import { BadRequestError } from '../utils/errors.js';
-import {
-  llmQuizOutputSchema,
-  llmGradedAnswersOutputSchema,
-  type LlmGeneratedQuestion,
-  type LlmGradedAnswer,
-  type QuizDifficulty,
-  type AnswerFormat,
-} from '@skills-trainer/shared';
 
 const logger = pino({ name: 'llm.service' });
 
@@ -113,6 +114,14 @@ async function callLlmStream(
     });
     return await stream.finalText();
   } catch (err) {
+    logger.error(
+      { err, provider: 'anthropic', model: LLM_MODEL, operation: 'callLlmStream' },
+      'LLM stream request failed',
+    );
+    Sentry.captureException(err, {
+      extra: { provider: 'anthropic', model: LLM_MODEL, operation: 'callLlmStream' },
+    });
+
     // Sanitize Anthropic auth errors so the raw SDK message (which may contain
     // key-related details) is never forwarded to the client.
     if (err instanceof Anthropic.AuthenticationError) {
@@ -139,7 +148,11 @@ async function parseBlock<T>(
     const parsed: unknown = JSON.parse(block);
     const result = schema.safeParse(parsed);
     return result.success ? result.data : null;
-  } catch {
+  } catch (err) {
+    logger.error({ err, blockName, operation: 'parseBlock' }, 'Failed to parse LLM response block');
+    Sentry.captureException(err, {
+      extra: { blockName, operation: 'parseBlock' },
+    });
     return null;
   }
 }

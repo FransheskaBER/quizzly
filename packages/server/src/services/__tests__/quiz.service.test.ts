@@ -45,6 +45,7 @@ vi.mock('../../utils/encryption.utils.js', () => ({
 import { prisma } from '../../config/database.js';
 import { Sentry } from '../../config/sentry.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from '../llm.service.js';
+import { decrypt } from '../../utils/encryption.utils.js';
 import {
   prepareGeneration,
   executeGeneration,
@@ -383,6 +384,26 @@ describe('prepareGeneration', () => {
     } as never);
 
     await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(TrialExhaustedError);
+  });
+
+  it('captures decrypt failures to Sentry for BYOK generation preparation', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      freeTrialUsedAt: new Date('2026-01-01'),
+      encryptedApiKey: 'encrypted-bad',
+    } as never);
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
+    vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
+    vi.mocked(decrypt).mockImplementationOnce(() => {
+      throw new Error('decrypt failed');
+    });
+
+    await expect(prepareGeneration(SESSION_ID, USER_ID)).rejects.toBeInstanceOf(BadRequestError);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'quiz.prepareGeneration.decrypt' }),
+      }),
+    );
   });
 });
 
@@ -810,6 +831,7 @@ describe('prepareGrading', () => {
   beforeEach(() => {
     vi.mocked(prisma.answer.update).mockResolvedValue({ id: ANSWER_ID } as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([]);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ encryptedApiKey: null } as never);
     // Re-fetch returns the same answered state
     vi.mocked(prisma.answer.findMany).mockResolvedValue([
       {
@@ -929,6 +951,33 @@ describe('prepareGrading', () => {
     vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokFreeTextAttempt as never);
 
     await expect(prepareGrading(ATTEMPT_ID, USER_ID, [])).rejects.toBeInstanceOf(TrialExhaustedError);
+  });
+
+  it('captures decrypt failures to Sentry for BYOK grading preparation', async () => {
+    const byokFreeTextAttempt = {
+      ...answeredAttempt,
+      isFreeTrial: false,
+      questions: [
+        {
+          ...mockAttemptWithQA.questions[0],
+          questionType: QuestionType.FREE_TEXT,
+          options: null,
+        },
+      ],
+    };
+    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokFreeTextAttempt as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ encryptedApiKey: 'encrypted-bad' } as never);
+    vi.mocked(decrypt).mockImplementationOnce(() => {
+      throw new Error('decrypt failed');
+    });
+
+    await expect(prepareGrading(ATTEMPT_ID, USER_ID, [])).rejects.toBeInstanceOf(BadRequestError);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'quiz.resolveUserApiKey.decrypt' }),
+      }),
+    );
   });
 
   it('allows grading BYOK MCQ-only quiz without key', async () => {
@@ -1341,6 +1390,10 @@ describe('prepareRegrade', () => {
       },
     ],
   };
+
+  beforeEach(() => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ encryptedApiKey: null } as never);
+  });
 
   it('returns a GradingContext for an attempt in SUBMITTED_UNGRADED status', async () => {
     vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(submittedAttempt as never);
