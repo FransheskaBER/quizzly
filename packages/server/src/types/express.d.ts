@@ -1,11 +1,15 @@
 import type pino from 'pino';
 
-import type { TokenPayload } from '../utils/token.utils.js';
+/** Attached by auth middleware after successful token validation. */
+export interface AuthUser {
+  userId: string;
+  email: string;
+}
 
 declare global {
   namespace Express {
     interface Request {
-      user?: TokenPayload;
+      user?: AuthUser;
       requestId: string;
       log: pino.Logger;
     }

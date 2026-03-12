@@ -36,7 +36,6 @@ export function useQuizGrading(quizAttemptId: string): UseQuizGradingResult {
   const dispatch = useAppDispatch();
   const { gradingStatus, gradedQuestions, gradingError, gradingFinalScore } =
     useAppSelector(selectGradingStream);
-  const token = useAppSelector((state) => state.auth.token) ?? '';
 
   const gradedBufferRef = useRef<GradedQuestion[]>([]);
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,7 +107,6 @@ export function useQuizGrading(quizAttemptId: string): UseQuizGradingResult {
     onEvent,
     onError,
     onComplete,
-    token,
     fetchInit: { method: 'POST' },
   });
 

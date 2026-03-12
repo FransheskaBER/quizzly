@@ -1,55 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import jwt from 'jsonwebtoken';
 import {
-  generateAccessToken,
-  verifyAccessToken,
+  generateOpaqueAccessToken,
+  parseExpiresInMs,
   generateVerificationToken,
   generateResetToken,
   hashToken,
 } from '../token.utils.js';
 
-describe('generateAccessToken', () => {
-  it('returns a string JWT', () => {
-    const token = generateAccessToken({ userId: 'user-123', email: 'user@example.com' });
+describe('generateOpaqueAccessToken', () => {
+  it('returns a token string and a hash', () => {
+    const { token, hash } = generateOpaqueAccessToken();
     expect(typeof token).toBe('string');
-    expect(token.split('.')).toHaveLength(3); // header.payload.signature
+    expect(typeof hash).toBe('string');
   });
 
-  it('payload contains userId and email', () => {
-    const token = generateAccessToken({ userId: 'user-123', email: 'user@example.com' });
-    const decoded = jwt.decode(token) as { userId: string; email: string; exp: number };
-    expect(decoded.userId).toBe('user-123');
-    expect(decoded.email).toBe('user@example.com');
+  it('token is ~64 hex characters (32 bytes)', () => {
+    const { token } = generateOpaqueAccessToken();
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('token has an expiry (exp claim)', () => {
-    const token = generateAccessToken({ userId: 'user-123', email: 'user@example.com' });
-    const decoded = jwt.decode(token) as { exp: number };
-    expect(decoded.exp).toBeTypeOf('number');
-    expect(decoded.exp).toBeGreaterThan(Date.now() / 1000); // expiry is in the future
+  it('hash is SHA-256 of the token', () => {
+    const { token, hash } = generateOpaqueAccessToken();
+    expect(hashToken(token)).toBe(hash);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('two calls produce different tokens', () => {
+    const a = generateOpaqueAccessToken();
+    const b = generateOpaqueAccessToken();
+    expect(a.token).not.toBe(b.token);
+    expect(a.hash).not.toBe(b.hash);
   });
 });
 
-describe('verifyAccessToken', () => {
-  it('returns decoded payload for a valid token', () => {
-    const token = generateAccessToken({ userId: 'user-456', email: 'test@example.com' });
-    const payload = verifyAccessToken(token);
-    expect(payload.userId).toBe('user-456');
-    expect(payload.email).toBe('test@example.com');
+describe('parseExpiresInMs', () => {
+  it('parses days correctly', () => {
+    expect(parseExpiresInMs('7d')).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(parseExpiresInMs('1d')).toBe(24 * 60 * 60 * 1000);
   });
 
-  it('throws for an expired token', () => {
-    // Sign with 0-second expiry to get an already-expired token
-    const expiredToken = jwt.sign(
-      { userId: 'user-789', email: 'test@example.com' },
-      process.env.JWT_SECRET!,
-      { expiresIn: 0 },
-    );
-    expect(() => verifyAccessToken(expiredToken)).toThrow();
+  it('parses hours correctly', () => {
+    expect(parseExpiresInMs('24h')).toBe(24 * 60 * 60 * 1000);
+    expect(parseExpiresInMs('1h')).toBe(60 * 60 * 1000);
   });
 
-  it('throws for a tampered/invalid token string', () => {
-    expect(() => verifyAccessToken('this.is.notavalidjwt')).toThrow();
+  it('parses minutes correctly', () => {
+    expect(parseExpiresInMs('30m')).toBe(30 * 60 * 1000);
+    expect(parseExpiresInMs('1m')).toBe(60 * 1000);
+  });
+
+  it('parses seconds correctly', () => {
+    expect(parseExpiresInMs('60s')).toBe(60 * 1000);
+    expect(parseExpiresInMs('1s')).toBe(1000);
+  });
+
+  it('is case-insensitive', () => {
+    expect(parseExpiresInMs('7D')).toBe(parseExpiresInMs('7d'));
+    expect(parseExpiresInMs('1H')).toBe(parseExpiresInMs('1h'));
+  });
+
+  it('returns 7d default for invalid format', () => {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    expect(parseExpiresInMs('invalid')).toBe(sevenDaysMs);
+    expect(parseExpiresInMs('')).toBe(sevenDaysMs);
+    expect(parseExpiresInMs('7x')).toBe(sevenDaysMs);
   });
 });
 

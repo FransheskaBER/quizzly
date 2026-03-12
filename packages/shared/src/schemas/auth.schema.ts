@@ -47,7 +47,6 @@ export const resetPasswordSchema = z.object({
 // Response schemas
 
 export const loginResponseSchema = z.object({
-  token: z.string(),
   user: z.object({
     id: z.string().uuid(),
     email: z.string(),

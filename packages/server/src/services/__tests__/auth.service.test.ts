@@ -8,6 +8,9 @@ vi.mock('../../config/database.js', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    accessToken: {
+      create: vi.fn(),
+    },
     passwordReset: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -161,37 +164,48 @@ describe('signup', () => {
 // login
 // ---------------------------------------------------------------------------
 describe('login', () => {
-  it('returns a JWT token and user profile for valid verified credentials', async () => {
+  it('returns user profile and creates access token for valid verified credentials', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: true });
     vi.mocked(comparePassword).mockResolvedValue(true);
+    vi.mocked(prisma.accessToken.create).mockResolvedValue({} as never);
 
     const result = await authService.login({
       email: 'test@example.com',
       password: 'valid-test-password-123!',
     });
 
-    expect(result.token).toBeTypeOf('string');
-    expect(result.token.split('.')).toHaveLength(3);
+    expect(result.rawToken).toBeTypeOf('string');
+    expect(result.rawToken).toMatch(/^[0-9a-f]{64}$/);
     expect(result.user).toEqual({
       id: mockUser.id,
       email: mockUser.email,
       username: mockUser.username,
     });
+    expect(prisma.accessToken.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: mockUser.id,
+          tokenHash: expect.any(String),
+          expiresAt: expect.any(Date),
+        }),
+      }),
+    );
   });
 
-  it('JWT payload contains the correct userId and email', async () => {
+  it('stores hashed token in access_tokens table', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: true });
     vi.mocked(comparePassword).mockResolvedValue(true);
+    vi.mocked(prisma.accessToken.create).mockResolvedValue({} as never);
 
-    const { token } = await authService.login({
+    const { rawToken } = await authService.login({
       email: 'test@example.com',
       password: 'valid-test-password-123!',
     });
 
-    const [, payloadB64] = token.split('.');
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
-    expect(payload.userId).toBe(mockUser.id);
-    expect(payload.email).toBe(mockUser.email);
+    expect(rawToken).toHaveLength(64);
+    const createCall = vi.mocked(prisma.accessToken.create).mock.calls[0][0];
+    expect(createCall.data.tokenHash).toHaveLength(64);
+    expect(createCall.data.tokenHash).not.toBe(rawToken);
   });
 
   it('throws UnauthorizedError when user is not found', async () => {

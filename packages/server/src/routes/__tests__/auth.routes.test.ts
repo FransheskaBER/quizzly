@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../../app.js';
 import { prisma, cleanDatabase, closeDatabase } from '../../__tests__/helpers/db.helper.js';
 import {
   createTestUser,
   createUnverifiedUser,
   getAuthToken,
+  getExpiredAuthToken,
 } from '../../__tests__/helpers/auth.helper.js';
 
 // Bypass rate limiting in integration tests — we're testing business logic,
@@ -148,7 +148,7 @@ describe('POST /api/auth/signup', () => {
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
 describe('POST /api/auth/login', () => {
-  it('200 — returns JWT token and user profile for valid verified credentials', async () => {
+  it('200 — returns user profile and Set-Cookie for valid verified credentials', async () => {
     const { user, password } = await createTestUser({ email: 'login@example.com' });
 
     const res = await request(app)
@@ -156,13 +156,14 @@ describe('POST /api/auth/login', () => {
       .send({ email: 'login@example.com', password });
 
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeTypeOf('string');
-    expect(res.body.token.split('.')).toHaveLength(3);
     expect(res.body.user).toMatchObject({
       id: user.id,
       email: user.email,
       username: user.username,
     });
+    expect(res.body.token).toBeUndefined();
+    expect(res.headers['set-cookie']).toBeDefined();
+    expect(res.headers['set-cookie'][0]).toMatch(/quizzly_session=/);
   });
 
   it('401 — wrong email (message: "Invalid email or password")', async () => {
@@ -404,9 +405,9 @@ describe('POST /api/auth/reset-password', () => {
 // GET /api/auth/me
 // ---------------------------------------------------------------------------
 describe('GET /api/auth/me', () => {
-  it('200 — returns user profile for a valid JWT', async () => {
+  it('200 — returns user profile for a valid session token', async () => {
     const { user } = await createTestUser({ email: 'me@example.com' });
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
 
@@ -422,10 +423,11 @@ describe('GET /api/auth/me', () => {
 
   it('200 — hasApiKey is false when no API key is saved', async () => {
     const { user } = await createTestUser({ email: 'noapikey@example.com' });
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.hasApiKey).toBe(false);
@@ -440,9 +442,10 @@ describe('GET /api/auth/me', () => {
       data: { encryptedApiKey: 'encrypted-placeholder-value', apiKeyHint: 'key-...abcd' },
     });
 
+    const token = await getAuthToken(user);
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.hasApiKey).toBe(true);
@@ -465,17 +468,27 @@ describe('GET /api/auth/me', () => {
   });
 
   it('401 — expired token', async () => {
-    const expiredToken = jwt.sign(
-      { userId: 'user-123', email: 'test@example.com' },
-      process.env.JWT_SECRET!,
-      { expiresIn: 0 },
-    );
+    const { user } = await createTestUser();
+    const expiredToken = await getExpiredAuthToken(user);
 
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${expiredToken}`);
 
     expect(res.status).toBe(401);
+  });
+
+  it('401 — token invalid after user is deleted (CASCADE removes token rows)', async () => {
+    const { user } = await createTestUser();
+    const token = await getAuthToken(user);
+    await prisma.user.delete({ where: { id: user.id } });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 });
 

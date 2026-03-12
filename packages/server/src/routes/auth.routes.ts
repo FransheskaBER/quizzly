@@ -17,6 +17,7 @@ import {
   resetPasswordSchema,
 } from '@skills-trainer/shared';
 import { UnauthorizedError } from '../utils/errors.js';
+import { setSessionCookie, clearSessionCookie } from '../utils/cookie.utils.js';
 
 const router = Router();
 
@@ -43,8 +44,17 @@ router.post(
   loginLimiter,
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
-    const result = await authService.login(req.body);
+    const { rawToken, ...result } = await authService.login(req.body);
+    setSessionCookie(res, rawToken);
     res.status(200).json(result);
+  }),
+);
+
+router.post(
+  '/logout',
+  asyncHandler(async (_req, res) => {
+    clearSessionCookie(res);
+    res.status(200).json({ message: 'Logged out' });
   }),
 );
 

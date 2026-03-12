@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from './db.helper.js';
-import { generateAccessToken } from '../../utils/token.utils.js';
+import { generateOpaqueAccessToken, parseExpiresInMs } from '../../utils/token.utils.js';
 import { generateVerificationToken } from '../../utils/token.utils.js';
+import { env } from '../../config/env.js';
 
 // Cost factor 1 for speed — bcrypt.compare works regardless of cost factor.
 const TEST_BCRYPT_COST = 1;
@@ -62,9 +63,24 @@ export const createUnverifiedUser = async (overrides: TestUserOverrides & { expi
 };
 
 /**
- * Generates a valid JWT for a given user — used to authenticate requests
- * to protected endpoints without going through the login flow.
+ * Creates an access token for a user and returns the raw token — used to
+ * authenticate requests to protected endpoints without going through the login flow.
  */
-export const getAuthToken = (user: { id: string; email: string }): string => {
-  return generateAccessToken({ userId: user.id, email: user.email });
+export const getAuthToken = async (user: { id: string; email: string }): Promise<string> => {
+  const { token, hash } = generateOpaqueAccessToken();
+  const expiresAt = new Date(Date.now() + parseExpiresInMs(env.JWT_EXPIRES_IN));
+  await prisma.accessToken.create({
+    data: { userId: user.id, tokenHash: hash, expiresAt },
+  });
+  return token;
+};
+
+/** Returns an expired opaque token for testing 401 expiry behavior. */
+export const getExpiredAuthToken = async (user: { id: string; email: string }): Promise<string> => {
+  const { token, hash } = generateOpaqueAccessToken();
+  const expiresAt = new Date(Date.now() - 60_000); // 1 minute ago
+  await prisma.accessToken.create({
+    data: { userId: user.id, tokenHash: hash, expiresAt },
+  });
+  return token;
 };

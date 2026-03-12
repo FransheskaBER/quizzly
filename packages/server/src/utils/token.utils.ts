@@ -1,32 +1,4 @@
-import jwt from 'jsonwebtoken';
 import { createHash, randomBytes } from 'node:crypto';
-import { env } from '../config/env.js';
-
-export interface TokenPayload {
-  userId: string;
-  email: string;
-}
-
-export const generateAccessToken = (payload: TokenPayload): string => {
-  // JWT_EXPIRES_IN is a string like "7d" — cast matches jsonwebtoken's accepted type
-  return jwt.sign(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
-  });
-};
-
-export const verifyAccessToken = (token: string): TokenPayload => {
-  const decoded = jwt.verify(token, env.JWT_SECRET);
-
-  if (
-    typeof decoded === 'string' ||
-    typeof decoded.userId !== 'string' ||
-    typeof decoded.email !== 'string'
-  ) {
-    throw new Error('Invalid token payload');
-  }
-
-  return { userId: decoded.userId, email: decoded.email };
-};
 
 /** SHA-256 hash of a raw token. Used for both verification and reset tokens. */
 export const hashToken = (token: string): string =>
@@ -40,6 +12,27 @@ export const generateVerificationToken = (): { token: string; hash: string } => 
 };
 
 export const generateResetToken = (): { token: string; hash: string } => {
+  const token = randomBytes(32).toString('hex');
+  return { token, hash: hashToken(token) };
+};
+
+/** Parses expiry string (e.g. "7d", "24h") into milliseconds. Used for access token expiry. */
+export const parseExpiresInMs = (s: string): number => {
+  const match = /^(\d+)(d|h|m|s)$/.exec(s.trim().toLowerCase());
+  if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7d
+  const [, n, unit] = match;
+  const num = parseInt(n!, 10);
+  switch (unit) {
+    case 'd': return num * 24 * 60 * 60 * 1000;
+    case 'h': return num * 60 * 60 * 1000;
+    case 'm': return num * 60 * 1000;
+    case 's': return num * 1000;
+    default: return 7 * 24 * 60 * 60 * 1000;
+  }
+};
+
+/** Returns a raw opaque access token and its SHA-256 hash. For DB-backed sessions. */
+export const generateOpaqueAccessToken = (): { token: string; hash: string } => {
   const token = randomBytes(32).toString('hex');
   return { token, hash: hashToken(token) };
 };
