@@ -71,6 +71,7 @@ import {
   QuestionType,
   QuizStatus,
   MaterialStatus,
+  KeySource,
 } from '@skills-trainer/shared';
 import type { LlmGeneratedQuestion } from '@skills-trainer/shared';
 import type { SseEvent } from '../../utils/sse.utils.js';
@@ -187,7 +188,7 @@ const mockAttemptWithQA = {
   answerFormat: 'mcq',
   questionCount: 1,
   materialsUsed: false,
-  isFreeTrial: true,
+  keySource: KeySource.SERVER_KEY,
   status: QuizStatus.IN_PROGRESS,
   score: null,
   startedAt: new Date(),
@@ -431,7 +432,7 @@ describe('executeGeneration', () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
   });
 
-  it('creates a quiz_attempt record with GENERATING status before LLM call', async () => {
+  it('creates a quiz_attempt record with keySource SERVER_KEY for free-trial generation', async () => {
     const writer = vi.fn();
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
 
@@ -445,6 +446,7 @@ describe('executeGeneration', () => {
           questionCount: 5,
           status: QuizStatus.GENERATING,
           materialsUsed: true,
+          keySource: KeySource.SERVER_KEY,
         }),
       }),
     );
@@ -720,13 +722,36 @@ describe('executeGeneration', () => {
 
     expect(prisma.quizAttempt.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
+        data: expect.objectContaining({
+          answerFormat: AnswerFormat.FREE_TEXT,
+          keySource: KeySource.USER_KEY,
+        }),
       }),
     );
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
       expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
       expect.any(Function),
       'sk-ant-byok-nonsecret-key-123',
+    );
+  });
+
+  it('creates a quiz_attempt record with keySource USER_KEY for BYOK generation', async () => {
+    const writer = vi.fn();
+    await executeGeneration(
+      {
+        ...BASE_EXECUTION_PARAMS,
+        isFreeTrialGeneration: false,
+        userApiKey: 'sk-ant-byok-nonsecret-key-123',
+      },
+      writer,
+    );
+
+    expect(prisma.quizAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          keySource: KeySource.USER_KEY,
+        }),
+      }),
     );
   });
 });
@@ -1071,7 +1096,7 @@ describe('prepareGrading', () => {
   it('throws TrialExhaustedError when BYOK quiz has free-text questions and no key provided', async () => {
     const byokFreeTextAttempt = {
       ...answeredAttempt,
-      isFreeTrial: false,
+      keySource: KeySource.USER_KEY,
       questions: [
         {
           ...mockAttemptWithQA.questions[0],
@@ -1088,7 +1113,7 @@ describe('prepareGrading', () => {
   it('captures decrypt failures to Sentry for BYOK grading preparation', async () => {
     const byokFreeTextAttempt = {
       ...answeredAttempt,
-      isFreeTrial: false,
+      keySource: KeySource.USER_KEY,
       questions: [
         {
           ...mockAttemptWithQA.questions[0],
@@ -1115,7 +1140,7 @@ describe('prepareGrading', () => {
   it('allows grading BYOK MCQ-only quiz without key', async () => {
     const byokMcqAttempt = {
       ...answeredAttempt,
-      isFreeTrial: false,
+      keySource: KeySource.USER_KEY,
     };
     vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokMcqAttempt as never);
 
@@ -1127,7 +1152,7 @@ describe('prepareGrading', () => {
   it('allows grading free trial quiz with free-text questions without key', async () => {
     const freeTrialFreeTextAttempt = {
       ...answeredAttempt,
-      isFreeTrial: true,
+      keySource: KeySource.SERVER_KEY,
       questions: [
         {
           ...mockAttemptWithQA.questions[0],
@@ -1574,7 +1599,7 @@ describe('prepareRegrade', () => {
   it('throws TrialExhaustedError when BYOK quiz has free-text questions and no key provided', async () => {
     const byokFreeTextAttempt = {
       ...submittedAttempt,
-      isFreeTrial: false,
+      keySource: KeySource.USER_KEY,
       questions: [
         {
           ...mockAttemptWithQA.questions[0],
@@ -1591,7 +1616,7 @@ describe('prepareRegrade', () => {
   it('allows regrading BYOK MCQ-only quiz without key', async () => {
     const byokMcqAttempt = {
       ...submittedAttempt,
-      isFreeTrial: false,
+      keySource: KeySource.USER_KEY,
     };
     vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(byokMcqAttempt as never);
 

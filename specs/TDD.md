@@ -711,6 +711,7 @@ Hard delete with cascade.
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'generating' | See lifecycle below |
 | score | DECIMAL(5,2) | NULLABLE | 0.00-100.00. Set on completion. |
 | materials_used | BOOLEAN | NOT NULL, DEFAULT false | |
+| key_source | VARCHAR(10) | NOT NULL | 'SERVER_KEY' (free trial, server key), 'USER_KEY' (user's own key) |
 | started_at | TIMESTAMPTZ | NULLABLE | |
 | completed_at | TIMESTAMPTZ | NULLABLE | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | |
@@ -872,6 +873,7 @@ model QuizAttempt {
   status        String    @default("generating") @db.VarChar(20)
   score         Decimal?  @db.Decimal(5, 2)
   materialsUsed Boolean   @default(false) @map("materials_used")
+  keySource     String    @map("key_source") @db.VarChar(10)
   startedAt     DateTime? @map("started_at") @db.Timestamptz()
   completedAt   DateTime? @map("completed_at") @db.Timestamptz()
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
@@ -1875,5 +1877,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-09] Updated Section 7 per specs/features/error-handling-audit/RFC.md
 - [2026-03-12] Updated Section 5 per specs/features/profile-refactor-api-key/RFC.md
 - [2026-03-11] Updated Sections 3.5, 4.2, 4.3, 5.2, 5.5, 5.6–5.9, 6.4 per specs/features/byok-api-key-storage/RFC.md
+- [2026-03-12] Updated Section 4 per specs/features/refactor-quiz-key-source/RFC.md
 
 *End of Technical Design Document*

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import request from 'supertest';
+import { KeySource } from '@skills-trainer/shared';
 import { createApp } from '../../app.js';
 import { prisma, cleanDatabase, closeDatabase } from '../../__tests__/helpers/db.helper.js';
 import { createTestUser, getAuthToken } from '../../__tests__/helpers/auth.helper.js';
@@ -238,6 +239,8 @@ describe('GET /api/sessions/:id', () => {
         difficulty: 'easy',
         answerFormat: 'mcq',
         questionCount: 5,
+        materialsUsed: false,
+        keySource: KeySource.USER_KEY,
         status: 'completed',
         score: 80,
       },
@@ -421,6 +424,8 @@ describe('DELETE /api/sessions/:id', () => {
         difficulty: 'medium',
         answerFormat: 'mcq',
         questionCount: 10,
+        materialsUsed: false,
+        keySource: KeySource.USER_KEY,
         status: 'completed',
       },
     });
