@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import request from 'supertest';
-import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus, MaterialStatus, MIN_QUESTION_COUNT } from '@skills-trainer/shared';
+import { QuizDifficulty, AnswerFormat, QuestionType, QuizStatus, MaterialStatus, MIN_QUESTION_COUNT, KeySource } from '@skills-trainer/shared';
 import type { LlmGeneratedQuestion } from '@skills-trainer/shared';
 
 // vi.mock calls are hoisted — mock factories run before imports.
@@ -438,6 +438,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
         answerFormat: AnswerFormat.MCQ,
         questionCount: 1,
         materialsUsed: false,
+        keySource: KeySource.SERVER_KEY,
         status: QuizStatus.GENERATING,
       },
     });
@@ -993,6 +994,26 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
 
     const attempt = await prisma.quizAttempt.findUnique({ where: { id: attemptId } });
     expect(attempt?.status).toBe(QuizStatus.COMPLETED);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DB schema constraints (refactor-quiz-key-source RFC AC 8)
+// ---------------------------------------------------------------------------
+describe('quiz_attempts.key_source — schema constraint', () => {
+  it('DB — omitting key_source causes database error (no default)', async () => {
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+
+    // Raw SQL insert without key_source to verify DB rejects (NOT NULL, no default)
+    await expect(
+      prisma.$executeRawUnsafe(
+        `INSERT INTO quiz_attempts (id, session_id, user_id, difficulty, answer_format, question_count, materials_used, status, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1::uuid, $2::uuid, 'easy', 'mcq', 5, false, 'completed', NOW(), NOW())`,
+        session.id,
+        user.id,
+      ),
+    ).rejects.toThrow();
   });
 });
 
