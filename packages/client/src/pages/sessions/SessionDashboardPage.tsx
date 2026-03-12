@@ -309,8 +309,8 @@ const SessionDashboardPage = () => {
           <ComponentErrorBoundary>
             {meData?.hasUsedFreeTrial && !meData?.hasApiKey ? (
               <p>
-                To generate more quizzes, save your Anthropic API key in your{' '}
-                <Link to="/profile">profile</Link>.
+                To generate more quizzes, add your Anthropic key.{' '}
+                <Button to="/profile" variant="primary" size="sm">Add API key</Button>
               </p>
             ) : generationStatus === 'idle' ? (
               <QuizPreferences

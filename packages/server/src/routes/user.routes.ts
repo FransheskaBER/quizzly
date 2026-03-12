@@ -1,13 +1,5 @@
-import {
-  saveApiKeySchema,
-  updateProfileSchema,
-  changePasswordSchema,
-} from '@skills-trainer/shared';
-import type {
-  SaveApiKeyRequest,
-  UpdateProfileRequest,
-  ChangePasswordRequest,
-} from '@skills-trainer/shared';
+import { saveApiKeySchema } from '@skills-trainer/shared';
+import type { SaveApiKeyRequest } from '@skills-trainer/shared';
 
 import { Router } from 'express';
 
@@ -54,30 +46,5 @@ router.delete(
   }),
 );
 
-// PATCH /api/users/profile
-router.patch(
-  '/profile',
-  auth,
-  validate({ body: updateProfileSchema }),
-  asyncHandler(async (req, res) => {
-    if (!req.user) throw new UnauthorizedError('Not authenticated');
-    const data = req.body as UpdateProfileRequest;
-    const result = await userService.updateProfile(req.user.userId, data);
-    res.status(200).json(result);
-  }),
-);
-
-// PUT /api/users/password
-router.put(
-  '/password',
-  auth,
-  validate({ body: changePasswordSchema }),
-  asyncHandler(async (req, res) => {
-    if (!req.user) throw new UnauthorizedError('Not authenticated');
-    const data = req.body as ChangePasswordRequest;
-    const result = await userService.changePassword(req.user.userId, data);
-    res.status(200).json(result);
-  }),
-);
 
 export { router as userRouter };
