@@ -43,7 +43,7 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error, isByok = false 
     resolver: zodResolver(generateQuizQuerySchema),
     defaultValues: {
       difficulty: QuizDifficulty.MEDIUM,
-      format: AnswerFormat.MIXED,
+      format: isByok ? AnswerFormat.MIXED : AnswerFormat.MCQ,
       count: FREE_TRIAL_QUESTION_COUNT,
     },
   });
@@ -54,7 +54,7 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error, isByok = false 
 
       {!isByok && (
         <p className={styles.hint}>
-          Free trial — 1 quiz, {FREE_TRIAL_QUESTION_COUNT} questions
+          Free trial — 1 quiz, {FREE_TRIAL_QUESTION_COUNT} multiple-choice questions
         </p>
       )}
 
@@ -71,18 +71,22 @@ export const QuizPreferences = ({ onGenerate, isDisabled, error, isByok = false 
         {errors.difficulty && <p className={styles.errorText}>{errors.difficulty.message}</p>}
       </div>
 
-      <div className={styles.field}>
-        <span className={styles.label}>Format</span>
-        <div className={styles.radioGroup}>
-          {Object.values(AnswerFormat).map((f) => (
-            <label key={f} className={styles.radioLabel}>
-              <input type="radio" value={f} {...register('format')} />
-              {FORMAT_LABELS[f]}
-            </label>
-          ))}
+      {isByok ? (
+        <div className={styles.field}>
+          <span className={styles.label}>Format</span>
+          <div className={styles.radioGroup}>
+            {Object.values(AnswerFormat).map((f) => (
+              <label key={f} className={styles.radioLabel}>
+                <input type="radio" value={f} {...register('format')} />
+                {FORMAT_LABELS[f]}
+              </label>
+            ))}
+          </div>
+          {errors.format && <p className={styles.errorText}>{errors.format.message}</p>}
         </div>
-        {errors.format && <p className={styles.errorText}>{errors.format.message}</p>}
-      </div>
+      ) : (
+        <input type="hidden" value={AnswerFormat.MCQ} {...register('format')} />
+      )}
 
       {isByok ? (
         <div className={styles.field}>

@@ -15,6 +15,7 @@ vi.mock('../../config/database.js', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      deleteMany: vi.fn(),
     },
     question: {
       create: vi.fn(),
@@ -107,6 +108,12 @@ const mockSecondLlmQuestion: LlmGeneratedQuestion = {
   difficulty: QuizDifficulty.MEDIUM,
   tags: ['typescript', 'interfaces'],
 };
+
+const mockFiveMcqLlmQuestions: LlmGeneratedQuestion[] = Array.from({ length: 5 }, (_, index) => ({
+  ...mockLlmQuestion,
+  questionNumber: index + 1,
+  questionText: `MCQ question ${index + 1}`,
+}));
 
 const mockSessionWithMaterials = {
   id: SESSION_ID,
@@ -418,9 +425,10 @@ describe('executeGeneration', () => {
     vi.mocked(prisma.question.create).mockResolvedValue(mockDbQuestion as never);
     vi.mocked(prisma.answer.create).mockResolvedValue({ id: 'answer-uuid-ddd' } as never);
     vi.mocked(prisma.quizAttempt.update).mockResolvedValue(mockQuizAttemptRecord as never);
+    vi.mocked(prisma.quizAttempt.deleteMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.user.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([]);
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
   });
 
   it('creates a quiz_attempt record with GENERATING status before LLM call', async () => {
@@ -433,7 +441,7 @@ describe('executeGeneration', () => {
           sessionId: SESSION_ID,
           userId: USER_ID,
           difficulty: QuizDifficulty.MEDIUM,
-          answerFormat: AnswerFormat.MIXED,
+          answerFormat: AnswerFormat.MCQ,
           questionCount: 5,
           status: QuizStatus.GENERATING,
           materialsUsed: true,
@@ -452,17 +460,17 @@ describe('executeGeneration', () => {
   });
 
   it('creates a question record and an answer record for each LLM question', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion, mockSecondLlmQuestion]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
 
-    expect(prisma.question.create).toHaveBeenCalledTimes(2);
-    expect(prisma.answer.create).toHaveBeenCalledTimes(2);
+    expect(prisma.question.create).toHaveBeenCalledTimes(5);
+    expect(prisma.answer.create).toHaveBeenCalledTimes(5);
   });
 
   it('sends one SSE question event per generated question', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion, mockSecondLlmQuestion]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -470,7 +478,7 @@ describe('executeGeneration', () => {
     const questionEvents = writer.mock.calls
       .map(([e]) => e as SseEvent)
       .filter((e) => e.type === 'question');
-    expect(questionEvents).toHaveLength(2);
+    expect(questionEvents).toHaveLength(5);
   });
 
   it('SSE question events do NOT include correctAnswer or explanation', async () => {
@@ -530,24 +538,86 @@ describe('executeGeneration', () => {
     );
   });
 
-  it('completes via $transaction when LLM returns fewer questions than requested', async () => {
+  it('completes via $transaction when BYOK generation returns fewer questions than requested', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
     const writer = vi.fn();
 
-    await executeGeneration({ ...BASE_EXECUTION_PARAMS, questionCount: 2 }, writer);
+    await executeGeneration(
+      {
+        ...BASE_EXECUTION_PARAMS,
+        isFreeTrialGeneration: false,
+        userApiKey: 'sk-ant-byok-test-key-123',
+        questionCount: 2,
+      },
+      writer,
+    );
 
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
-  it('still sends the complete event when LLM returns fewer questions than requested', async () => {
+  it('still sends the complete event when BYOK generation returns fewer questions than requested', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
     const writer = vi.fn();
 
-    await executeGeneration({ ...BASE_EXECUTION_PARAMS, questionCount: 5 }, writer);
+    await executeGeneration(
+      {
+        ...BASE_EXECUTION_PARAMS,
+        isFreeTrialGeneration: false,
+        userApiKey: 'sk-ant-byok-test-key-123',
+        questionCount: 5,
+      },
+      writer,
+    );
 
     const events = writer.mock.calls.map(([e]) => e as SseEvent);
     expect(events.some((e) => e.type === 'complete')).toBe(true);
     expect(events.some((e) => e.type === 'error')).toBe(false);
+  });
+
+  it('fails free-trial generation when LLM returns fewer than 5 questions', async () => {
+    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
+    const writer = vi.fn();
+
+    await executeGeneration(BASE_EXECUTION_PARAMS, writer);
+
+    const events = writer.mock.calls.map(([e]) => e as SseEvent);
+    expect(events.some((e) => e.type === 'complete')).toBe(false);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
+    );
+  });
+
+  it('fails free-trial generation when any generated question is non-MCQ', async () => {
+    vi.mocked(llmGenerateQuiz).mockResolvedValue([
+      ...mockFiveMcqLlmQuestions.slice(0, 4),
+      { ...mockSecondLlmQuestion, questionNumber: 5 },
+    ]);
+    const writer = vi.fn();
+
+    await executeGeneration(BASE_EXECUTION_PARAMS, writer);
+
+    const events = writer.mock.calls.map(([e]) => e as SseEvent);
+    expect(events.some((e) => e.type === 'complete')).toBe(false);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
+    );
+  });
+
+  it('does not delete attempt when SSE writer fails after generation commit', async () => {
+    const writer = vi.fn((event: SseEvent) => {
+      if (event.type === 'complete') throw new Error('sse write failed');
+    });
+
+    await executeGeneration(BASE_EXECUTION_PARAMS, writer);
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.quizAttempt.deleteMany).not.toHaveBeenCalled();
+    const events = writer.mock.calls.map(([e]) => e as SseEvent);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
   });
 
   it('sends an SSE error event when the LLM call throws', async () => {
@@ -561,6 +631,10 @@ describe('executeGeneration', () => {
       .find((e) => e.type === 'error');
     expect(errorEvent).toBeDefined();
     expect((errorEvent as { type: string; message: string }).message).toContain('failed');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
+    );
   });
 
   it('does not throw when the LLM call throws — errors are sent as SSE events', async () => {
@@ -610,6 +684,49 @@ describe('executeGeneration', () => {
       expect.any(Object),
       expect.any(Function),
       byokKey,
+    );
+  });
+
+  it('forces free-trial generation format to MCQ even when a non-MCQ format is requested', async () => {
+    const writer = vi.fn();
+    await executeGeneration(
+      { ...BASE_EXECUTION_PARAMS, answerFormat: AnswerFormat.FREE_TEXT },
+      writer,
+    );
+
+    expect(prisma.quizAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ answerFormat: AnswerFormat.MCQ }),
+      }),
+    );
+    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+      expect.objectContaining({ answerFormat: AnswerFormat.MCQ }),
+      expect.any(Function),
+      undefined,
+    );
+  });
+
+  it('preserves requested format for BYOK generations', async () => {
+    const writer = vi.fn();
+    await executeGeneration(
+      {
+        ...BASE_EXECUTION_PARAMS,
+        isFreeTrialGeneration: false,
+        answerFormat: AnswerFormat.FREE_TEXT,
+        userApiKey: 'sk-ant-byok-test-key-123',
+      },
+      writer,
+    );
+
+    expect(prisma.quizAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
+      }),
+    );
+    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+      expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
+      expect.any(Function),
+      'sk-ant-byok-test-key-123',
     );
   });
 });
