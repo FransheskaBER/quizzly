@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
+import { Sentry } from '@/config/sentry';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import styles from './ResetPasswordPage.module.css';
@@ -45,6 +46,14 @@ const ResetPasswordPage = () => {
       await resetPassword({ token, password: data.password });
       setSuccess(true);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Reset password failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'resetPassword',
+          hasToken: Boolean(token),
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'reset-password', status);

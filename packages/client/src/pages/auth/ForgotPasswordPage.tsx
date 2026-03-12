@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
+import { Sentry } from '@/config/sentry';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
@@ -30,6 +31,14 @@ const ForgotPasswordPage = () => {
       await forgotPassword(data.email);
       setSubmittedEmail(data.email);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Forgot password request failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'forgotPassword',
+          email: data.email,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'forgot-password', status);

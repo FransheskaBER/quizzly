@@ -14,6 +14,19 @@ import type {
   MessageResponse,
 } from '@skills-trainer/shared';
 
+const HYDRATION_401_CAPTURE_INTERVAL_MS = 60_000;
+let lastHydration401CaptureAt = 0;
+
+const shouldCaptureHydration401 = (): boolean => {
+  const now = Date.now();
+  if (now - lastHydration401CaptureAt < HYDRATION_401_CAPTURE_INTERVAL_MS) {
+    return false;
+  }
+
+  lastHydration401CaptureAt = now;
+  return true;
+};
+
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     signup: builder.mutation<MessageResponse, SignupRequest>({
@@ -58,14 +71,34 @@ export const authApi = api.injectEndpoints({
           }
         } catch (err) {
           // 401 is handled globally by baseQueryWithAuth (dispatches logout()).
-          // Capture non-401 errors that indicate real failures.
-          const isUnauthorized =
-            (err as { error?: { status?: number } })?.error?.status === 401;
-          if (!isUnauthorized) {
-            // eslint-disable-next-line no-console
-            console.error('getMe hydration failed:', err);
-            Sentry.captureException(err);
+          const status = (err as { error?: { status?: number } })?.error?.status;
+          if (status === 401) {
+            if (shouldCaptureHydration401()) {
+              // eslint-disable-next-line no-console
+              console.error('getMe hydration unauthorized:', err);
+              Sentry.captureException(err, {
+                extra: {
+                  operation: 'getMeHydration',
+                  route: '/auth/me',
+                  reason: 'unauthorized',
+                  status: 401,
+                  telemetryMode: 'rate-limited',
+                },
+              });
+            }
+            return;
           }
+
+          // eslint-disable-next-line no-console
+          console.error('getMe hydration failed:', err);
+          Sentry.captureException(err, {
+            extra: {
+              operation: 'getMeHydration',
+              route: '/auth/me',
+              reason: 'non-401',
+              status: status ?? null,
+            },
+          });
         }
       },
     }),

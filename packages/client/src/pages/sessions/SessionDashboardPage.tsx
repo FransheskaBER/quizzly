@@ -22,6 +22,7 @@ import { formatDate, formatScore } from '@/utils/formatters';
 import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '@skills-trainer/shared';
 import { api } from '@/store/api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
+import { Sentry } from '@/config/sentry';
 import {
   submitFailureCleared,
   submitFailureReported,
@@ -48,7 +49,10 @@ const readViewedFeedbackIds = (): string[] => {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to read viewed feedback ids from storage:', err);
+    Sentry.captureException(err, { extra: { operation: 'readViewedFeedbackIds' } });
     return [];
   }
 };
@@ -168,6 +172,15 @@ const SessionDashboardPage = () => {
       dispatch(submitFailureCleared(quizAttemptId));
       dispatch(api.util.invalidateTags([{ type: 'Session', id: session.id }]));
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Retry quiz submission failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'handleRetrySubmission',
+          sessionId: session.id,
+          quizAttemptId,
+        },
+      });
       const fbqErr = err as FetchBaseQueryError;
       const isStreamStarted =
         typeof err === 'object' &&
@@ -206,6 +219,14 @@ const SessionDashboardPage = () => {
       showSuccess('Saved your changes');
       setIsEditing(false);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Update session failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'handleUpdateSession',
+          sessionId: session.id,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'update-session', status);
@@ -219,6 +240,14 @@ const SessionDashboardPage = () => {
       showSuccess('Deleted that session');
       navigate('/sessions');
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Delete session failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'handleDeleteSession',
+          sessionId: session.id,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'delete-session', status);

@@ -16,6 +16,7 @@ import { QuestionNav } from '@/components/quiz/QuestionNav';
 import { api } from '@/store/api';
 import { useAppDispatch } from '@/store/store';
 import { submitFailureReported } from '@/store/slices/quizSubmit.slice';
+import { Sentry } from '@/config/sentry';
 import styles from './QuizTakingPage.module.css';
 
 const AUTOSAVE_DELAY_MS = 1000;
@@ -74,6 +75,17 @@ const QuizTakingPage = () => {
         }
       })
       .catch((err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error('Quiz autosave failed:', err);
+        Sentry.captureException(err, {
+          extra: {
+            operation: 'saveAnswers',
+            stage: 'doSave',
+            quizId: idRef.current,
+            sessionId: quiz?.sessionId ?? null,
+            pendingAnswerCount: entries.length,
+          },
+        });
         const { code } = parseApiError(err);
         const status = extractHttpStatus(err);
         const userMessage = getUserMessage(code, 'save-answer', status);
@@ -136,35 +148,45 @@ const QuizTakingPage = () => {
         showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
       })
       .catch((err: unknown) => {
-      // Keep this as a non-blocking best-effort submission. If it fails, the
-      // session poll will keep the user informed via attempt status.
-      const fbqErr = err as FetchBaseQueryError;
-      const isStreamStarted =
-        typeof err === 'object' &&
-        err !== null &&
-        'status' in err &&
-        fbqErr.status === 'PARSING_ERROR' &&
-        typeof fbqErr.originalStatus === 'number' &&
-        fbqErr.originalStatus >= 200 &&
-        fbqErr.originalStatus < 300;
+        // RTK Query rejects SSE submit requests with PARSING_ERROR + 2xx once the
+        // stream has started; treat that as success and avoid false-positive telemetry.
+        const fbqErr = err as FetchBaseQueryError;
+        const isStreamStarted =
+          typeof err === 'object' &&
+          err !== null &&
+          'status' in err &&
+          fbqErr.status === 'PARSING_ERROR' &&
+          typeof fbqErr.originalStatus === 'number' &&
+          fbqErr.originalStatus >= 200 &&
+          fbqErr.originalStatus < 300;
 
-      if (isStreamStarted) {
-        showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
-      } else {
-        const { code } = parseApiError(err);
-        const status = extractHttpStatus(err);
-        const userMessage = getUserMessage(code, 'submit-quiz', status);
-        showError(userMessage.title, userMessage.description);
-        dispatch(
-          submitFailureReported({
-            quizAttemptId: id,
-            sessionId: quiz.sessionId,
-            message: userMessage.description,
-            createdAt: new Date().toISOString(),
-          }),
-        );
-        dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
-      }
+        if (isStreamStarted) {
+          showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
+        } else {
+          // eslint-disable-next-line no-console
+          console.error('Quiz submit failed:', err);
+          Sentry.captureException(err, {
+            extra: {
+              operation: 'submitQuiz',
+              stage: 'submit',
+              quizId: id,
+              sessionId: quiz.sessionId,
+            },
+          });
+          const { code } = parseApiError(err);
+          const status = extractHttpStatus(err);
+          const userMessage = getUserMessage(code, 'submit-quiz', status);
+          showError(userMessage.title, userMessage.description);
+          dispatch(
+            submitFailureReported({
+              quizAttemptId: id,
+              sessionId: quiz.sessionId,
+              message: userMessage.description,
+              createdAt: new Date().toISOString(),
+            }),
+          );
+          dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
+        }
       });
 
     // Force session and quiz cache refresh so session list and results page see correct status.

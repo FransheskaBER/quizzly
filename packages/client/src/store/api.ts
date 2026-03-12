@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { Sentry } from '@/config/sentry';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 export const API_BASE_URL = `${API_BASE}/api`;
@@ -20,6 +21,17 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
     const result = await baseQuery(args, api, extraOptions);
 
     if (result.error && result.error.status === 401) {
+      const endpoint = typeof args === 'string' ? args : args.url;
+      const method = typeof args === 'string' ? 'GET' : (args.method ?? 'GET');
+      const telemetryContext = {
+        operation: 'autoLogoutOnUnauthorized',
+        endpoint,
+        method,
+        status: result.error.status,
+      };
+      // eslint-disable-next-line no-console
+      console.error('Auto logout triggered by unauthorized API response', result.error, telemetryContext);
+      Sentry.captureException(result.error, { extra: telemetryContext });
       const { dispatch } = api;
       const { logout } = await import('./slices/auth.slice');
       dispatch(logout());
