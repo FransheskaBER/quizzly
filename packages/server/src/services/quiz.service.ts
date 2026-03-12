@@ -4,6 +4,7 @@ import {
   MaterialStatus,
   SSE_SERVER_TIMEOUT_MS,
   FREE_TRIAL_QUESTION_COUNT,
+  KeySource,
   type QuizDifficulty,
   AnswerFormat,
   type QuizAttemptResponse,
@@ -215,7 +216,7 @@ export const executeGeneration = async (
         answerFormat,
         questionCount,
         materialsUsed,
-        isFreeTrial: isFreeTrialGeneration,
+        keySource: isFreeTrialGeneration ? KeySource.SERVER_KEY : KeySource.USER_KEY,
         status: QuizStatus.GENERATING,
       },
     });
@@ -486,7 +487,7 @@ export const prepareGrading = async (
   // BYOK quizzes require the user's key for free-text grading
   const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
   let userApiKey: string | undefined;
-  if (!attempt.isFreeTrial && hasFreeText) {
+  if (attempt.keySource === KeySource.USER_KEY && hasFreeText) {
     userApiKey = await resolveUserApiKey(userId);
     if (!userApiKey) {
       throw new TrialExhaustedError(
@@ -565,7 +566,7 @@ export const prepareRegrade = async (
   // BYOK quizzes require the user's key for free-text grading
   const hasFreeText = attempt.questions.some((q) => q.questionType === QuestionType.FREE_TEXT);
   let userApiKey: string | undefined;
-  if (!attempt.isFreeTrial && hasFreeText) {
+  if (attempt.keySource === KeySource.USER_KEY && hasFreeText) {
     userApiKey = await resolveUserApiKey(userId);
     if (!userApiKey) {
       throw new TrialExhaustedError(

@@ -13,3 +13,8 @@ export const MIN_ANTHROPIC_KEY_LENGTH = 20;
 export const SUBJECT_MAX_LENGTH = 200;
 export const GOAL_MAX_LENGTH = 1000;
 export const SESSION_NAME_MAX_LENGTH = 200;
+
+export const KeySource = {
+  SERVER_KEY: 'SERVER_KEY',
+  USER_KEY: 'USER_KEY',
+} as const;

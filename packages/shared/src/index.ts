@@ -50,6 +50,7 @@ export {
   GOAL_MAX_LENGTH,
   ANTHROPIC_KEY_PREFIX,
   MIN_ANTHROPIC_KEY_LENGTH,
+  KeySource,
 } from './constants/quiz.constants.js';
 
 // Schemas
