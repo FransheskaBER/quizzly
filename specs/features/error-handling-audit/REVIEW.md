@@ -44,7 +44,7 @@
 | BE-009: `error.middleware.ts` includes telemetry for mapped error paths | Yes | Yes (`middleware/__tests__/error.middleware.test.ts`) | Pass |
 | BE-010: material fallback update failure preserves/captures causal context | Yes | No (no dedicated regression test) | Gap |
 | BE-011: duplicate capture removed from auth/email path | Yes | No (no dedicated non-duplication assertion) | Gap |
-| BE-012: process-level `uncaughtException`/`unhandledRejection` handlers with Sentry + shutdown | Yes | No (no dedicated test) | Gap |
+| BE-012: process-level `uncaughtException`/`unhandledRejection` handlers with Sentry + shutdown | Yes | Yes (`utils/__tests__/process-shutdown.utils.test.ts`) | Pass |
 
 ## Lessons Learned
 
