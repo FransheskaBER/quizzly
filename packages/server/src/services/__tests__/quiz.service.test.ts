@@ -364,7 +364,7 @@ describe('prepareGeneration', () => {
   it('allows generation with saved BYOK key when trial is used', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       freeTrialUsedAt: new Date('2026-01-01'),
-      encryptedApiKey: 'encrypted-sk-ant-test-key-1234567890',
+      encryptedApiKey: 'encrypted-sk-ant-test-nonsecret-key-1234567890',
     } as never);
     vi.mocked(prisma.session.findUnique).mockResolvedValue(mockSessionWithMaterials as never);
     vi.mocked(prisma.quizAttempt.findFirst).mockResolvedValue(null);
@@ -372,7 +372,7 @@ describe('prepareGeneration', () => {
     const result = await prepareGeneration(SESSION_ID, USER_ID);
 
     expect(result.isFreeTrialGeneration).toBe(false);
-    expect(result.userApiKey).toBe('sk-ant-test-key-1234567890');
+    expect(result.userApiKey).toBe('sk-ant-test-nonsecret-key-1234567890');
   });
 
   it('uses server key when trial is not used (no userApiKey)', async () => {
@@ -546,7 +546,7 @@ describe('executeGeneration', () => {
       {
         ...BASE_EXECUTION_PARAMS,
         isFreeTrialGeneration: false,
-        userApiKey: 'sk-ant-byok-test-key-123',
+        userApiKey: 'sk-ant-byok-nonsecret-key-123',
         questionCount: 2,
       },
       writer,
@@ -563,7 +563,7 @@ describe('executeGeneration', () => {
       {
         ...BASE_EXECUTION_PARAMS,
         isFreeTrialGeneration: false,
-        userApiKey: 'sk-ant-byok-test-key-123',
+        userApiKey: 'sk-ant-byok-nonsecret-key-123',
         questionCount: 5,
       },
       writer,
@@ -674,7 +674,7 @@ describe('executeGeneration', () => {
 
   it('passes userApiKey to LLM service for BYOK generation', async () => {
     const writer = vi.fn();
-    const byokKey = 'sk-ant-byok-test-key-123';
+    const byokKey = 'sk-ant-byok-nonsecret-key-123';
     await executeGeneration(
       { ...BASE_EXECUTION_PARAMS, isFreeTrialGeneration: false, userApiKey: byokKey },
       writer,
@@ -713,7 +713,7 @@ describe('executeGeneration', () => {
         ...BASE_EXECUTION_PARAMS,
         isFreeTrialGeneration: false,
         answerFormat: AnswerFormat.FREE_TEXT,
-        userApiKey: 'sk-ant-byok-test-key-123',
+        userApiKey: 'sk-ant-byok-nonsecret-key-123',
       },
       writer,
     );
@@ -726,7 +726,7 @@ describe('executeGeneration', () => {
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
       expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
       expect.any(Function),
-      'sk-ant-byok-test-key-123',
+      'sk-ant-byok-nonsecret-key-123',
     );
   });
 });
@@ -1365,7 +1365,7 @@ describe('executeGrading', () => {
   });
 
   it('passes userApiKey to LLM grading service for BYOK', async () => {
-    const byokKey = 'sk-ant-byok-grading-key-99';
+    const byokKey = 'sk-ant-byok-nonsecret-grading-key-99';
     const byokFreeTextContext: GradingContext = {
       quizAttemptId: ATTEMPT_ID,
       sessionSubject: 'TypeScript',

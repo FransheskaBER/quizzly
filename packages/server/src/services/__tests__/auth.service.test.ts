@@ -77,12 +77,12 @@ describe('signup', () => {
     const result = await authService.signup({
       email: 'test@example.com',
       username: 'testuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(result.message).toMatch(/Account created/i);
     expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-    expect(hashPassword).toHaveBeenCalledWith('Password123!');
+    expect(hashPassword).toHaveBeenCalledWith('valid-test-password-123!');
     expect(prisma.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -104,12 +104,12 @@ describe('signup', () => {
     await authService.signup({
       email: 'test@example.com',
       username: 'testuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     const createData = vi.mocked(prisma.user.create).mock.calls[0][0].data;
     expect(createData.passwordHash).toBe('$2b$12$fake_bcrypt_hash');
-    expect(createData.passwordHash).not.toBe('Password123!');
+    expect(createData.passwordHash).not.toBe('valid-test-password-123!');
   });
 
   it('sets verificationTokenExpiresAt approximately 24 hours from now', async () => {
@@ -120,7 +120,7 @@ describe('signup', () => {
     await authService.signup({
       email: 'test@example.com',
       username: 'testuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     const after = Date.now();
 
@@ -138,7 +138,7 @@ describe('signup', () => {
     );
 
     await expect(
-      authService.signup({ email: 'test@example.com', username: 'testuser', password: 'Password123!' }),
+      authService.signup({ email: 'test@example.com', username: 'testuser', password: 'valid-test-password-123!' }),
     ).rejects.toBeInstanceOf(EmailDeliveryError);
 
     // Account was still created before email was attempted
@@ -149,7 +149,7 @@ describe('signup', () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
 
     await expect(
-      authService.signup({ email: 'test@example.com', username: 'other', password: 'Password123!' }),
+      authService.signup({ email: 'test@example.com', username: 'other', password: 'valid-test-password-123!' }),
     ).rejects.toBeInstanceOf(ConflictError);
 
     expect(prisma.user.create).not.toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe('login', () => {
 
     const result = await authService.login({
       email: 'test@example.com',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(result.token).toBeTypeOf('string');
@@ -185,7 +185,7 @@ describe('login', () => {
 
     const { token } = await authService.login({
       email: 'test@example.com',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     const [, payloadB64] = token.split('.');
@@ -198,7 +198,7 @@ describe('login', () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
 
     await expect(
-      authService.login({ email: 'nobody@example.com', password: 'Password123!' }),
+      authService.login({ email: 'nobody@example.com', password: 'valid-test-password-123!' }),
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
@@ -207,7 +207,7 @@ describe('login', () => {
     vi.mocked(comparePassword).mockResolvedValue(false);
 
     await expect(
-      authService.login({ email: 'test@example.com', password: 'WrongPassword!' }),
+      authService.login({ email: 'test@example.com', password: 'wrong-test-password-123!' }),
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
@@ -239,7 +239,7 @@ describe('login', () => {
     vi.mocked(comparePassword).mockResolvedValue(true);
 
     await expect(
-      authService.login({ email: 'test@example.com', password: 'Password123!' }),
+      authService.login({ email: 'test@example.com', password: 'valid-test-password-123!' }),
     ).rejects.toBeInstanceOf(EmailNotVerifiedError);
   });
 });
@@ -428,11 +428,11 @@ describe('resetPassword', () => {
 
     const result = await authService.resetPassword({
       token: 'valid_token',
-      password: 'NewPassword123!',
+      password: 'new-test-password-123!',
     });
 
     expect(result.message).toBeTruthy();
-    expect(hashPassword).toHaveBeenCalledWith('NewPassword123!');
+    expect(hashPassword).toHaveBeenCalledWith('new-test-password-123!');
     expect(prisma.$transaction).toHaveBeenCalled();
 
     // Transaction receives an array of two operations.
@@ -446,7 +446,7 @@ describe('resetPassword', () => {
     vi.mocked(prisma.passwordReset.findFirst).mockResolvedValue(null);
 
     await expect(
-      authService.resetPassword({ token: 'bad_token', password: 'NewPassword123!' }),
+      authService.resetPassword({ token: 'bad_token', password: 'new-test-password-123!' }),
     ).rejects.toBeInstanceOf(BadRequestError);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();

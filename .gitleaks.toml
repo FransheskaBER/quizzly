@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deterministic non-secret test literals"
+regexTarget = "match"
+regexes = [
+  '''sk-ant-(test|invalid|byok)-[a-z0-9-]+''',
+  '''(valid|wrong|new|next|test-user)-test-password-[a-z0-9!-]+''',
+  '''nonsecret-test-header-value''',
+  '''Bearer test-token''',
+  '''encrypted-placeholder-value'''
+]

@@ -48,7 +48,7 @@ describe('POST /api/auth/signup', () => {
     const res = await request(app).post('/api/auth/signup').send({
       email: 'new@example.com',
       username: 'newuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(res.status).toBe(201);
@@ -59,14 +59,14 @@ describe('POST /api/auth/signup', () => {
     await request(app).post('/api/auth/signup').send({
       email: 'new@example.com',
       username: 'newuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     const user = await prisma.user.findUnique({ where: { email: 'new@example.com' } });
     expect(user).not.toBeNull();
     expect(user!.emailVerified).toBe(false);
     expect(user!.verificationToken).not.toBeNull();
-    expect(user!.passwordHash).not.toBe('Password123!');
+    expect(user!.passwordHash).not.toBe('valid-test-password-123!');
     expect(user!.passwordHash).toMatch(/^\$2[ab]\$/);
   });
 
@@ -74,7 +74,7 @@ describe('POST /api/auth/signup', () => {
     const res = await request(app).post('/api/auth/signup').send({
       email: 'not-an-email',
       username: 'newuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(res.status).toBe(400);
@@ -106,7 +106,7 @@ describe('POST /api/auth/signup', () => {
     const res = await request(app).post('/api/auth/signup').send({
       email: 'existing@example.com',
       username: 'anotheruser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(res.status).toBe(409);
@@ -117,7 +117,7 @@ describe('POST /api/auth/signup', () => {
     const res = await request(app).post('/api/auth/signup').send({
       email: 'new@example.com',
       username: 'newuser',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
       isAdmin: true, // should be ignored
     });
 
@@ -132,7 +132,7 @@ describe('POST /api/auth/signup', () => {
     const res = await request(app).post('/api/auth/signup').send({
       email: 'emailfail@example.com',
       username: 'emailfail',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
 
     expect(res.status).toBe(502);
@@ -168,7 +168,7 @@ describe('POST /api/auth/login', () => {
   it('401 — wrong email (message: "Invalid email or password")', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'nobody@example.com', password: 'Password123!' });
+      .send({ email: 'nobody@example.com', password: 'valid-test-password-123!' });
 
     expect(res.status).toBe(401);
     expect(res.body.error.message).toBe('Invalid email or password');
@@ -179,7 +179,7 @@ describe('POST /api/auth/login', () => {
 
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'login@example.com', password: 'WrongPassword!' });
+      .send({ email: 'login@example.com', password: 'wrong-test-password-123!' });
 
     expect(res.status).toBe(401);
     expect(res.body.error.message).toBe('Invalid email or password');
@@ -351,14 +351,14 @@ describe('POST /api/auth/reset-password', () => {
 
     const res = await request(app)
       .post('/api/auth/reset-password')
-      .send({ token: rawToken, password: 'NewPassword123!' });
+      .send({ token: rawToken, password: 'new-test-password-123!' });
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBeTruthy();
 
     // Verify new password hash was stored (not plaintext)
     const updated = await prisma.user.findUnique({ where: { id: user.id } });
-    expect(updated!.passwordHash).not.toBe('NewPassword123!');
+    expect(updated!.passwordHash).not.toBe('new-test-password-123!');
 
     // Verify reset record is marked as used
     const reset = await prisma.passwordReset.findFirst({ where: { userId: user.id } });
@@ -367,14 +367,14 @@ describe('POST /api/auth/reset-password', () => {
     // User can login with the new password
     const loginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'user@example.com', password: 'NewPassword123!' });
+      .send({ email: 'user@example.com', password: 'new-test-password-123!' });
     expect(loginRes.status).toBe(200);
   });
 
   it('400 — invalid token', async () => {
     const res = await request(app)
       .post('/api/auth/reset-password')
-      .send({ token: 'fake-token-that-does-not-exist', password: 'NewPassword123!' });
+      .send({ token: 'fake-token-that-does-not-exist', password: 'new-test-password-123!' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('BAD_REQUEST');
@@ -388,12 +388,12 @@ describe('POST /api/auth/reset-password', () => {
     // First reset succeeds
     await request(app)
       .post('/api/auth/reset-password')
-      .send({ token: rawToken, password: 'NewPassword123!' });
+      .send({ token: rawToken, password: 'new-test-password-123!' });
 
     // Second reset with same token fails
     const res = await request(app)
       .post('/api/auth/reset-password')
-      .send({ token: rawToken, password: 'AnotherPassword456!' });
+      .send({ token: rawToken, password: 'next-test-password-123!' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('BAD_REQUEST');
@@ -437,7 +437,7 @@ describe('GET /api/auth/me', () => {
     // Set the encrypted key directly in the DB (mirrors what POST /api/users/api-key does)
     await prisma.user.update({
       where: { id: user.id },
-      data: { encryptedApiKey: 'some-encrypted-value', apiKeyHint: 'sk-ant-...abcd' },
+      data: { encryptedApiKey: 'encrypted-placeholder-value', apiKeyHint: 'key-...abcd' },
     });
 
     const res = await request(app)

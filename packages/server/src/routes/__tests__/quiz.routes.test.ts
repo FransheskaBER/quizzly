@@ -307,7 +307,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
 // ---------------------------------------------------------------------------
 
 describe('BYOK — save API key then generate quiz (AC1)', () => {
-  const BYOK_API_KEY = 'sk-ant-api03-byok-key-that-is-long-enough-for-validation-1234567890abcdef';
+  const BYOK_API_KEY = 'sk-ant-test-byok-nonsecret-value-1234567890abcdef';
 
   it('generates quiz using the stored user API key after free trial is used', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);

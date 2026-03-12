@@ -18,7 +18,7 @@ interface TestUserOverrides {
  * Returns the user record and the plaintext password for login tests.
  */
 export const createTestUser = async (overrides: TestUserOverrides = {}) => {
-  const plaintext = overrides.password ?? 'TestPassword123!';
+  const plaintext = overrides.password ?? 'test-user-password-123!';
   const passwordHash = await bcrypt.hash(plaintext, TEST_BCRYPT_COST);
 
   const user = await prisma.user.create({
@@ -39,7 +39,7 @@ export const createTestUser = async (overrides: TestUserOverrides = {}) => {
  * (what would have been emailed) for use in verify-email tests.
  */
 export const createUnverifiedUser = async (overrides: TestUserOverrides & { expiredToken?: boolean } = {}) => {
-  const plaintext = overrides.password ?? 'TestPassword123!';
+  const plaintext = overrides.password ?? 'test-user-password-123!';
   const passwordHash = await bcrypt.hash(plaintext, TEST_BCRYPT_COST);
   const { token, hash } = generateVerificationToken();
 

@@ -126,9 +126,12 @@ npm install
 # Start local Postgres
 docker-compose up -d
 
-# Configure environment — four vars required for a working local server:
-# DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, RESEND_API_KEY
+# Configure environment from the template (all values are blank by design):
 cp .env.example packages/server/.env
+
+# Fill packages/server/.env with your local values:
+# DATABASE_URL, JWT_SECRET, API_KEY_ENCRYPTION_KEY
+# and optionally ANTHROPIC_API_KEY, RESEND_API_KEY, AWS_* vars, S3_BUCKET_NAME
 
 # Run migrations and generate Prisma client
 cd packages/server && npx prisma migrate dev && cd ../..
@@ -178,26 +181,62 @@ Open `http://localhost:5173`. The API is at `http://localhost:3000/api`.
 
 ## Environment Variables
 
-All variables from `.env.example` (copy to `packages/server/.env`). Use placeholders — never real secrets.
+All variables from `.env.example` (copy to `packages/server/.env`). Keep `.env.example` blank (`KEY=` only) and put real values only in local `.env`, CI secrets, and hosting environment settings.
 
-| Variable Name | Description | Required? | Example Value |
-|---------------|-------------|----------|---------------|
-| `NODE_ENV` | development/production/test | No | `development` |
-| `PORT` | Server listen port | No | `3000` |
-| `CLIENT_URL` | CORS origin for frontend | No | `http://localhost:5173` |
-| `DATABASE_URL` | Postgres connection string | Yes | `postgresql://skills_dev:skills_dev@localhost:5432/skills_trainer` |
-| `JWT_SECRET` | Signing key for JWT (min 32 chars) | Yes | `your-secret-here-change-in-production-minimum-32-characters` |
-| `JWT_EXPIRES_IN` | Token expiry | No | `7d` |
-| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 | For S3 uploads | *(empty)* |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 | For S3 uploads | *(empty)* |
-| `AWS_REGION` | AWS region | For S3 uploads | `eu-north-1` |
-| `S3_BUCKET_NAME` | S3 bucket name | For S3 uploads | *(empty)* |
-| `ANTHROPIC_API_KEY` | Claude API key | Yes | *(empty)* |
-| `RESEND_API_KEY` | Resend API key for email | Yes | *(empty)* |
-| `EMAIL_FROM` | From address for emails | No | `noreply@yourdomain.com` |
-| `SENTRY_DSN` | Sentry error tracking (optional) | No | *(empty)* |
-| `VITE_API_URL` | Backend origin (no /api suffix) | No | `http://localhost:3000` |
-| `VITE_SENTRY_DSN` | Sentry DSN for client | No | *(empty)* |
+| Variable Name | Description | Required? | Where to set real value |
+|---------------|-------------|----------|--------------------------|
+| `NODE_ENV` | development/production/test | No | Local `.env` / runtime |
+| `PORT` | Server listen port | No | Local `.env` / runtime |
+| `CLIENT_URL` | CORS origin for frontend | No | Local `.env` / runtime |
+| `DATABASE_URL` | Postgres connection string | Yes | Local `.env` and CI secret |
+| `JWT_SECRET` | Signing key for JWT (min 32 chars) | Yes | Local `.env` and CI secret |
+| `JWT_EXPIRES_IN` | Token expiry | No | Local `.env` / runtime |
+| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 | For S3 uploads | Local `.env` / CI secret |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 | For S3 uploads | Local `.env` / CI secret |
+| `AWS_REGION` | AWS region | For S3 uploads | Local `.env` / runtime |
+| `S3_BUCKET_NAME` | S3 bucket name | For S3 uploads | Local `.env` / CI secret |
+| `ANTHROPIC_API_KEY` | Claude API key | Yes (for LLM features) | Local `.env` / CI secret |
+| `API_KEY_ENCRYPTION_KEY` | 64-char hex key for API key encryption | Yes | Local `.env` and CI secret |
+| `RESEND_API_KEY` | Resend API key for email | Yes (for email features) | Local `.env` / CI secret |
+| `EMAIL_FROM` | From address for emails | No | Local `.env` / runtime |
+| `SENTRY_DSN` | Sentry error tracking (optional) | No | Local `.env` / CI secret |
+| `VITE_API_URL` | Backend origin (no /api suffix) | No | Local `.env` / runtime |
+| `VITE_SENTRY_DSN` | Sentry DSN for client | No | Local `.env` / runtime |
+
+---
+
+## CI Secrets And Guardrails
+
+Set these GitHub Actions repository secrets before enabling CI:
+
+- Required: `DATABASE_URL`, `JWT_SECRET`, `API_KEY_ENCRYPTION_KEY`
+- Optional (only if relevant jobs/features need them): `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME`, `SENTRY_DSN`
+
+Enable local secret scanning before commit:
+
+```bash
+pipx install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+Automated scanning is also configured in GitHub Actions:
+
+- `.github/workflows/gitleaks.yml` runs gitleaks on every push and pull request.
+- `.github/workflows/ci.yml` fails fast if required secrets are missing.
+
+## GitHub Security Checklist
+
+Use this checklist to keep a public repository secure:
+
+- Enable 2FA on the GitHub account that owns the repo.
+- Review and revoke unused personal access tokens and stale SSH keys.
+- Protect the default branch (require pull requests and required status checks).
+- Block force pushes on protected branches.
+- Enable Dependabot alerts and automatic security updates.
+- Enable secret scanning and push protection (if available on your plan).
+- Keep workflow permissions minimal (`contents: read` by default; elevate only where necessary).
+- Rotate credentials immediately if a leak is suspected.
 
 ---
 

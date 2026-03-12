@@ -13,7 +13,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'user@example.com',
       username: 'alice',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(true);
   });
@@ -24,7 +24,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'Test@EXAMPLE.COM',
       username: 'alice',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.email).toBe('test@example.com');
@@ -34,7 +34,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'user@example.com',
       username: '  alice  ',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.username).toBe('alice');
@@ -44,13 +44,13 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'not-an-email',
       username: 'alice',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(false);
   });
 
   it('rejects missing email', () => {
-    const result = signupSchema.safeParse({ username: 'alice', password: 'Password123!' });
+    const result = signupSchema.safeParse({ username: 'alice', password: 'valid-test-password-123!' });
     expect(result.success).toBe(false);
   });
 
@@ -58,7 +58,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'user@example.com',
       username: '',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(false);
   });
@@ -76,7 +76,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: `${'a'.repeat(250)}@example.com`,
       username: 'alice',
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(false);
   });
@@ -85,7 +85,7 @@ describe('signupSchema', () => {
     const result = signupSchema.safeParse({
       email: 'user@example.com',
       username: 'a'.repeat(51),
-      password: 'Password123!',
+      password: 'valid-test-password-123!',
     });
     expect(result.success).toBe(false);
   });
@@ -164,7 +164,7 @@ describe('forgotPasswordSchema', () => {
 
 describe('resetPasswordSchema', () => {
   it('accepts valid token and password', () => {
-    const result = resetPasswordSchema.safeParse({ token: 'abc123', password: 'NewPassword1!' });
+    const result = resetPasswordSchema.safeParse({ token: 'abc123', password: 'new-test-password-123!' });
     expect(result.success).toBe(true);
   });
 
@@ -174,7 +174,7 @@ describe('resetPasswordSchema', () => {
   });
 
   it('rejects missing token', () => {
-    const result = resetPasswordSchema.safeParse({ password: 'NewPassword1!' });
+    const result = resetPasswordSchema.safeParse({ password: 'new-test-password-123!' });
     expect(result.success).toBe(false);
   });
 });

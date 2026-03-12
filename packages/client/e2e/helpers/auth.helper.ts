@@ -10,7 +10,7 @@ export interface SignupCredentials {
 export const createE2ECredentials = (): SignupCredentials => ({
   email: `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@test.com`,
   username: `e2e-user-${Date.now().toString(36).slice(-6)}`,
-  password: 'TestPassword123!',
+  password: 'valid-test-password-123!',
 });
 
 /**

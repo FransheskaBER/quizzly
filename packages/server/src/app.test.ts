@@ -4,7 +4,7 @@ import { redactSensitiveHeaders } from './app.js';
 describe('redactSensitiveHeaders', () => {
   it('removes x-anthropic-key from headers', () => {
     const mockReq = {
-      headers: { 'x-anthropic-key': 'sk-ant-secret-key-value', 'content-type': 'application/json' },
+      headers: { 'x-anthropic-key': 'nonsecret-test-header-value', 'content-type': 'application/json' },
       method: 'GET',
       url: '/api/test',
     };
@@ -17,22 +17,22 @@ describe('redactSensitiveHeaders', () => {
 
   it('preserves all other headers when x-anthropic-key is absent', () => {
     const mockReq = {
-      headers: { 'authorization': 'Bearer token', 'content-type': 'application/json' },
+      headers: { 'authorization': 'Bearer test-token', 'content-type': 'application/json' },
       method: 'GET',
       url: '/api/test',
     };
 
     const result = redactSensitiveHeaders(mockReq);
 
-    expect(result.headers).toEqual({ 'authorization': 'Bearer token', 'content-type': 'application/json' });
+    expect(result.headers).toEqual({ 'authorization': 'Bearer test-token', 'content-type': 'application/json' });
   });
 
   it('does not mutate the original request object', () => {
-    const originalHeaders = { 'x-anthropic-key': 'sk-ant-secret-key-value', 'content-type': 'application/json' };
+    const originalHeaders = { 'x-anthropic-key': 'nonsecret-test-header-value', 'content-type': 'application/json' };
     const mockReq = { headers: originalHeaders, method: 'GET', url: '/api/test' };
 
     redactSensitiveHeaders(mockReq);
 
-    expect(originalHeaders['x-anthropic-key']).toBe('sk-ant-secret-key-value');
+    expect(originalHeaders['x-anthropic-key']).toBe('nonsecret-test-header-value');
   });
 });
