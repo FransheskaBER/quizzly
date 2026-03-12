@@ -96,7 +96,7 @@ model QuizAttempt {
   status        String    @default("generating") @db.VarChar(20)
   score         Decimal?  @db.Decimal(5, 2)
   materialsUsed Boolean   @default(false) @map("materials_used")
-  isFreeTrial   Boolean   @default(false) @map("is_free_trial")
+  keySource     String    @map("key_source") @db.VarChar(10)
   startedAt     DateTime? @map("started_at") @db.Timestamptz()
   completedAt   DateTime? @map("completed_at") @db.Timestamptz()
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()

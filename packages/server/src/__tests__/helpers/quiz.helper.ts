@@ -1,4 +1,4 @@
-import { QuizStatus, QuizDifficulty, AnswerFormat, QuestionType } from '@skills-trainer/shared';
+import { QuizStatus, QuizDifficulty, AnswerFormat, QuestionType, KeySource } from '@skills-trainer/shared';
 
 import { prisma } from './db.helper.js';
 
@@ -20,6 +20,7 @@ export const createQuizWithAnswers = async (
       answerFormat: AnswerFormat.MCQ,
       questionCount: 1,
       materialsUsed: false,
+      keySource: KeySource.USER_KEY,
       status: QuizStatus.IN_PROGRESS,
       startedAt: new Date(),
     },
