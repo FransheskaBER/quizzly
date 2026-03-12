@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 import { SSE_CLIENT_WARNING_TIMEOUT_MS } from '@skills-trainer/shared';
+import { Sentry } from '@/config/sentry';
 
 export interface GenericSSEEvent {
   type: string;
@@ -35,6 +36,7 @@ const isBackendError = (data: unknown): data is BackendErrorShape =>
   typeof (data as BackendErrorShape).error?.message === 'string';
 
 type StreamStatus = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error';
+const SSE_EVENT_CHUNK_PREVIEW_MAX_CHARS = 120;
 
 /**
  * Generic SSE hook backed by fetch + ReadableStream.
@@ -154,8 +156,16 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
                 scheduleWarning();
                 setWarning(null);
                 onEventRef.current(event);
-              } catch {
-                // Malformed JSON in SSE event — skip and continue reading.
+              } catch (err) {
+                const context = {
+                  operation: 'parseSseEvent',
+                  url,
+                  eventChunkLength: part.length,
+                  eventChunkPreview: part.slice(0, SSE_EVENT_CHUNK_PREVIEW_MAX_CHARS),
+                };
+                // eslint-disable-next-line no-console
+                console.error('Failed to parse SSE event payload', err, context);
+                Sentry.captureException(err, { extra: context });
               }
             }
           }
@@ -166,6 +176,14 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
           // Intentional close via close() or component unmount — not an error.
           return;
         }
+        const context = {
+          operation: 'startSseStream',
+          url,
+          method: fetchInitRef.current?.method ?? 'GET',
+        };
+        // eslint-disable-next-line no-console
+        console.error('SSE stream failed', err, context);
+        Sentry.captureException(err, { extra: context });
         onErrorRef.current('Connection failed. Please check your connection and try again.');
         setStatus('error');
       }

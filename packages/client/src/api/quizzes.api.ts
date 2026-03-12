@@ -1,4 +1,5 @@
 import { api } from '@/store/api';
+import { Sentry } from '@/config/sentry';
 import type { QuizAttemptResponse, SaveAnswersRequest, QuizResultsResponse } from '@skills-trainer/shared';
 
 type AnswerInput = SaveAnswersRequest['answers'][number];
@@ -44,7 +45,15 @@ const quizzesApi = api.injectEndpoints({
         // so the visual state is preserved via dirty even after the rollback.
         try {
           await queryFulfilled;
-        } catch {
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('saveAnswers optimistic update failed:', err);
+          Sentry.captureException(err, {
+            extra: {
+              endpoint: 'saveAnswers',
+              quizId: id,
+            },
+          });
           patchResult.undo();
         }
       },

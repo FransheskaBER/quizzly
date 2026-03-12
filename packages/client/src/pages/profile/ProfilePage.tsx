@@ -30,6 +30,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { useAppDispatch } from '@/store/store';
+import { Sentry } from '@/config/sentry';
 import styles from './ProfilePage.module.css';
 
 /** Client-side schema that adds a confirm field and validates it matches newPassword. */
@@ -65,6 +66,14 @@ const UsernameSection = () => {
       void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
       setSuccessMessage('Username updated.');
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Update profile username failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'updateProfileUsername',
+          userId: meData?.id ?? null,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, null, status);
@@ -110,6 +119,13 @@ const PasswordSection = () => {
       setSuccessMessage(result.message);
       reset();
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Change password failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'changePassword',
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, null, status);
@@ -175,6 +191,13 @@ const ApiKeySection = () => {
       showSuccess('Saved your API key');
       reset();
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Save API key failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'saveApiKey',
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'save-api-key', status);
@@ -189,6 +212,13 @@ const ApiKeySection = () => {
       setShowDeleteConfirm(false);
       showSuccess('Removed your API key');
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Delete API key failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'deleteApiKey',
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'delete-api-key', status);

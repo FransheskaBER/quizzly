@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SessionDetailResponse } from '@skills-trainer/shared';
 
@@ -7,11 +8,29 @@ import type { SessionDetailResponse } from '@skills-trainer/shared';
 // Mocks — must come before the component import
 // ---------------------------------------------------------------------------
 
-const mockDispatch = vi.fn();
+const {
+  mockDispatch,
+  mockUseAppSelector,
+  mockShowError,
+  mockShowSuccess,
+  mockSubmitQuiz,
+  mockUpdateSession,
+  mockDeleteSession,
+  mockCaptureException,
+} = vi.hoisted(() => ({
+  mockDispatch: vi.fn(),
+  mockUseAppSelector: vi.fn(() => []),
+  mockShowError: vi.fn(),
+  mockShowSuccess: vi.fn(),
+  mockSubmitQuiz: vi.fn(),
+  mockUpdateSession: vi.fn(),
+  mockDeleteSession: vi.fn(),
+  mockCaptureException: vi.fn(),
+}));
 
 vi.mock('@/store/store', () => ({
   useAppDispatch: () => mockDispatch,
-  useAppSelector: vi.fn(() => []),
+  useAppSelector: mockUseAppSelector,
 }));
 
 vi.mock('@/store/api', () => ({
@@ -28,12 +47,12 @@ vi.mock('@/api/auth.api', () => ({
 
 vi.mock('@/api/sessions.api', () => ({
   useGetSessionQuery: vi.fn(),
-  useUpdateSessionMutation: vi.fn(() => [vi.fn(), { isLoading: false, error: null }]),
-  useDeleteSessionMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
+  useUpdateSessionMutation: vi.fn(() => [mockUpdateSession, { isLoading: false, error: null }]),
+  useDeleteSessionMutation: vi.fn(() => [mockDeleteSession, { isLoading: false }]),
 }));
 
 vi.mock('@/api/quizzes.api', () => ({
-  useSubmitQuizMutation: vi.fn(() => [vi.fn()]),
+  useSubmitQuizMutation: vi.fn(() => [mockSubmitQuiz]),
 }));
 
 vi.mock('@/hooks/useQuizGeneration', () => ({
@@ -53,6 +72,19 @@ vi.mock('@/hooks/useQuizGeneration', () => ({
 // MaterialUploader makes API calls — stub it out to avoid network requests in tests.
 vi.mock('@/components/session/MaterialUploader', () => ({
   MaterialUploader: () => <div data-testid="material-uploader" />,
+}));
+vi.mock('@/hooks/useToast', () => ({
+  useToast: () => ({ showError: mockShowError, showSuccess: mockShowSuccess }),
+}));
+vi.mock('@/components/session/SessionForm', () => ({
+  SessionForm: ({ onSubmit }: { onSubmit: (data: unknown) => Promise<void> }) => (
+    <button type="button" onClick={() => void onSubmit({ name: 'Updated', subject: 'TS', goal: 'Learn' })}>
+      Save Session Form
+    </button>
+  ),
+}));
+vi.mock('@/config/sentry', () => ({
+  Sentry: { captureException: mockCaptureException },
 }));
 
 import { useGetMeQuery } from '@/api/auth.api';
@@ -89,6 +121,15 @@ const renderPage = () =>
 
 describe('SessionDashboardPage — Generate Quiz section (AC4)', () => {
   beforeEach(() => {
+    mockShowError.mockReset();
+    mockShowSuccess.mockReset();
+    mockSubmitQuiz.mockReset();
+    mockUpdateSession.mockReset();
+    mockDeleteSession.mockReset();
+    mockCaptureException.mockReset();
+    mockUseAppSelector.mockReturnValue([]);
+    localStorage.clear();
+
     vi.mocked(useGetSessionQuery).mockReturnValue({
       data: MOCK_SESSION,
       isLoading: false,
@@ -171,5 +212,118 @@ describe('SessionDashboardPage — Generate Quiz section (AC4)', () => {
 
     expect(screen.queryByText(/to generate more quizzes/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument();
+  });
+});
+
+describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
+  beforeEach(() => {
+    mockShowError.mockReset();
+    mockShowSuccess.mockReset();
+    mockSubmitQuiz.mockReset();
+    mockUpdateSession.mockReset();
+    mockDeleteSession.mockReset();
+    mockCaptureException.mockReset();
+    mockUseAppSelector.mockReturnValue([]);
+    localStorage.clear();
+
+    const nowIso = new Date().toISOString();
+    vi.mocked(useGetMeQuery).mockReturnValue({
+      data: {
+        id: 'u1',
+        email: 'a@b.com',
+        username: 'alice',
+        emailVerified: true,
+        hasApiKey: true,
+        hasUsedFreeTrial: true,
+        createdAt: '',
+      },
+    } as unknown as ReturnType<typeof useGetMeQuery>);
+
+    vi.mocked(useGetSessionQuery).mockReturnValue({
+      data: {
+        ...MOCK_SESSION,
+        quizAttempts: [{ id: 'qa-1', status: 'submitted_ungraded', createdAt: nowIso, questionCount: 1, score: null, difficulty: 'easy', answerFormat: 'multiple_choice', startedAt: null }],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useGetSessionQuery>);
+  });
+
+  it('captures localStorage parse failures with readViewedFeedbackIds context', () => {
+    localStorage.setItem('quiz-feedback-viewed-ids', '{bad-json');
+    renderPage();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(SyntaxError),
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'readViewedFeedbackIds' }),
+      }),
+    );
+  });
+
+  it('captures retry submission failures with session and attempt metadata', async () => {
+    const user = userEvent.setup();
+    mockUseAppSelector.mockReturnValue([
+      { quizAttemptId: 'qa-1', sessionId: 'session-1', message: 'Failed', createdAt: new Date().toISOString() },
+    ]);
+    mockSubmitQuiz.mockReturnValue({
+      unwrap: vi.fn().mockRejectedValue(new Error('retry failed')),
+    });
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /retry submission/i }));
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          operation: 'handleRetrySubmission',
+          sessionId: 'session-1',
+          quizAttemptId: 'qa-1',
+        }),
+      }),
+    );
+  });
+
+  it('captures update failures with handleUpdateSession metadata', async () => {
+    const user = userEvent.setup();
+    mockUpdateSession.mockReturnValue({
+      unwrap: vi.fn().mockRejectedValue(new Error('update failed')),
+    });
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+    await user.click(screen.getByRole('button', { name: /save session form/i }));
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          operation: 'handleUpdateSession',
+          sessionId: 'session-1',
+        }),
+      }),
+    );
+  });
+
+  it('captures delete failures with handleDeleteSession metadata', async () => {
+    const user = userEvent.setup();
+    mockDeleteSession.mockReturnValue({
+      unwrap: vi.fn().mockRejectedValue(new Error('delete failed')),
+    });
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await user.click(screen.getByRole('button', { name: /delete session/i }));
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          operation: 'handleDeleteSession',
+          sessionId: 'session-1',
+        }),
+      }),
+    );
   });
 });
