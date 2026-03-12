@@ -11,3 +11,11 @@ regexes = [
   '''Bearer test-token''',
   '''encrypted-placeholder-value'''
 ]
+
+[[allowlists]]
+description = "GitHub Actions secret references (variable names, not values)"
+paths = ['''\.github/workflows/.*\.ya?ml$''']
+
+[[allowlists]]
+description = "S3 object key in error logs (path, not API key)"
+paths = ['''packages/server/src/services/material\.service\.ts''']

@@ -11,8 +11,8 @@ const { mockCreateSession, mockNavigate, mockShowError, mockShowSuccess, mockCap
   mockCaptureException: vi.fn(),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal();
   return {
     ...actual,
     useNavigate: () => mockNavigate,

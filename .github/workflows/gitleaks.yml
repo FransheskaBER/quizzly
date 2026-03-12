@@ -25,5 +25,6 @@ jobs:
             detect \
             --source=/repo \
             --config=/repo/.gitleaks.toml \
+            --log-opts="--max-count=1" \
             --redact \
             --verbose
