@@ -11,8 +11,23 @@ permissions:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: quizzly_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: postgresql://test:test@localhost:5432/quizzly_test
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -34,7 +49,7 @@ jobs:
       - name: Validate required CI secrets
         run: |
           missing=0
-          for key in DATABASE_URL JWT_SECRET API_KEY_ENCRYPTION_KEY; do
+          for key in JWT_SECRET API_KEY_ENCRYPTION_KEY; do
             if [ -z "${!key}" ]; then
               echo "::error::Missing required repository secret: $key"
               missing=1
@@ -58,6 +73,9 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Run migrations
+        run: npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma
 
       - name: Test
         run: npm test
