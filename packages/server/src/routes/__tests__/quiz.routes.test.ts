@@ -42,6 +42,12 @@ const VALID_LLM_QUESTION: LlmGeneratedQuestion = {
   tags: ['typescript'],
 };
 
+const FIVE_VALID_LLM_QUESTIONS: LlmGeneratedQuestion[] = Array.from({ length: 5 }, (_, index) => ({
+  ...VALID_LLM_QUESTION,
+  questionNumber: index + 1,
+  questionText: `What does TypeScript add to JavaScript? (${index + 1})`,
+}));
+
 // Query string used in every happy-path test.
 const VALID_QUERY = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.MCQ}&count=${MIN_QUESTION_COUNT}`;
 
@@ -101,7 +107,7 @@ afterAll(async () => {
 
 describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('200 with Content-Type text/event-stream', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -115,7 +121,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('SSE stream contains progress, question, and complete events', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -132,7 +138,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('question SSE event does NOT include correctAnswer or explanation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -152,7 +158,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('question SSE event includes id, questionNumber, questionType, questionText, options', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -171,7 +177,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('complete event carries a quizAttemptId', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -190,7 +196,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('DB — quiz_attempt is in_progress with correct questionCount after successful generation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -208,13 +214,36 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
       where: { id: completeEvent.data.quizAttemptId },
     });
     expect(attempt?.status).toBe(QuizStatus.IN_PROGRESS);
-    expect(attempt?.questionCount).toBe(1);
+    expect(attempt?.questionCount).toBe(5);
     // startedAt is null after generation; it is set when the user first opens the quiz.
     expect(attempt?.startedAt).toBeNull();
   });
 
+  it('DB — free-trial generation enforces MCQ format even when free_text is requested', async () => {
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+    const freeTextQuery = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.FREE_TEXT}&count=${MIN_QUESTION_COUNT}`;
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${freeTextQuery}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .buffer(true);
+
+    const events = parseSSEEvents(res.text);
+    const completeEvent = events.find((e) => e.type === 'complete') as {
+      type: string;
+      data: { quizAttemptId: string };
+    };
+    const attempt = await prisma.quizAttempt.findUnique({
+      where: { id: completeEvent.data.quizAttemptId },
+    });
+
+    expect(attempt?.answerFormat).toBe(AnswerFormat.MCQ);
+  });
+
   it('DB — one question and one answer record exist after successful generation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -233,12 +262,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
       prisma.question.findMany({ where: { quizAttemptId } }),
       prisma.answer.findMany({ where: { quizAttemptId } }),
     ]);
-    expect(questions).toHaveLength(1);
-    expect(answers).toHaveLength(1);
+    expect(questions).toHaveLength(5);
+    expect(answers).toHaveLength(5);
   });
 
   it('passes materialsText from ready materials to the LLM call', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
     await createMaterial(session.id, 'Specific extracted content for the test');
@@ -256,7 +285,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('passes materialsText as null when session has no ready materials', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -281,7 +310,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
   const BYOK_API_KEY = 'sk-ant-api03-byok-key-that-is-long-enough-for-validation-1234567890abcdef';
 
   it('generates quiz using the stored user API key after free trial is used', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const session = await createSession(user.id);
 
@@ -456,6 +485,42 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
 
     const events = parseSSEEvents(res.text);
     expect(events.some((e) => e.type === 'complete')).toBe(false);
+  });
+
+  it('does not consume free trial on generation failure and allows retry', async () => {
+    vi.mocked(llmGenerateQuiz).mockRejectedValueOnce(new Error('Anthropic unavailable'));
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+    const token = getAuthToken(user);
+
+    const failedRes = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${token}`)
+      .buffer(true);
+
+    const failedEvents = parseSSEEvents(failedRes.text);
+    expect(failedEvents.some((e) => e.type === 'error')).toBe(true);
+    expect(failedEvents.some((e) => e.type === 'complete')).toBe(false);
+
+    const refreshedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { freeTrialUsedAt: true },
+    });
+    expect(refreshedUser?.freeTrialUsedAt).toBeNull();
+
+    const generatingAttempts = await prisma.quizAttempt.count({
+      where: { sessionId: session.id, status: QuizStatus.GENERATING },
+    });
+    expect(generatingAttempts).toBe(0);
+
+    vi.mocked(llmGenerateQuiz).mockResolvedValueOnce(FIVE_VALID_LLM_QUESTIONS);
+    const retryRes = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${token}`)
+      .buffer(true);
+
+    const retryEvents = parseSSEEvents(retryRes.text);
+    expect(retryEvents.some((e) => e.type === 'complete')).toBe(true);
   });
 });
 

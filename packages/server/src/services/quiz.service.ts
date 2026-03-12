@@ -5,7 +5,7 @@ import {
   SSE_SERVER_TIMEOUT_MS,
   FREE_TRIAL_QUESTION_COUNT,
   type QuizDifficulty,
-  type AnswerFormat,
+  AnswerFormat,
   type QuizAttemptResponse,
   type QuizResultsResponse,
 } from '@skills-trainer/shared';
@@ -183,7 +183,7 @@ export const executeGeneration = async (
     sessionId,
     userId,
     difficulty,
-    answerFormat,
+    answerFormat: requestedFormat,
     questionCount: requestedCount,
     sessionSubject,
     sessionGoal,
@@ -194,6 +194,7 @@ export const executeGeneration = async (
   } = params;
 
   const questionCount = isFreeTrialGeneration ? FREE_TRIAL_QUESTION_COUNT : requestedCount;
+  const answerFormat = isFreeTrialGeneration ? AnswerFormat.MCQ : requestedFormat;
 
   let quizAttemptId: string | null = null;
   let timedOut = false;
@@ -235,6 +236,14 @@ export const executeGeneration = async (
       () => {},
       userApiKey,
     );
+
+    if (isFreeTrialGeneration) {
+      const hasExactTrialCount = questions.length === FREE_TRIAL_QUESTION_COUNT;
+      const hasOnlyMcqQuestions = questions.every((q) => q.questionType === QuestionType.MCQ);
+      if (!hasExactTrialCount || !hasOnlyMcqQuestions) {
+        throw new Error('Free trial generation must return exactly 5 multiple-choice questions');
+      }
+    }
 
     let questionsGenerated = 0;
 
@@ -311,10 +320,16 @@ export const executeGeneration = async (
       writer({ type: 'error', message: 'Generation failed. Please try again.' });
     }
 
-    // QuizStatus has no FAILED value — the attempt remains in GENERATING status.
-    // The user can start a new generation once this one is identified as stale.
+    // QuizStatus has no FAILED value. Remove failed attempts so users can retry
+    // immediately without hitting the "already generating" guard.
     if (quizAttemptId) {
-      logger.info({ quizAttemptId }, 'Quiz attempt left in generating status after failure');
+      try {
+        await prisma.quizAttempt.delete({ where: { id: quizAttemptId } });
+        logger.info({ quizAttemptId }, 'Deleted failed quiz attempt');
+      } catch (cleanupErr) {
+        logger.error({ cleanupErr, quizAttemptId }, 'Failed to clean up quiz attempt after failure');
+        captureExceptionOnce(cleanupErr, { extra: { quizAttemptId } });
+      }
     }
   } finally {
     clearTimeout(timeoutId);

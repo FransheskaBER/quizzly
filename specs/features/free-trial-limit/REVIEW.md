@@ -1,45 +1,56 @@
 # Review: free-trial-limit
-**Date**: 2026-03-08
+**Date**: 2026-03-12
 **Spec file**: RFC.md
-**Overall result**: Deviations found (2) — both resolved
+**Overall result**: Deviations found (3) — resolved via spec classification + code fixes
 
 ## Deviations
 
-### 1. auth.service.test.ts not updated for hasUsedFreeTrial
-- **Section**: Section 4 (Blast Radius) — "Tests affected: auth.service.test.ts — updated getMe response shape"
-- **Type**: Code is wrong
-- **Spec says**: auth.service.test.ts should be updated for the new getMe response shape
-- **Code does**: mockUser was missing freeTrialUsedAt field, and the getMe test expectation didn't include hasUsedFreeTrial. Double bug: (1) .toEqual() fails because actual response has hasUsedFreeTrial but expected doesn't, (2) mockUser without freeTrialUsedAt causes undefined !== null to evaluate to true, making hasUsedFreeTrial incorrectly true
-- **Root cause**: Test file wasn't touched during implementation. Missing env vars prevented running these tests locally, so the failure wasn't caught.
-- **Resolution**: Added freeTrialUsedAt: null to mockUser, added hasUsedFreeTrial: false to getMe assertion, added new test for hasUsedFreeTrial:true when freeTrialUsedAt is set.
+### 1) RFC non-goal "BYOK implementation" is outdated
+- **Section**: Section 2 (Goals and Non-Goals)
+- **Type**: Spec is outdated
+- **Spec says**: BYOK is out of scope for this RFC stage.
+- **Code does**: post-trial generation is allowed when a saved user API key exists; blocked only when trial is used and no key is saved.
+- **Root cause**: BYOK stage-2 work landed after this RFC and behavior now spans both stages.
+- **Resolution**: keep implementation; treat RFC section as historical/outdated.
 
-### 2. executeGeneration $transaction assertion too loose
-- **Section**: Section 6 (Acceptance Criteria) — AC2: "freeTrialUsedAt is set"
-- **Type**: Code is wrong (test gap)
-- **Spec says**: "Given a new user When they generate a quiz Then exactly 5 questions are generated and freeTrialUsedAt is set"
-- **Code does**: The $transaction test used expect.arrayContaining([expect.objectContaining({})]) which passes for any non-empty array — doesn't verify freeTrialUsedAt is actually set
-- **Root cause**: Original test asserted on prisma.quizAttempt.update directly. When refactored to $transaction for atomicity, the assertion was weakened.
-- **Resolution**: Strengthened assertion to verify transaction array has length 2 (quizAttempt update + user update). Renamed test to reflect both operations.
+### 2) prepareGeneration error contract in RFC is outdated
+- **Section**: Section 3 (Detailed Design)
+- **Type**: Spec is outdated
+- **Spec says**: if `freeTrialUsedAt` is non-null, throw `ForbiddenError`.
+- **Code does**: throws `TrialExhaustedError` (`TRIAL_EXHAUSTED`) only when trial is used and no saved API key exists.
+- **Root cause**: error contract evolved to support BYOK continuation after trial.
+- **Resolution**: keep implementation; RFC wording should reflect current contract.
+
+### 3) Free-trial output was not strictly enforced to exactly 5 MCQ
+- **Section**: Section 6 (Acceptance Criteria AC2)
+- **Type**: Code is wrong
+- **Spec says**: free-trial generation yields exactly 5 multiple-choice questions and marks trial used only on success.
+- **Code did**: accepted partial LLM output and persisted fewer questions.
+- **Root cause**: generic "partial output is acceptable" generation behavior conflicted with strict free-trial contract.
+- **Resolution**: fixed:
+  - `executeGeneration` now validates free-trial output is exactly 5 and all MCQ.
+  - invalid free-trial output fails generation (SSE error, no complete).
+  - failed attempt cleanup deletes `GENERATING` attempt so immediate retry is possible.
+  - trial consumption remains success-only.
 
 ## Acceptance Criteria Results
 
 | Criterion | Implemented | Tested | Status |
 |-----------|------------|--------|--------|
-| AC1: New user sees locked count (5) and trial note | Yes | No (frontend — not in RFC test scope) | Pass |
-| AC2: Generation produces 5 questions and sets freeTrialUsedAt | Yes | Yes (quiz.service.test.ts — questionCount:5 + $transaction length:2) | Pass |
-| AC3: Used trial → 403 ForbiddenError | Yes | Yes (quiz.service.test.ts — "throws ForbiddenError when free trial has already been used") | Pass |
-| AC4: Used trial → "trial used" message on dashboard | Yes | No (frontend — not in RFC test scope) | Pass |
-| AC5: Failed generation → trial not consumed | Yes | Yes (implicitly — error path tests show $transaction not called on LLM failure) | Pass |
-| AC6: Existing users (pre-migration) → trial available | Yes | No (deployment concern, not unit testable) | Pass |
+| AC1: New user sees locked count (5), locked MCQ format, trial note | Yes | Yes (`QuizPreferences.test.tsx`, `SessionDashboardPage.test.tsx`) | Pass |
+| AC2: New user generation yields exactly 5 MCQ and sets `freeTrialUsedAt` | Yes | Yes (`quiz.service.test.ts`, `quiz.routes.test.ts`) | Pass |
+| AC3: Used trial user gets 403 message requiring own key | Yes | Yes (`quiz.service.test.ts`, `quiz.routes.test.ts`) | Pass |
+| AC4: Used trial user sees "trial used" message instead of form | Yes | Yes (`SessionDashboardPage.test.tsx`) | Pass |
+| AC5: Failed generation does not consume trial; retry still works | Yes | Yes (`quiz.routes.test.ts` retry path + freeTrialUsedAt null assertion) | Pass |
+| AC6: Existing pre-migration users still have one trial | Yes | Partially (migration shape verified; no dedicated migration regression test) | Pass |
+| AC7: Client-submitted `free_text`/`mixed` still enforced to MCQ in free trial | Yes | Partial (`free_text` explicitly tested; service-level forced-MCQ behavior covered) | Pass |
 
 ## Lessons Learned
 
-- When adding a field to a service response, search for ALL test files that assert on that response shape — not just the service's own test file. The auth.service.test.ts was explicitly listed in the RFC's blast radius but was still missed.
-- When refactoring from a direct Prisma call to a $transaction, the test assertion must be updated to verify the transaction contents, not just that $transaction was called. Weakening assertions during refactoring defeats the purpose of the test.
-- Test files that can't run locally (due to missing env vars) are a blind spot. Consider fixing the env-var dependency in auth.service.test.ts and token.utils.test.ts so they can run in the same CI-free local flow as other service tests.
+- When an acceptance criterion uses "exactly", enforce cardinality and type at the service boundary rather than relying on prompt compliance.
+- For SSE generation failures, failed-attempt cleanup must be explicit when no failed status exists, otherwise concurrency guards can block retries.
+- RFCs that are stage-based should be updated or annotated once cross-stage behavior lands to prevent false-positive audit deviations.
 
 ## TDD Updates Required
 
-- **TDD Section 4 (Database Schema):** Add freeTrialUsedAt DateTime? to User model
-- **TDD Section 5 (API Contracts):** Add hasUsedFreeTrial: boolean to GET /api/auth/me response
-- **TDD Section 7 (Error Handling):** Add TRIAL_EXHAUSTED error code (403) for quiz generation
+- No new TDD updates required from this review. Required items from the RFC (`freeTrialUsedAt`, `hasUsedFreeTrial`, `TRIAL_EXHAUSTED`) are already present in `specs/TDD.md`.
