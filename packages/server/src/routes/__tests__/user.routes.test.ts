@@ -165,96 +165,26 @@ describe('DELETE /api/users/api-key', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PATCH /api/users/profile
+// Removed endpoints regression
 // ---------------------------------------------------------------------------
 
-describe('PATCH /api/users/profile', () => {
-  it('updates the username and returns the user response', async () => {
+describe('Removed legacy profile endpoints', () => {
+  it('returns 404 for PATCH /api/users/profile and PUT /api/users/password', async () => {
     const { user } = await createTestUser();
+    const token = getAuthToken(user);
 
-    const res = await request(app)
+    const patchRes = await request(app)
       .patch('/api/users/profile')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ username: 'newname' });
+      .set('Authorization', `Bearer ${token}`)
+      .send({ username: 'new-name' });
 
-    expect(res.status).toBe(200);
-    expect(res.body.username).toBe('newname');
-    expect(res.body.id).toBe(user.id);
-  });
+    const putRes = await request(app)
+      .put('/api/users/password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'old-pass', newPassword: 'new-pass-123' });
 
-  it('returns 400 for empty username', async () => {
-    const { user } = await createTestUser();
-
-    const res = await request(app)
-      .patch('/api/users/profile')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ username: '' });
-
-    expect(res.status).toBe(400);
+    expect(patchRes.status).toBe(404);
+    expect(putRes.status).toBe(404);
   });
 });
 
-// ---------------------------------------------------------------------------
-// PUT /api/users/password
-// ---------------------------------------------------------------------------
-
-describe('PUT /api/users/password', () => {
-  it('changes password successfully with correct current password', async () => {
-    const { user, password } = await createTestUser();
-
-    const res = await request(app)
-      .put('/api/users/password')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ currentPassword: password, newPassword: 'NewSecurePassword456!' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toContain('Password changed');
-  });
-
-  it('new password works for login, old password does not (AC8)', async () => {
-    const { user, password: oldPassword } = await createTestUser({ email: 'pwchange@example.com' });
-    const newPassword = 'BrandNewSecure789!';
-
-    const changePasswordRes = await request(app)
-      .put('/api/users/password')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ currentPassword: oldPassword, newPassword });
-    expect(changePasswordRes.status).toBe(200);
-    expect(changePasswordRes.body?.message).toContain('Password changed');
-
-    // New password succeeds
-    const loginNew = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'pwchange@example.com', password: newPassword });
-    expect(loginNew.status).toBe(200);
-    expect(loginNew.body.token).toBeTypeOf('string');
-
-    // Old password fails
-    const loginOld = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'pwchange@example.com', password: oldPassword });
-    expect(loginOld.status).toBe(401);
-  });
-
-  it('returns 401 for wrong current password', async () => {
-    const { user } = await createTestUser();
-
-    const res = await request(app)
-      .put('/api/users/password')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ currentPassword: 'wrong-password', newPassword: 'NewSecurePassword456!' });
-
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 400 when new password is too short', async () => {
-    const { user, password } = await createTestUser();
-
-    const res = await request(app)
-      .put('/api/users/password')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
-      .send({ currentPassword: password, newPassword: 'short' });
-
-    expect(res.status).toBe(400);
-  });
-});

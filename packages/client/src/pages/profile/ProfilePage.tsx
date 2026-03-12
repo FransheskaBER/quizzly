@@ -2,26 +2,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
-import { z } from 'zod';
 
-import {
-  updateProfileSchema,
-  changePasswordSchema,
-  saveApiKeySchema,
-  PASSWORD_MIN_LENGTH,
-} from '@skills-trainer/shared';
-import type {
-  UpdateProfileRequest,
-  SaveApiKeyRequest,
-} from '@skills-trainer/shared';
+import { saveApiKeySchema } from '@skills-trainer/shared';
+import type { SaveApiKeyRequest } from '@skills-trainer/shared';
 
-import { useGetMeQuery } from '@/api/auth.api';
 import {
   useGetApiKeyStatusQuery,
   useSaveApiKeyMutation,
   useDeleteApiKeyMutation,
-  useUpdateProfileMutation,
-  useChangePasswordMutation,
 } from '@/api/user.api';
 import { authApi } from '@/api/auth.api';
 import { FormField } from '@/components/common/FormField';
@@ -32,140 +20,6 @@ import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { useAppDispatch } from '@/store/store';
 import { Sentry } from '@/config/sentry';
 import styles from './ProfilePage.module.css';
-
-/** Client-side schema that adds a confirm field and validates it matches newPassword. */
-const changePasswordFormSchema = changePasswordSchema
-  .extend({ confirmNewPassword: z.string().min(1, 'Please confirm your new password') })
-  .refine((data) => data.newPassword === data.confirmNewPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmNewPassword'],
-  });
-
-type ChangePasswordFormValues = z.infer<typeof changePasswordFormSchema>;
-
-const UsernameSection = () => {
-  const { showError } = useToast();
-  const { data: meData } = useGetMeQuery();
-  const dispatch = useAppDispatch();
-  const [updateProfile, { isLoading }] = useUpdateProfileMutation();
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty },
-  } = useForm<UpdateProfileRequest>({
-    resolver: zodResolver(updateProfileSchema),
-    values: { username: meData?.username ?? '' },
-  });
-
-  const onSubmit = async (data: UpdateProfileRequest): Promise<void> => {
-    setSuccessMessage(null);
-    try {
-      await updateProfile(data).unwrap();
-      void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
-      setSuccessMessage('Username updated.');
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Update profile username failed:', err);
-      Sentry.captureException(err, {
-        extra: {
-          operation: 'updateProfileUsername',
-          userId: meData?.id ?? null,
-        },
-      });
-      const { code } = parseApiError(err);
-      const status = extractHttpStatus(err);
-      const userMessage = getUserMessage(code, null, status);
-      showError(userMessage.title, userMessage.description);
-    }
-  };
-
-  return (
-    <div className={styles.section}>
-      <h2 className={styles.sectionTitle}>Username</h2>
-      <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-        <FormField label="Username" {...register('username')} error={errors.username?.message} />
-        <div className={styles.actions}>
-          <Button type="submit" disabled={isLoading || !isDirty}>
-            {isLoading ? 'Saving…' : 'Save'}
-          </Button>
-          {successMessage && <span className={styles.successMessage}>{successMessage}</span>}
-        </div>
-      </form>
-    </div>
-  );
-};
-
-const PasswordSection = () => {
-  const { showError } = useToast();
-  const [changePassword, { isLoading }] = useChangePasswordMutation();
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(changePasswordFormSchema),
-  });
-
-  const onSubmit = async (data: ChangePasswordFormValues): Promise<void> => {
-    setSuccessMessage(null);
-    try {
-      const { currentPassword, newPassword } = data;
-      const result = await changePassword({ currentPassword, newPassword }).unwrap();
-      setSuccessMessage(result.message);
-      reset();
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Change password failed:', err);
-      Sentry.captureException(err, {
-        extra: {
-          operation: 'changePassword',
-        },
-      });
-      const { code } = parseApiError(err);
-      const status = extractHttpStatus(err);
-      const userMessage = getUserMessage(code, null, status);
-      showError(userMessage.title, userMessage.description);
-    }
-  };
-
-  return (
-    <div className={styles.section}>
-      <h2 className={styles.sectionTitle}>Change Password</h2>
-      <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-        <FormField
-          label="Current Password"
-          type="password"
-          {...register('currentPassword')}
-          error={errors.currentPassword?.message}
-        />
-        <FormField
-          label="New Password"
-          type="password"
-          {...register('newPassword')}
-          error={errors.newPassword?.message}
-        />
-        <FormField
-          label="Confirm New Password"
-          type="password"
-          {...register('confirmNewPassword')}
-          error={errors.confirmNewPassword?.message}
-        />
-        <p className={styles.hint}>Minimum {PASSWORD_MIN_LENGTH} characters</p>
-        <div className={styles.actions}>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Changing…' : 'Change Password'}
-          </Button>
-          {successMessage && <span className={styles.successMessage}>{successMessage}</span>}
-        </div>
-      </form>
-    </div>
-  );
-};
 
 const ApiKeySection = () => {
   const { showError, showSuccess } = useToast();
@@ -280,8 +134,7 @@ const ProfilePage = () => {
         <Link to="/dashboard" className={styles.backLink}>
           ← Dashboard
         </Link>
-        <UsernameSection />
-        <PasswordSection />
+        <h1 className={styles.sectionTitle}>Your API Key</h1>
         <ApiKeySection />
       </div>
     </div>

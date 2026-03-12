@@ -1,20 +1,33 @@
 import React from 'react';
 import type { ButtonHTMLAttributes } from 'react';
+import { Link } from 'react-router-dom';
 import styles from './Button.module.css';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonBaseProps {
   variant?: 'primary' | 'secondary' | 'destructive' | 'ghost';
   size?: 'md' | 'sm';
+  className?: string;
+}
+
+export interface ButtonProps extends ButtonBaseProps, ButtonHTMLAttributes<HTMLButtonElement> {
+  to?: undefined;
+}
+
+interface LinkButtonProps extends ButtonBaseProps {
+  to: string;
   children: React.ReactNode;
 }
 
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  className = '',
-  children,
-  ...props
-}: ButtonProps) {
+export function Button(props: ButtonProps | LinkButtonProps): React.ReactElement {
+  const {
+    variant = 'primary',
+    size = 'md',
+    className = '',
+    children,
+    to,
+    ...rest
+  } = props;
+
   const variantClass = {
     primary: styles.btnPrimary,
     secondary: styles.btnSecondary,
@@ -31,8 +44,16 @@ export function Button({
     className
   ].filter(Boolean).join(' ');
 
+  if (to) {
+    return (
+      <Link to={to} className={buttonClasses}>
+        {children}
+      </Link>
+    );
+  }
+
   return (
-    <button className={buttonClasses} {...props}>
+    <button className={buttonClasses} {...(rest as ButtonHTMLAttributes<HTMLButtonElement>)}>
       {children}
     </button>
   );

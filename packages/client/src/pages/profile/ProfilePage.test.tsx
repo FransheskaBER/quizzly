@@ -30,19 +30,15 @@ vi.mock('@/api/auth.api', () => ({
   },
 }));
 
-const { mockSaveApiKey, mockDeleteApiKey, mockUpdateProfile, mockChangePassword } = vi.hoisted(() => ({
+const { mockSaveApiKey, mockDeleteApiKey } = vi.hoisted(() => ({
   mockSaveApiKey: vi.fn(),
   mockDeleteApiKey: vi.fn(),
-  mockUpdateProfile: vi.fn(),
-  mockChangePassword: vi.fn(),
 }));
 
 vi.mock('@/api/user.api', () => ({
   useGetApiKeyStatusQuery: vi.fn(),
   useSaveApiKeyMutation: vi.fn(() => [mockSaveApiKey, { isLoading: false }]),
   useDeleteApiKeyMutation: vi.fn(() => [mockDeleteApiKey, { isLoading: false }]),
-  useUpdateProfileMutation: vi.fn(() => [mockUpdateProfile, { isLoading: false }]),
-  useChangePasswordMutation: vi.fn(() => [mockChangePassword, { isLoading: false }]),
 }));
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({ showError: mockShowError, showSuccess: mockShowSuccess }),
@@ -77,12 +73,23 @@ describe('ProfilePage — API Key section (AC3)', () => {
     mockCaptureException.mockReset();
     mockSaveApiKey.mockReset();
     mockDeleteApiKey.mockReset();
-    mockUpdateProfile.mockReset();
-    mockChangePassword.mockReset();
 
     vi.mocked(useGetMeQuery).mockReturnValue({
       data: { id: 'u1', email: 'a@b.com', username: 'alice', emailVerified: true, hasApiKey: false, hasUsedFreeTrial: false, createdAt: '' },
     } as unknown as ReturnType<typeof useGetMeQuery>);
+  });
+
+  it('renders "Your API Key" heading and omits legacy Username/Password sections (AC1)', () => {
+    vi.mocked(useGetApiKeyStatusQuery).mockReturnValue({
+      data: { hasApiKey: false, hint: null },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useGetApiKeyStatusQuery>);
+
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: /your api key/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /username/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /password/i })).not.toBeInTheDocument();
   });
 
   it('shows the save-key form (input + Save Key button) when no key is saved', () => {
@@ -135,37 +142,6 @@ describe('ProfilePage — API Key section (AC3)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// AC7 — Username section dispatches refetch after profile update
-// ---------------------------------------------------------------------------
-
-describe('ProfilePage — Username section (AC7)', () => {
-  beforeEach(() => {
-    mockShowError.mockReset();
-    mockShowSuccess.mockReset();
-    mockCaptureException.mockReset();
-    mockSaveApiKey.mockReset();
-    mockDeleteApiKey.mockReset();
-    mockUpdateProfile.mockReset();
-    mockChangePassword.mockReset();
-  });
-
-  it('renders username field with current username', () => {
-    vi.mocked(useGetMeQuery).mockReturnValue({
-      data: { id: 'u1', email: 'a@b.com', username: 'alice', emailVerified: true, hasApiKey: false, hasUsedFreeTrial: false, createdAt: '' },
-    } as unknown as ReturnType<typeof useGetMeQuery>);
-    vi.mocked(useGetApiKeyStatusQuery).mockReturnValue({
-      data: { hasApiKey: false, hint: null },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useGetApiKeyStatusQuery>);
-
-    renderPage();
-
-    const usernameInput = screen.getByLabelText(/username/i);
-    expect(usernameInput).toHaveValue('alice');
-  });
-});
-
 describe('ProfilePage — telemetry catches (FE-006)', () => {
   beforeEach(() => {
     mockShowError.mockReset();
@@ -173,8 +149,6 @@ describe('ProfilePage — telemetry catches (FE-006)', () => {
     mockCaptureException.mockReset();
     mockSaveApiKey.mockReset();
     mockDeleteApiKey.mockReset();
-    mockUpdateProfile.mockReset();
-    mockChangePassword.mockReset();
 
     vi.mocked(useGetMeQuery).mockReturnValue({
       data: { id: 'u1', email: 'a@b.com', username: 'alice', emailVerified: true, hasApiKey: false, hasUsedFreeTrial: false, createdAt: '' },
@@ -183,45 +157,6 @@ describe('ProfilePage — telemetry catches (FE-006)', () => {
       data: { hasApiKey: false, hint: null },
       isLoading: false,
     } as unknown as ReturnType<typeof useGetApiKeyStatusQuery>);
-  });
-
-  it('captures username update errors with updateProfileUsername metadata', async () => {
-    const user = userEvent.setup();
-    mockUpdateProfile.mockReturnValue({
-      unwrap: vi.fn().mockRejectedValue(new Error('profile failed')),
-    });
-
-    renderPage();
-    await user.clear(screen.getByLabelText(/username/i));
-    await user.type(screen.getByLabelText(/username/i), 'alice-2');
-    await user.click(screen.getByRole('button', { name: /^save$/i }));
-
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ operation: 'updateProfileUsername', userId: 'u1' }),
-      }),
-    );
-  });
-
-  it('captures change password errors with changePassword metadata', async () => {
-    const user = userEvent.setup();
-    mockChangePassword.mockReturnValue({
-      unwrap: vi.fn().mockRejectedValue(new Error('password failed')),
-    });
-
-    renderPage();
-    await user.type(screen.getByLabelText(/current password/i), 'old-password');
-    await user.type(screen.getByLabelText(/^new password$/i), 'new-password-1');
-    await user.type(screen.getByLabelText(/confirm new password/i), 'new-password-1');
-    await user.click(screen.getByRole('button', { name: /change password/i }));
-
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({ operation: 'changePassword' }),
-      }),
-    );
   });
 
   it('captures save API key errors with saveApiKey metadata', async () => {

@@ -13,16 +13,10 @@ vi.mock('../../utils/encryption.utils.js', () => ({
   encrypt: vi.fn((plaintext: string) => `encrypted-${plaintext}`),
 }));
 
-vi.mock('../../utils/password.utils.js', () => ({
-  hashPassword: vi.fn(),
-  comparePassword: vi.fn(),
-}));
-
 import { prisma } from '../../config/database.js';
 import { encrypt } from '../../utils/encryption.utils.js';
-import { hashPassword, comparePassword } from '../../utils/password.utils.js';
 import * as userService from '../user.service.js';
-import { NotFoundError, UnauthorizedError } from '../../utils/errors.js';
+import { NotFoundError } from '../../utils/errors.js';
 
 const USER_ID = 'user-uuid-111';
 
@@ -115,70 +109,3 @@ describe('deleteApiKey', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// updateProfile
-// ---------------------------------------------------------------------------
-
-describe('updateProfile', () => {
-  it('updates the username and returns the user response', async () => {
-    vi.mocked(prisma.user.update).mockResolvedValue({
-      ...mockUser,
-      username: 'newname',
-    } as never);
-
-    const result = await userService.updateProfile(USER_ID, { username: 'newname' });
-
-    expect(result.username).toBe('newname');
-    expect(result.id).toBe(USER_ID);
-    expect(result.hasApiKey).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// changePassword
-// ---------------------------------------------------------------------------
-
-describe('changePassword', () => {
-  it('returns success message when current password is correct', async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      passwordHash: 'hashed_old',
-    } as never);
-    vi.mocked(comparePassword).mockResolvedValue(true);
-    vi.mocked(hashPassword).mockResolvedValue('hashed_new');
-    vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
-
-    const result = await userService.changePassword(USER_ID, {
-      currentPassword: 'old-password',
-      newPassword: 'new-password-123',
-    });
-
-    expect(result.message).toBe('Password changed successfully.');
-    expect(comparePassword).toHaveBeenCalledWith('old-password', 'hashed_old');
-    expect(hashPassword).toHaveBeenCalledWith('new-password-123');
-  });
-
-  it('throws UnauthorizedError when current password is wrong', async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      passwordHash: 'hashed_old',
-    } as never);
-    vi.mocked(comparePassword).mockResolvedValue(false);
-
-    await expect(
-      userService.changePassword(USER_ID, {
-        currentPassword: 'wrong-password',
-        newPassword: 'new-password-123',
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-  });
-
-  it('throws NotFoundError when user does not exist', async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
-
-    await expect(
-      userService.changePassword(USER_ID, {
-        currentPassword: 'old',
-        newPassword: 'new-pass-123',
-      }),
-    ).rejects.toBeInstanceOf(NotFoundError);
-  });
-});
