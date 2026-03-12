@@ -15,8 +15,24 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ) => {
-  // 4xx — expected business errors. Do not report to Sentry.
+  const requestId = req.requestId;
+  const userId = req.user?.userId;
+  const requestContext = {
+    requestId,
+    userId,
+    method: req.method,
+    path: req.path,
+  };
+
+  // 4xx — expected business errors.
   if (err instanceof AppError) {
+    logger.warn({ err, ...requestContext }, 'Handled application error');
+    Sentry.captureException(err, {
+      extra: {
+        ...requestContext,
+        operation: 'error.middleware.appError',
+      },
+    });
     res.status(err.statusCode).json({
       error: {
         code: err.code,
@@ -27,8 +43,15 @@ export const errorHandler = (
     return;
   }
 
-  // 400 — validation errors. Do not report to Sentry.
+  // 400 — validation errors.
   if (err instanceof ZodError) {
+    logger.warn({ err, ...requestContext }, 'Handled validation error');
+    Sentry.captureException(err, {
+      extra: {
+        ...requestContext,
+        operation: 'error.middleware.validationError',
+      },
+    });
     res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
@@ -42,8 +65,16 @@ export const errorHandler = (
     return;
   }
 
-  // Known Prisma errors that map to 4xx — do not report to Sentry.
+  // Known Prisma errors that map to 4xx.
   if (err instanceof PrismaClientKnownRequestError) {
+    logger.warn({ err, ...requestContext }, 'Handled Prisma request error');
+    Sentry.captureException(err, {
+      extra: {
+        ...requestContext,
+        operation: 'error.middleware.prismaKnownError',
+        prismaCode: err.code,
+      },
+    });
     if (err.code === 'P2002') {
       res.status(409).json({
         error: {
@@ -74,17 +105,12 @@ export const errorHandler = (
   }
 
   // 5xx — unexpected error. Log and report to Sentry with request context.
-  const requestId = req.requestId;
-  const userId = req.user?.userId;
-
-  logger.error({ err, requestId, userId }, 'Unhandled error');
+  logger.error({ err, ...requestContext }, 'Unhandled error');
 
   Sentry.captureException(err, {
     extra: {
-      requestId,
-      userId,
-      method: req.method,
-      path: req.path,
+      ...requestContext,
+      operation: 'error.middleware.unhandled',
     },
   });
 

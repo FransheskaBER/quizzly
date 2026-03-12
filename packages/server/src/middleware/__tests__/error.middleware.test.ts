@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import { errorHandler } from '../error.middleware.js';
+import { Sentry } from '../../config/sentry.js';
 import { EmailDeliveryError, ValidationError } from '../../utils/errors.js';
 
-vi.mock('pino', () => ({ default: () => ({ error: vi.fn() }) }));
+vi.mock('pino', () => ({ default: () => ({ error: vi.fn(), warn: vi.fn() }) }));
 vi.mock('../../config/sentry.js', () => ({
   Sentry: { captureException: vi.fn() },
 }));
@@ -38,6 +39,12 @@ describe('errorHandler', () => {
         details: undefined,
       },
     });
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'error.middleware.appError' }),
+      }),
+    );
   });
 
   it('returns 400 for ValidationError (existing behavior preserved)', () => {
@@ -54,5 +61,11 @@ describe('errorHandler', () => {
         details: undefined,
       },
     });
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'error.middleware.appError' }),
+      }),
+    );
   });
 });

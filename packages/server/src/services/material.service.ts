@@ -7,6 +7,7 @@ import { Readability } from '@mozilla/readability';
 import pino from 'pino';
 
 import { prisma } from '../config/database.js';
+import { Sentry } from '../config/sentry.js';
 import { assertOwnership } from '../utils/ownership.js';
 import { sanitizeString } from '../utils/sanitize.utils.js';
 import { estimateTokenCount } from '../utils/tokenCount.utils.js';
@@ -75,6 +76,28 @@ const toMaterialResponse = (m: {
   errorMessage: m.errorMessage,
   createdAt: m.createdAt.toISOString(),
 });
+
+const setMaterialFailed = async (
+  materialId: string,
+  errorMessage: string,
+  originalError: unknown,
+  operation: string,
+): Promise<void> => {
+  try {
+    await prisma.material.update({
+      where: { id: materialId },
+      data: { status: MaterialStatus.FAILED, errorMessage },
+    });
+  } catch (updateErr) {
+    logger.error(
+      { err: updateErr, originalError, materialId, operation },
+      'Failed to persist material failure status',
+    );
+    Sentry.captureException(updateErr, {
+      extra: { materialId, operation, stage: 'persist-material-failure', originalError },
+    });
+  }
+};
 
 // ---------------------------------------------------------------------------
 // PDF extraction setup (pdfjs-dist legacy build — handles Google Docs CMaps)
@@ -159,9 +182,11 @@ const fetchAndExtractUrl = async (url: string): Promise<string> => {
     } catch (err) {
       if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TypeError')) {
         logger.warn({ err, url }, 'URL fetch failed — network error or timeout');
+        Sentry.captureException(err, { extra: { url, operation: 'material.fetchAndExtractUrl.fetch' } });
         throw new BadRequestError('Could not reach this URL. Check that it is publicly accessible.');
       }
       logger.error({ err, url }, 'Unexpected error fetching URL');
+      Sentry.captureException(err, { extra: { url, operation: 'material.fetchAndExtractUrl.fetch' } });
       throw err;
     }
 
@@ -271,10 +296,10 @@ export const processMaterial = async (
     buffer = await getObjectBuffer(material.s3Key);
   } catch (err) {
     logger.error({ err, materialId, s3Key: material.s3Key }, 'Failed to download material from S3');
-    await prisma.material.update({
-      where: { id: materialId },
-      data: { status: MaterialStatus.FAILED, errorMessage: 'Failed to download file from storage' },
+    Sentry.captureException(err, {
+      extra: { materialId, s3Key: material.s3Key, fileType: material.fileType, operation: 'material.processMaterial.download' },
     });
+    await setMaterialFailed(materialId, 'Failed to download file from storage', err, 'material.processMaterial.download');
     throw new BadRequestError('Failed to download file from storage');
   }
 
@@ -291,10 +316,10 @@ export const processMaterial = async (
   } catch (err) {
     const message = err instanceof BadRequestError ? err.message : 'Failed to extract text from file';
     logger.warn({ err, materialId }, 'Text extraction failed');
-    await prisma.material.update({
-      where: { id: materialId },
-      data: { status: MaterialStatus.FAILED, errorMessage: message },
+    Sentry.captureException(err, {
+      extra: { materialId, s3Key: material.s3Key, fileType: material.fileType, operation: 'material.processMaterial.extract' },
     });
+    await setMaterialFailed(materialId, message, err, 'material.processMaterial.extract');
     throw new BadRequestError(message);
   }
 

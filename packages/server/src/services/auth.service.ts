@@ -17,7 +17,6 @@ import type {
 } from '@skills-trainer/shared';
 
 import { prisma } from '../config/database.js';
-import { Sentry } from '../config/sentry.js';
 import { hashPassword, comparePassword } from '../utils/password.utils.js';
 import {
   generateAccessToken,
@@ -149,7 +148,6 @@ export const resendVerification = async (
     await sendVerificationEmail(user.email, verificationToken);
   } catch (err) {
     logger.error({ err, email: user.email }, 'Verification email failed');
-    Sentry.captureException(err, { extra: { email: user.email } });
     return genericResponse;
   }
 
@@ -184,7 +182,6 @@ export const forgotPassword = async (data: ForgotPasswordRequest): Promise<Messa
     await sendPasswordResetEmail(user.email, token);
   } catch (err) {
     logger.error({ err, email: user.email }, 'Password reset email failed');
-    Sentry.captureException(err, { extra: { email: user.email } });
     return genericResponse;
   }
 

@@ -91,6 +91,7 @@ const resolveUserApiKey = async (userId: string): Promise<string | undefined> =>
     return decrypt(user.encryptedApiKey);
   } catch (err) {
     logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+    Sentry.captureException(err, { extra: { userId, operation: 'quiz.resolveUserApiKey.decrypt' } });
     throw new BadRequestError(
       'Could not read your saved API key. Please re-save it in your profile.',
     );
@@ -148,6 +149,7 @@ export const prepareGeneration = async (
       userApiKey = decrypt(user.encryptedApiKey!);
     } catch (err) {
       logger.warn({ err, userId }, 'Failed to decrypt stored API key');
+      Sentry.captureException(err, { extra: { userId, operation: 'quiz.prepareGeneration.decrypt' } });
       throw new BadRequestError(
         'Could not read your saved API key. Please re-save it in your profile.',
       );
