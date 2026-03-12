@@ -39,9 +39,10 @@ const LoginPage = () => {
       const status = extractHttpStatus(err);
       if (code === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(data.email);
+      } else {
+        const userMessage = getUserMessage(code, 'login', status);
+        showError(userMessage.title, userMessage.description);
       }
-      const userMessage = getUserMessage(code, 'login', status);
-      showError(userMessage.title, userMessage.description);
     }
   };
 
