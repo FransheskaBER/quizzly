@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
+import { Sentry } from '@/config/sentry';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import styles from './SignupPage.module.css';
@@ -29,6 +30,14 @@ const SignupPage = () => {
       showSuccess("You're in!", 'Check your inbox - we sent you a verification link.');
       setSubmittedEmail(data.email);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Signup failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'signup',
+          email: data.email,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'signup', status);

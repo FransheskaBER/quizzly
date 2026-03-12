@@ -37,6 +37,16 @@ const LoginPage = () => {
     } catch (err) {
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
+      // eslint-disable-next-line no-console
+      console.error('Login failed:', err);
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'login',
+          email: data.email,
+          code,
+          status: status ?? null,
+        },
+      });
       if (code === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(data.email);
       } else {
@@ -55,7 +65,12 @@ const LoginPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Failed to resend verification email:', err);
-      Sentry.captureException(err, { extra: { email: unverifiedEmail } });
+      Sentry.captureException(err, {
+        extra: {
+          operation: 'resendVerification',
+          email: unverifiedEmail,
+        },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'resend-verification', status);

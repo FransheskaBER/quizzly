@@ -4,6 +4,7 @@ import { SessionForm } from '@/components/session/SessionForm';
 import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
+import { Sentry } from '@/config/sentry';
 import type { CreateSessionRequest } from '@skills-trainer/shared';
 import styles from './CreateSessionPage.module.css';
 
@@ -18,6 +19,9 @@ const CreateSessionPage = () => {
       showSuccess('Created your session', `"${result.name}" is ready to go.`);
       navigate(`/sessions/${result.id}`);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Create session failed:', err);
+      Sentry.captureException(err, { extra: { operation: 'createSession' } });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'create-session', status);
