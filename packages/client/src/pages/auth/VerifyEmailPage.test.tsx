@@ -5,7 +5,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 const { mockVerifyEmail, mockCaptureException, mockParseApiError } = vi.hoisted(() => ({
   mockVerifyEmail: vi.fn(),
   mockCaptureException: vi.fn(),
-  mockParseApiError: vi.fn((_err?: unknown) => ({ code: 'CONFLICT', message: 'Conflict' })),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mock accepts error arg for type compatibility
+  mockParseApiError: vi.fn((err?: unknown) => ({ code: 'CONFLICT', message: 'Conflict' })),
 }));
 
 vi.mock('@/api/auth.api', () => ({

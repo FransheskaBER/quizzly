@@ -20,7 +20,7 @@ const {
   mockCaptureException,
 } = vi.hoisted(() => ({
   mockDispatch: vi.fn(),
-  mockUseAppSelector: vi.fn(() => []),
+  mockUseAppSelector: vi.fn((): QuizSubmitFailure[] => []),
   mockShowError: vi.fn(),
   mockShowSuccess: vi.fn(),
   mockSubmitQuiz: vi.fn(),
@@ -128,7 +128,7 @@ describe('SessionDashboardPage — Generate Quiz section (AC4)', () => {
     mockUpdateSession.mockReset();
     mockDeleteSession.mockReset();
     mockCaptureException.mockReset();
-    mockUseAppSelector.mockReturnValue([] as any);
+    mockUseAppSelector.mockReturnValue([]);
     localStorage.clear();
 
     vi.mocked(useGetSessionQuery).mockReturnValue({
@@ -224,7 +224,7 @@ describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
     mockUpdateSession.mockReset();
     mockDeleteSession.mockReset();
     mockCaptureException.mockReset();
-    mockUseAppSelector.mockReturnValue([] as any);
+    mockUseAppSelector.mockReturnValue([]);
     localStorage.clear();
 
     const nowIso = new Date().toISOString();
@@ -271,7 +271,7 @@ describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
         message: 'Failed',
         createdAt: new Date().toISOString(),
       },
-    ] as any);
+    ] as QuizSubmitFailure[]);
     mockSubmitQuiz.mockReturnValue({
       unwrap: vi.fn().mockRejectedValue(new Error('retry failed')),
     });
