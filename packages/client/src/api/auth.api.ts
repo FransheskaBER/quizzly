@@ -27,6 +27,13 @@ const shouldCaptureHydration401 = (): boolean => {
   return true;
 };
 
+function toSentryError(err: unknown, fallbackMessage: string): Error {
+  if (err instanceof Error) return err;
+  const inner = (err as { error?: unknown })?.error;
+  if (inner instanceof Error) return inner;
+  return new Error(fallbackMessage);
+}
+
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     signup: builder.mutation<MessageResponse, SignupRequest>({
@@ -76,7 +83,7 @@ export const authApi = api.injectEndpoints({
             if (shouldCaptureHydration401()) {
               // eslint-disable-next-line no-console
               console.error('getMe hydration unauthorized:', err);
-              Sentry.captureException(err, {
+              Sentry.captureException(toSentryError(err, 'getMe hydration unauthorized (401)'), {
                 extra: {
                   operation: 'getMeHydration',
                   route: '/auth/me',
@@ -91,14 +98,17 @@ export const authApi = api.injectEndpoints({
 
           // eslint-disable-next-line no-console
           console.error('getMe hydration failed:', err);
-          Sentry.captureException(err, {
-            extra: {
-              operation: 'getMeHydration',
-              route: '/auth/me',
-              reason: 'non-401',
-              status: status ?? null,
+          Sentry.captureException(
+            toSentryError(err, `getMe hydration failed (status: ${status ?? 'unknown'})`),
+            {
+              extra: {
+                operation: 'getMeHydration',
+                route: '/auth/me',
+                reason: 'non-401',
+                status: status ?? null,
+              },
             },
-          });
+          );
         }
       },
     }),
