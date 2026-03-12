@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useVerifyEmailMutation } from '@/api/auth.api';
 import { parseApiError } from '@/hooks/useApiError';
-import { useToast } from '@/hooks/useToast';
-import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import styles from './VerifyEmailPage.module.css';
 
@@ -12,7 +10,6 @@ type VerifyState = 'loading' | 'success' | 'already-verified' | 'error' | 'no-to
 const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const { showError } = useToast();
 
   // Use the mutation trigger directly — RTK Query guarantees a stable reference,
   // so it can go in the useEffect dep array without causing repeated calls.
@@ -34,12 +31,9 @@ const VerifyEmailPage = () => {
       } catch (err) {
         if (!cancelled) {
           const { code } = parseApiError(err);
-          const status = extractHttpStatus(err);
           if (code === 'CONFLICT') {
             setState('already-verified');
           } else {
-            const userMessage = getUserMessage(code, 'verify-email', status);
-            showError(userMessage.title, userMessage.description);
             setState('error');
           }
         }
@@ -51,7 +45,7 @@ const VerifyEmailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, showError, verifyEmail]);
+  }, [token, verifyEmail]);
 
   if (state === 'loading') {
     return (

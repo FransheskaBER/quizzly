@@ -183,7 +183,7 @@ export const getUserMessage = (
     if (codeMessages?._default) return codeMessages._default;
   }
 
-  if (httpStatus === null || errorCode === null) return NETWORK_ERROR;
+  if (httpStatus === null) return NETWORK_ERROR;
 
   if (httpStatus >= 500) {
     return TRANSIENT_STATUS_CODES.has(httpStatus) ? SERVER_ERROR_TRANSIENT : SERVER_ERROR_PERSISTENT;

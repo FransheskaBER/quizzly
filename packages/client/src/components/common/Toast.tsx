@@ -29,6 +29,8 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
   const [isPaused, setIsPaused] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const dismissTimeoutRef = useRef<number | null>(null);
+  const remainingMsRef = useRef(0);
+  const startedAtMsRef = useRef(0);
 
   const durationMs = TOAST_DURATIONS[variant];
 
@@ -43,17 +45,31 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
 
   const requestDismiss = (): void => {
     if (isExiting) return;
+    if (dismissTimeoutRef.current !== null) {
+      window.clearTimeout(dismissTimeoutRef.current);
+      dismissTimeoutRef.current = null;
+    }
     setIsExiting(true);
   };
 
-  useEffect(() => {
+  const scheduleDismiss = (delayMs: number): void => {
+    if (dismissTimeoutRef.current !== null) {
+      window.clearTimeout(dismissTimeoutRef.current);
+    }
+    startedAtMsRef.current = Date.now();
     dismissTimeoutRef.current = window.setTimeout(() => {
       requestDismiss();
-    }, durationMs);
+    }, delayMs);
+  };
+
+  useEffect(() => {
+    remainingMsRef.current = durationMs;
+    scheduleDismiss(durationMs);
 
     return () => {
       if (dismissTimeoutRef.current !== null) {
         window.clearTimeout(dismissTimeoutRef.current);
+        dismissTimeoutRef.current = null;
       }
     };
   }, [durationMs]);
@@ -68,10 +84,19 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
   }, [id, isExiting, onDismiss]);
 
   const handleMouseEnter = (): void => {
+    if (dismissTimeoutRef.current !== null) {
+      window.clearTimeout(dismissTimeoutRef.current);
+      dismissTimeoutRef.current = null;
+      const elapsedMs = Date.now() - startedAtMsRef.current;
+      remainingMsRef.current = Math.max(remainingMsRef.current - elapsedMs, 0);
+    }
     setIsPaused(true);
   };
 
   const handleMouseLeave = (): void => {
+    if (!isExiting && remainingMsRef.current > 0) {
+      scheduleDismiss(remainingMsRef.current);
+    }
     setIsPaused(false);
   };
 

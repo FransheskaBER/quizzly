@@ -131,8 +131,11 @@ const QuizTakingPage = () => {
     // Submit starts a grading SSE stream on the server. Do not await here:
     // we want to return users to the session page immediately.
     const submitPromise = submitQuiz({ id, answers: finalAnswers }).unwrap();
-    showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
-    void submitPromise.catch((err: unknown) => {
+    void submitPromise
+      .then(() => {
+        showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
+      })
+      .catch((err: unknown) => {
       // Keep this as a non-blocking best-effort submission. If it fails, the
       // session poll will keep the user informed via attempt status.
       const fbqErr = err as FetchBaseQueryError;
@@ -145,7 +148,9 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus >= 200 &&
         fbqErr.originalStatus < 300;
 
-      if (!isStreamStarted) {
+      if (isStreamStarted) {
+        showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
+      } else {
         const { code } = parseApiError(err);
         const status = extractHttpStatus(err);
         const userMessage = getUserMessage(code, 'submit-quiz', status);
@@ -160,7 +165,7 @@ const QuizTakingPage = () => {
         );
         dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
       }
-    });
+      });
 
     // Force session and quiz cache refresh so session list and results page see correct status.
     dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }, { type: 'Quiz', id }]));

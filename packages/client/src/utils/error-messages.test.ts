@@ -29,12 +29,16 @@ describe('getUserMessage', () => {
     expect(message.description).toContain('few hours');
   });
 
-  it('returns network message when code or status is missing', () => {
+  it('returns network message when status is missing', () => {
     const noStatusMessage = getUserMessage('UNKNOWN_CODE', 'create-session', null);
-    const noCodeMessage = getUserMessage(null, 'create-session', 400);
 
     expect(noStatusMessage.title).toBe("Couldn't reach the server");
-    expect(noCodeMessage.title).toBe("Couldn't reach the server");
+  });
+
+  it('returns unknown fallback when code is missing but status is present', () => {
+    const noCodeMessage = getUserMessage(null, 'create-session', 400);
+
+    expect(noCodeMessage.title).toBe("Couldn't do that");
   });
 
   it('returns unknown fallback for unmatched 4xx codes', () => {
