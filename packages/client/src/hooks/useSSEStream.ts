@@ -36,6 +36,7 @@ const isBackendError = (data: unknown): data is BackendErrorShape =>
   typeof (data as BackendErrorShape).error?.message === 'string';
 
 type StreamStatus = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error';
+const SSE_EVENT_CHUNK_PREVIEW_MAX_CHARS = 120;
 
 /**
  * Generic SSE hook backed by fetch + ReadableStream.
@@ -159,7 +160,8 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
                 const context = {
                   operation: 'parseSseEvent',
                   url,
-                  eventChunk: part,
+                  eventChunkLength: part.length,
+                  eventChunkPreview: part.slice(0, SSE_EVENT_CHUNK_PREVIEW_MAX_CHARS),
                 };
                 // eslint-disable-next-line no-console
                 console.error('Failed to parse SSE event payload', err, context);

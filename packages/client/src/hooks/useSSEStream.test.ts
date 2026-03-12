@@ -54,10 +54,15 @@ describe('useSSEStream telemetry catches (FE-002, FE-004)', () => {
           extra: expect.objectContaining({
             operation: 'parseSseEvent',
             url: '/api/stream',
+            eventChunkLength: 'data: {"broken"'.length,
+            eventChunkPreview: 'data: {"broken"',
           }),
         }),
       );
     });
+
+    const [, sentryContext] = mockCaptureException.mock.calls[0];
+    expect((sentryContext as { extra: Record<string, unknown> }).extra.eventChunk).toBeUndefined();
   });
 
   it('captures stream transport failures and reports error status', async () => {
