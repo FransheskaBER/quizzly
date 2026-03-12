@@ -95,7 +95,7 @@ const LandingPage = () => {
       <header className={styles.navbar}>
         <span className={styles.logo}>Quizzly</span>
         <Link to="/login" className={styles.navCta}>
-          Start Practicing Now
+          Generate Your First Quiz
         </Link>
       </header>
 
@@ -104,19 +104,16 @@ const LandingPage = () => {
         <div className={styles.heroInner}>
           <p className={styles.eyebrow}>AI-native engineering</p>
           <h1 className={styles.headline}>
-            Stop memorising.
-            <br />
-            Start thinking like a senior engineer.
+            From writing code to leading it.
           </h1>
           <p className={styles.subheadline}>
-            LeetCode trains you to write code. Quizzly trains you to evaluate it
-            — spot bugs, critique AI output, reason about architecture.
+            Quizzly helps you build the skills that matter now: reviewing AI-generated code, spotting bugs, analysing trade-offs, thinking architecturally, and working effectively with AI.
           </p>
           <Link to="/login" className={styles.heroCta}>
-            Start Practicing Now
+            Generate Your First Quiz
           </Link>
           <p className={styles.frictionReducer}>
-            No credit card required. Works with any subject.
+            No credit card required. Sign up to get started.
           </p>
         </div>
       </section>
@@ -188,7 +185,7 @@ const LandingPage = () => {
             minute.
           </p>
           <Link to="/login" className={styles.heroCta}>
-            Start Practicing Now
+            Generate Your First Quiz
           </Link>
           <p className={styles.frictionReducer}>No credit card required.</p>
         </div>
