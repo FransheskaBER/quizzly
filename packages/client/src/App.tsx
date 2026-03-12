@@ -6,8 +6,8 @@ import { RootErrorBoundary, RouteErrorBoundary } from '@/components/common/Error
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ToastContainer } from '@/components/common/ToastContainer';
-import { useAppSelector, useAppDispatch } from '@/store/store';
-import { selectIsAuthenticated, selectCurrentUser, logout } from '@/store/slices/auth.slice';
+import { useAppDispatch } from '@/store/store';
+import { logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
 
 const LandingPage = lazy(() => import('@/pages/landing/LandingPage'));

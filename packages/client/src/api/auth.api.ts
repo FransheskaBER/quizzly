@@ -74,7 +74,7 @@ export const authApi = api.injectEndpoints({
     // onQueryStarted hydrates the auth slice with the fetched user data.
     getMe: builder.query<UserResponse, void>({
       query: () => '/auth/me',
-      async onQueryStarted(_, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
           dispatch(

@@ -412,6 +412,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get(`/api/sessions/00000000-0000-0000-0000-000000000001/quizzes/generate?${VALID_QUERY}`)
@@ -585,6 +586,7 @@ describe('GET /api/quizzes/:id', () => {
 
   it('404 — quiz attempt does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/quizzes/00000000-0000-0000-0000-000000000001')
@@ -703,6 +705,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('404 — quiz attempt does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/quizzes/00000000-0000-0000-0000-000000000001/submit')
