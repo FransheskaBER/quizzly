@@ -15,7 +15,7 @@ vi.mock('../../config/database.js', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
     question: {
       create: vi.fn(),
@@ -425,7 +425,7 @@ describe('executeGeneration', () => {
     vi.mocked(prisma.question.create).mockResolvedValue(mockDbQuestion as never);
     vi.mocked(prisma.answer.create).mockResolvedValue({ id: 'answer-uuid-ddd' } as never);
     vi.mocked(prisma.quizAttempt.update).mockResolvedValue(mockQuizAttemptRecord as never);
-    vi.mocked(prisma.quizAttempt.delete).mockResolvedValue(mockQuizAttemptRecord as never);
+    vi.mocked(prisma.quizAttempt.deleteMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.user.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([]);
     vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
@@ -584,8 +584,8 @@ describe('executeGeneration', () => {
     expect(events.some((e) => e.type === 'complete')).toBe(false);
     expect(events.some((e) => e.type === 'error')).toBe(true);
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.quizAttempt.delete).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: ATTEMPT_ID } }),
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
     );
   });
 
@@ -602,9 +602,22 @@ describe('executeGeneration', () => {
     expect(events.some((e) => e.type === 'complete')).toBe(false);
     expect(events.some((e) => e.type === 'error')).toBe(true);
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.quizAttempt.delete).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: ATTEMPT_ID } }),
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
     );
+  });
+
+  it('does not delete attempt when SSE writer fails after generation commit', async () => {
+    const writer = vi.fn((event: SseEvent) => {
+      if (event.type === 'complete') throw new Error('sse write failed');
+    });
+
+    await executeGeneration(BASE_EXECUTION_PARAMS, writer);
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.quizAttempt.deleteMany).not.toHaveBeenCalled();
+    const events = writer.mock.calls.map(([e]) => e as SseEvent);
+    expect(events.some((e) => e.type === 'error')).toBe(true);
   });
 
   it('sends an SSE error event when the LLM call throws', async () => {
@@ -619,8 +632,8 @@ describe('executeGeneration', () => {
     expect(errorEvent).toBeDefined();
     expect((errorEvent as { type: string; message: string }).message).toContain('failed');
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.quizAttempt.delete).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: ATTEMPT_ID } }),
+    expect(prisma.quizAttempt.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ATTEMPT_ID, status: QuizStatus.GENERATING } }),
     );
   });
 
