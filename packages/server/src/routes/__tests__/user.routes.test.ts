@@ -215,10 +215,12 @@ describe('PUT /api/users/password', () => {
     const { user, password: oldPassword } = await createTestUser({ email: 'pwchange@example.com' });
     const newPassword = 'BrandNewSecure789!';
 
-    await request(app)
+    const changePasswordRes = await request(app)
       .put('/api/users/password')
       .set('Authorization', `Bearer ${getAuthToken(user)}`)
       .send({ currentPassword: oldPassword, newPassword });
+    expect(changePasswordRes.status).toBe(200);
+    expect(changePasswordRes.body?.message).toContain('Password changed');
 
     // New password succeeds
     const loginNew = await request(app)
