@@ -310,9 +310,8 @@ const SessionDashboardPage = () => {
             {meData?.hasUsedFreeTrial && !meData?.hasApiKey ? (
               <p>
                 To generate more quizzes, add your Anthropic key.{' '}
-                <br>
+                <br />
                 <Button to="/profile" variant="primary" size="sm">Add API Key</Button>
-                </br>
               </p>
             ) : generationStatus === 'idle' ? (
               <QuizPreferences
