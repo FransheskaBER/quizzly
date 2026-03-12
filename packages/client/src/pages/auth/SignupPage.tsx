@@ -6,37 +6,33 @@ import { signupSchema } from '@skills-trainer/shared';
 import type { SignupRequest } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import styles from './SignupPage.module.css';
 
 const SignupPage = () => {
   const { signup } = useAuth();
+  const { showError, showSuccess } = useToast();
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    setError,
     formState: { errors, isSubmitting },
   } = useForm<SignupRequest>({ resolver: zodResolver(signupSchema) });
 
   const onSubmit = async (data: SignupRequest) => {
-    setFormError(null);
     try {
       await signup(data);
+      showSuccess("You're in!", 'Check your inbox - we sent you a verification link.');
       setSubmittedEmail(data.email);
     } catch (err) {
-      const { code, message } = parseApiError(err);
-      if (code === 'CONFLICT') {
-        setError('email', { message: 'Email already registered' });
-      } else if (code === 'RATE_LIMITED') {
-        setFormError('Too many attempts. Please try again later.');
-      } else {
-        setFormError(message);
-      }
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'signup', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -71,8 +67,6 @@ const SignupPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-          <FormError message={formError} />
-
           <FormField
             id="email"
             label="Email"

@@ -1,0 +1,14 @@
+.container {
+  position: fixed;
+  top: var(--toast-viewport-offset);
+  right: var(--toast-viewport-offset);
+  display: flex;
+  flex-direction: column;
+  gap: var(--toast-gap);
+  z-index: var(--toast-z-index);
+  pointer-events: none;
+}
+
+.container > * {
+  pointer-events: auto;
+}

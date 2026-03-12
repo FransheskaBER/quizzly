@@ -6,6 +6,8 @@ import { QuizStatus } from '@skills-trainer/shared';
 
 import { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } from '@/api/quizzes.api';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Button } from '@/components/common/Button';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -25,6 +27,7 @@ const AUTOSAVE_DELAY_MS = 1000;
 const QuizTakingPage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showError, showSuccess } = useToast();
   const dispatch = useAppDispatch();
 
   const { data: quiz, isLoading, error: fetchError } = useGetQuizQuery(id, { skip: !id });
@@ -37,8 +40,6 @@ const QuizTakingPage = () => {
   // Tracks answers the user has typed but not yet confirmed saved by the server.
   // NOT a copy of API data — this only holds what the user typed this session.
   const [dirtyAnswers, setDirtyAnswers] = useState<Record<string, string>>({});
-
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Refs for stable access from callbacks and cleanup — avoid stale closures
   const dirtyRef = useRef<Record<string, string>>({});
@@ -70,20 +71,23 @@ const QuizTakingPage = () => {
         dirtyRef.current = remaining;
         if (isMountedRef.current) {
           setDirtyAnswers(remaining);
-          setSaveError(null);
         }
       })
       .catch((err: unknown) => {
-        if (isMountedRef.current) setSaveError(parseApiError(err).message);
+        const { code } = parseApiError(err);
+        const status = extractHttpStatus(err);
+        const userMessage = getUserMessage(code, 'save-answer', status);
+        if (isMountedRef.current) {
+          showError(userMessage.title, userMessage.description);
+        }
       });
-  }, []);
+  }, [showError]);
 
   const handleAnswerChange = useCallback(
     (questionId: string, answer: string) => {
       const updated = { ...dirtyRef.current, [questionId]: answer };
       dirtyRef.current = updated;
       setDirtyAnswers(updated);
-      setSaveError(null);
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => void doSave(), AUTOSAVE_DELAY_MS);
@@ -127,7 +131,11 @@ const QuizTakingPage = () => {
     // Submit starts a grading SSE stream on the server. Do not await here:
     // we want to return users to the session page immediately.
     const submitPromise = submitQuiz({ id, answers: finalAnswers }).unwrap();
-    void submitPromise.catch((err: unknown) => {
+    void submitPromise
+      .then(() => {
+        showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
+      })
+      .catch((err: unknown) => {
       // Keep this as a non-blocking best-effort submission. If it fails, the
       // session poll will keep the user informed via attempt status.
       const fbqErr = err as FetchBaseQueryError;
@@ -140,18 +148,24 @@ const QuizTakingPage = () => {
         fbqErr.originalStatus >= 200 &&
         fbqErr.originalStatus < 300;
 
-      if (!isStreamStarted) {
+      if (isStreamStarted) {
+        showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
+      } else {
+        const { code } = parseApiError(err);
+        const status = extractHttpStatus(err);
+        const userMessage = getUserMessage(code, 'submit-quiz', status);
+        showError(userMessage.title, userMessage.description);
         dispatch(
           submitFailureReported({
-          quizAttemptId: id,
-          sessionId: quiz.sessionId,
-          message: parseApiError(err).message,
-          createdAt: new Date().toISOString(),
+            quizAttemptId: id,
+            sessionId: quiz.sessionId,
+            message: userMessage.description,
+            createdAt: new Date().toISOString(),
           }),
         );
         dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }]));
       }
-    });
+      });
 
     // Force session and quiz cache refresh so session list and results page see correct status.
     dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }, { type: 'Quiz', id }]));
@@ -217,8 +231,6 @@ const QuizTakingPage = () => {
         />
 
         <div className={styles.submitArea}>
-          {saveError && <p className={styles.saveError}>{saveError}</p>}
-
           <Button
             type="button"
             variant="primary"

@@ -3,7 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { createSessionSchema } from '@skills-trainer/shared';
 import type { CreateSessionRequest } from '@skills-trainer/shared';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import styles from './SessionForm.module.css';
 
@@ -13,7 +12,6 @@ interface SessionFormProps {
   onSubmit: (data: CreateSessionRequest) => void | Promise<void>;
   onCancel?: () => void;
   isLoading: boolean;
-  error?: string;
 }
 
 export const SessionForm = ({
@@ -22,7 +20,6 @@ export const SessionForm = ({
   onSubmit,
   onCancel,
   isLoading,
-  error,
 }: SessionFormProps) => {
   const {
     register,
@@ -35,8 +32,6 @@ export const SessionForm = ({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className={styles.form}>
-      <FormError message={error ?? null} />
-
       <FormField
         label="Session name"
         type="text"
