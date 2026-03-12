@@ -211,6 +211,29 @@ describe('PUT /api/users/password', () => {
     expect(res.body.message).toContain('Password changed');
   });
 
+  it('new password works for login, old password does not (AC8)', async () => {
+    const { user, password: oldPassword } = await createTestUser({ email: 'pwchange@example.com' });
+    const newPassword = 'BrandNewSecure789!';
+
+    await request(app)
+      .put('/api/users/password')
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .send({ currentPassword: oldPassword, newPassword });
+
+    // New password succeeds
+    const loginNew = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'pwchange@example.com', password: newPassword });
+    expect(loginNew.status).toBe(200);
+    expect(loginNew.body.token).toBeTypeOf('string');
+
+    // Old password fails
+    const loginOld = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'pwchange@example.com', password: oldPassword });
+    expect(loginOld.status).toBe(401);
+  });
+
   it('returns 401 for wrong current password', async () => {
     const { user } = await createTestUser();
 

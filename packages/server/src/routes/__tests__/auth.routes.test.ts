@@ -420,6 +420,34 @@ describe('GET /api/auth/me', () => {
     expect(res.body.createdAt).toBeTypeOf('string');
   });
 
+  it('200 — hasApiKey is false when no API key is saved', async () => {
+    const { user } = await createTestUser({ email: 'noapikey@example.com' });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.hasApiKey).toBe(false);
+  });
+
+  it('200 — hasApiKey is true after saving an API key', async () => {
+    const { user } = await createTestUser({ email: 'withkey@example.com' });
+
+    // Set the encrypted key directly in the DB (mirrors what POST /api/users/api-key does)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { encryptedApiKey: 'some-encrypted-value', apiKeyHint: 'sk-ant-...abcd' },
+    });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.hasApiKey).toBe(true);
+  });
+
   it('401 — no Authorization header', async () => {
     const res = await request(app).get('/api/auth/me');
 

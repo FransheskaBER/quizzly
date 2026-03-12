@@ -1,7 +1,7 @@
 # RFC: Secure API Key Storage for BYOK
 
 **Date**: 2026-03-11
-**Status**: Draft
+**Status**: Reviewed (2026-03-12 — see REVIEW.md)
 **Type**: Refactor
 **TDD Updates Required**: Yes
 
@@ -154,7 +154,7 @@ All require JWT auth. Operate on `req.user.id` — no ownership check needed.
 | `packages/client/src/hooks/useQuizGeneration.ts` | Remove API key header logic |
 | `packages/client/src/hooks/useSSEStream.ts` | Remove `extraHeaders` parameter |
 | `packages/client/src/pages/sessions/SessionDashboardPage.tsx` | Replace `ApiKeyInput` with link to profile |
-| `packages/client/src/components/quiz/QuizPreferences.tsx` | Derive `isByok` from `hasApiKey` |
+| `packages/client/src/components/quiz/QuizPreferences.tsx` | Derive `isByok` from `hasUsedFreeTrial && hasApiKey` — users who have a saved key but haven't yet consumed their free trial still see the free-trial UI |
 | `packages/client/src/pages/dashboard/HomeDashboardPage.tsx` | Add profile link to top bar |
 
 ### Files deleted
