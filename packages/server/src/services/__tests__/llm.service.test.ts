@@ -474,7 +474,7 @@ describe('BYOK — per-request client', () => {
   it('uses a per-request client (not the default) when apiKey is provided', async () => {
     mockByokStream.mockReturnValue(mockStream(VALID_GENERATION_RESPONSE));
 
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-test-key-123');
+    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-test-nonsecret-key-123');
 
     expect(mockByokStream).toHaveBeenCalled();
     // Default client should NOT be used
@@ -500,11 +500,11 @@ describe('BYOK — per-request client', () => {
     });
 
     await expect(
-      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-bad-key-456'),
+      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
     ).rejects.toThrow(BadRequestError);
 
     await expect(
-      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-bad-key-456'),
+      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
     ).rejects.toThrow('Invalid API key. Please check your key and try again.');
     expect(Sentry.captureException).toHaveBeenCalled();
   });

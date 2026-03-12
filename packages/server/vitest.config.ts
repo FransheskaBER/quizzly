@@ -1,5 +1,13 @@
 import { defineConfig } from 'vitest/config';
 
+const requireEnv = (key: string): string => {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required test environment variable: ${key}`);
+  }
+  return value;
+};
+
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
@@ -10,20 +18,12 @@ export default defineConfig({
     setupFiles: ['src/__tests__/setup.ts'],
     env: {
       NODE_ENV: 'test',
-      // Resolution order:
-      // 1. TEST_DATABASE_URL — explicit test DB override (local or CI)
-      // 2. DATABASE_URL      — CI sets this on the "Run tests" step
-      // 3. hardcoded local fallback
-      DATABASE_URL:
-        process.env.TEST_DATABASE_URL ??
-        process.env.DATABASE_URL ??
-        'postgresql://skills_dev:skills_dev@localhost:5432/skills_trainer_test',
-      JWT_SECRET: 'test-jwt-secret-must-be-at-least-32-characters-long!!',
+      DATABASE_URL: process.env.TEST_DATABASE_URL ?? requireEnv('DATABASE_URL'),
+      JWT_SECRET: requireEnv('JWT_SECRET'),
       JWT_EXPIRES_IN: '7d',
       CLIENT_URL: 'http://localhost:5173',
       PORT: '3001',
-      // Fixed 64-char hex key (32 bytes) — for encryption integration tests only.
-      API_KEY_ENCRYPTION_KEY: '0'.repeat(64),
+      API_KEY_ENCRYPTION_KEY: requireEnv('API_KEY_ENCRYPTION_KEY'),
     },
     coverage: {
       provider: 'v8',

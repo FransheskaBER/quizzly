@@ -78,13 +78,13 @@ describe('saveApiKey', () => {
   it('encrypts the key and stores it with a masked hint', async () => {
     vi.mocked(prisma.user.update).mockResolvedValue(mockUser as never);
 
-    const result = await userService.saveApiKey(USER_ID, 'sk-ant-api03-abcdef1234567890');
+    const result = await userService.saveApiKey(USER_ID, 'sk-ant-test-nonsecret-value-abcdef1234567890');
 
-    expect(encrypt).toHaveBeenCalledWith('sk-ant-api03-abcdef1234567890');
+    expect(encrypt).toHaveBeenCalledWith('sk-ant-test-nonsecret-value-abcdef1234567890');
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: USER_ID },
       data: {
-        encryptedApiKey: 'encrypted-sk-ant-api03-abcdef1234567890',
+        encryptedApiKey: 'encrypted-sk-ant-test-nonsecret-value-abcdef1234567890',
         apiKeyHint: 'sk-ant-...7890',
       },
     });

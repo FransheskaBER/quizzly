@@ -17,7 +17,7 @@ import { createTestUser, getAuthToken } from '../../__tests__/helpers/auth.helpe
 
 const app = createApp();
 
-const VALID_API_KEY = 'sk-ant-api03-valid-key-that-is-long-enough-for-validation-1234567890abcdef';
+const VALID_API_KEY = 'sk-ant-test-nonsecret-validation-value-1234567890';
 
 beforeAll(async () => {
   execSync('npx prisma migrate deploy', { stdio: 'inherit' });
