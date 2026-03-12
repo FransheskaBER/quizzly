@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SessionDetailResponse } from '@skills-trainer/shared';
+import type { QuizSubmitFailure } from '@/store/slices/quizSubmit.slice';
 
 // ---------------------------------------------------------------------------
 // Mocks — must come before the component import
@@ -127,7 +128,7 @@ describe('SessionDashboardPage — Generate Quiz section (AC4)', () => {
     mockUpdateSession.mockReset();
     mockDeleteSession.mockReset();
     mockCaptureException.mockReset();
-    mockUseAppSelector.mockReturnValue([]);
+    mockUseAppSelector.mockReturnValue([] as any);
     localStorage.clear();
 
     vi.mocked(useGetSessionQuery).mockReturnValue({
@@ -223,7 +224,7 @@ describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
     mockUpdateSession.mockReset();
     mockDeleteSession.mockReset();
     mockCaptureException.mockReset();
-    mockUseAppSelector.mockReturnValue([]);
+    mockUseAppSelector.mockReturnValue([] as any);
     localStorage.clear();
 
     const nowIso = new Date().toISOString();
@@ -264,8 +265,13 @@ describe('SessionDashboardPage — telemetry catches (FE-001, FE-005)', () => {
   it('captures retry submission failures with session and attempt metadata', async () => {
     const user = userEvent.setup();
     mockUseAppSelector.mockReturnValue([
-      { quizAttemptId: 'qa-1', sessionId: 'session-1', message: 'Failed', createdAt: new Date().toISOString() },
-    ]);
+      {
+        quizAttemptId: 'qa-1',
+        sessionId: 'session-1',
+        message: 'Failed',
+        createdAt: new Date().toISOString(),
+      },
+    ] as any);
     mockSubmitQuiz.mockReturnValue({
       unwrap: vi.fn().mockRejectedValue(new Error('retry failed')),
     });
