@@ -171,6 +171,16 @@
   --modal-footer-gap: var(--spacing-sm);
 
   /* =========================================
+     Toast Tokens
+     ========================================= */
+
+  --toast-z-index: 1100;
+  --toast-viewport-offset: 16px;
+  --toast-gap: 12px;
+  --toast-max-width: 420px;
+  --toast-min-width: 320px;
+
+  /* =========================================
      Transitions
      ========================================= */
 

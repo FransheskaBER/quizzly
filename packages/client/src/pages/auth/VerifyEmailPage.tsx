@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useVerifyEmailMutation } from '@/api/auth.api';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import styles from './VerifyEmailPage.module.css';
 
@@ -10,19 +12,18 @@ type VerifyState = 'loading' | 'success' | 'already-verified' | 'error' | 'no-to
 const VerifyEmailPage = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+  const { showError } = useToast();
 
   // Use the mutation trigger directly — RTK Query guarantees a stable reference,
   // so it can go in the useEffect dep array without causing repeated calls.
   const [verifyEmail] = useVerifyEmailMutation();
 
   const [state, setState] = useState<VerifyState>(token ? 'loading' : 'no-token');
-  const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
     if (!token) return;
 
     setState('loading');
-    setErrorMessage('');
 
     let cancelled = false;
 
@@ -32,11 +33,13 @@ const VerifyEmailPage = () => {
         if (!cancelled) setState('success');
       } catch (err) {
         if (!cancelled) {
-          const { code, message } = parseApiError(err);
+          const { code } = parseApiError(err);
+          const status = extractHttpStatus(err);
           if (code === 'CONFLICT') {
             setState('already-verified');
           } else {
-            setErrorMessage(message);
+            const userMessage = getUserMessage(code, 'verify-email', status);
+            showError(userMessage.title, userMessage.description);
             setState('error');
           }
         }
@@ -48,7 +51,7 @@ const VerifyEmailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, verifyEmail]);
+  }, [token, showError, verifyEmail]);
 
   if (state === 'loading') {
     return (
@@ -108,7 +111,7 @@ const VerifyEmailPage = () => {
       <div className={styles.card}>
         <span className={styles.icon}>❌</span>
         <h1 className={styles.title}>Verification failed</h1>
-        <p className={styles.errorText}>{errorMessage}</p>
+        <p className={styles.errorText}>That verification link did not work.</p>
         <p className={styles.text}>
           Need a new link? <Link to="/signup">Sign up again</Link> or{' '}
           <Link to="/login">go to sign in</Link>.

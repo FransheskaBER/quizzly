@@ -6,8 +6,9 @@ import { z } from 'zod';
 import { PASSWORD_MIN_LENGTH } from '@skills-trainer/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import styles from './ResetPasswordPage.module.css';
 
@@ -27,10 +28,10 @@ type ResetFormData = z.infer<typeof resetFormSchema>;
 const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
   const { resetPassword } = useAuth();
+  const { showError } = useToast();
   const token = searchParams.get('token');
 
   const [success, setSuccess] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -40,13 +41,14 @@ const ResetPasswordPage = () => {
 
   const onSubmit = async (data: ResetFormData) => {
     if (!token) return;
-    setFormError(null);
     try {
       await resetPassword({ token, password: data.password });
       setSuccess(true);
     } catch (err) {
-      const { message } = parseApiError(err);
-      setFormError(message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'reset-password', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -90,8 +92,6 @@ const ResetPasswordPage = () => {
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-          <FormError message={formError} />
-
           <FormField
             id="password"
             label="New password"

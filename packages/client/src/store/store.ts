@@ -6,6 +6,7 @@ import { api } from './api';
 import authReducer from './slices/auth.slice';
 import quizSubmitReducer from './slices/quizSubmit.slice';
 import quizStreamReducer from './slices/quizStream.slice';
+import toastReducer from './slices/toast.slice';
 
 export const store = configureStore({
   reducer: {
@@ -13,6 +14,7 @@ export const store = configureStore({
     auth: authReducer,
     quizSubmit: quizSubmitReducer,
     quizStream: quizStreamReducer,
+    toast: toastReducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
 });
