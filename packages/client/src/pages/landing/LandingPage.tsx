@@ -107,7 +107,7 @@ const LandingPage = () => {
             From writing code to leading it.
           </h1>
           <p className={styles.subheadline}>
-            Quizzly helps you build the skills that matter now: reviewing AI-generated code, spotting bugs, analysing trade-offs, thinking architecturally, and working effectively with AI.
+            Quizzly helps you build the skills that matter now: AI code review, bug spotting, trade-off analysis, architectural thinking, and effective AI collaboration.
           </p>
           <Link to="/login" className={styles.heroCta}>
             Generate Your First Quiz
