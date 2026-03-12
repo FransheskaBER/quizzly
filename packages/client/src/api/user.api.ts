@@ -27,6 +27,7 @@ export const userApi = api.injectEndpoints({
 
     updateProfile: builder.mutation<UserResponse, UpdateProfileRequest>({
       query: (body) => ({ url: '/users/profile', method: 'PATCH', body }),
+      invalidatesTags: ['Dashboard'],
     }),
 
     changePassword: builder.mutation<MessageResponse, ChangePasswordRequest>({

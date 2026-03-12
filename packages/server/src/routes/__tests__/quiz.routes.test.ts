@@ -251,6 +251,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: 'Specific extracted content for the test' }),
       expect.any(Function),
+      undefined, // free-trial user — no stored API key
     );
   });
 
@@ -267,7 +268,69 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: null }),
       expect.any(Function),
+      undefined, // free-trial user — no stored API key
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BYOK — save key then generate (AC1 integrated persistence flow)
+// ---------------------------------------------------------------------------
+
+describe('BYOK — save API key then generate quiz (AC1)', () => {
+  const BYOK_API_KEY = 'sk-ant-api03-byok-key-that-is-long-enough-for-validation-1234567890abcdef';
+
+  it('generates quiz using the stored user API key after free trial is used', async () => {
+    vi.mocked(llmGenerateQuiz).mockResolvedValue([VALID_LLM_QUESTION]);
+    const { user } = await createTestUser();
+    const session = await createSession(user.id);
+
+    // Step 1: save the API key
+    const saveRes = await request(app)
+      .post('/api/users/api-key')
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .send({ apiKey: BYOK_API_KEY });
+    expect(saveRes.status).toBe(200);
+    expect(saveRes.body.hasApiKey).toBe(true);
+
+    // Step 2: simulate free trial already used (set freeTrialUsedAt directly)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { freeTrialUsedAt: new Date() },
+    });
+
+    // Step 3: generate — should succeed using the stored key
+    const genRes = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .buffer(true);
+
+    expect(genRes.status).toBe(200);
+    expect(genRes.headers['content-type']).toContain('text/event-stream');
+
+    // The decrypted stored key must be passed to the LLM call as the third argument
+    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Function),
+      BYOK_API_KEY,
+    );
+  });
+
+  it('403 TRIAL_EXHAUSTED when free trial is used but no key is saved', async () => {
+    const { user } = await createTestUser({ email: 'exhausted@example.com', username: 'exhausted' });
+    const session = await createSession(user.id);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { freeTrialUsedAt: new Date() },
+    });
+
+    const res = await request(app)
+      .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
+      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('TRIAL_EXHAUSTED');
   });
 });
 
