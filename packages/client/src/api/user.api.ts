@@ -2,10 +2,6 @@ import { api } from '@/store/api';
 import type {
   ApiKeyStatusResponse,
   SaveApiKeyRequest,
-  UpdateProfileRequest,
-  ChangePasswordRequest,
-  UserResponse,
-  MessageResponse,
 } from '@skills-trainer/shared';
 
 export const userApi = api.injectEndpoints({
@@ -24,15 +20,6 @@ export const userApi = api.injectEndpoints({
       query: () => ({ url: '/users/api-key', method: 'DELETE' }),
       invalidatesTags: ['ApiKeyStatus'],
     }),
-
-    updateProfile: builder.mutation<UserResponse, UpdateProfileRequest>({
-      query: (body) => ({ url: '/users/profile', method: 'PATCH', body }),
-      invalidatesTags: ['Dashboard'],
-    }),
-
-    changePassword: builder.mutation<MessageResponse, ChangePasswordRequest>({
-      query: (body) => ({ url: '/users/password', method: 'PUT', body }),
-    }),
   }),
 });
 
@@ -40,6 +27,4 @@ export const {
   useGetApiKeyStatusQuery,
   useSaveApiKeyMutation,
   useDeleteApiKeyMutation,
-  useUpdateProfileMutation,
-  useChangePasswordMutation,
 } = userApi;

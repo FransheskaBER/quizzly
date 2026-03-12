@@ -123,8 +123,6 @@ export {
 
 export {
   saveApiKeySchema,
-  updateProfileSchema,
-  changePasswordSchema,
   apiKeyStatusResponseSchema,
 } from './schemas/user.schema.js';
 
@@ -185,7 +183,5 @@ export type {
   SseGradeCompleteEvent,
   DashboardResponse,
   SaveApiKeyRequest,
-  UpdateProfileRequest,
-  ChangePasswordRequest,
   ApiKeyStatusResponse,
 } from './types/index.js';
