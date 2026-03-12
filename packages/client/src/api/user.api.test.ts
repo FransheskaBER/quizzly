@@ -61,22 +61,27 @@ describe('userApi — updateProfile invalidates Dashboard cache (AC7)', () => {
     expect(invalidated[0].endpointName).toBe('getDashboard');
   });
 
-  it('getDashboard is still the only Dashboard-providing query after priming — mutation does not add its own entries', async () => {
+  it('updateProfile invalidates Dashboard and refetches primed getDashboard query', async () => {
     const store = buildTestStore();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await store.dispatch((api as any).endpoints.getDashboard.initiate());
-    await store.dispatch(userApi.endpoints.updateProfile.initiate({ username: 'new-name' }));
 
-    // After the mutation completes, RTK Query triggers a re-fetch of getDashboard.
-    // selectInvalidatedBy will show which queries would be invalidated by 'Dashboard' tag.
-    // This confirms the tag relationship between getDashboard (providesTags) and
-    // updateProfile (invalidatesTags) is correctly wired.
-    // (RTK Query handles tag invalidation internally — a non-empty result confirms wiring.)
-    const stateAfterMutation = store.getState();
-    // getDashboard should still be in the query cache (possibly refetching)
-    const queriesAfter = stateAfterMutation[api.reducerPath].queries;
-    const dashboardKey = Object.keys(queriesAfter).find((k) => k.startsWith('getDashboard'));
+    const stateBeforeMutation = store.getState();
+    const queriesBefore = stateBeforeMutation[api.reducerPath].queries;
+    const dashboardKey = Object.keys(queriesBefore).find((k) => k.startsWith('getDashboard'));
     expect(dashboardKey).toBeDefined();
+
+    const initialEntry = queriesBefore[dashboardKey!];
+    const initialFulfilledTime = initialEntry?.fulfilledTimeStamp;
+    expect(typeof initialFulfilledTime).toBe('number');
+
+    await store.dispatch(userApi.endpoints.updateProfile.initiate({ username: 'new-name' }));
+    await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()));
+
+    const stateAfterMutation = store.getState();
+    const updatedEntry = stateAfterMutation[api.reducerPath].queries[dashboardKey!];
+    expect(typeof updatedEntry?.fulfilledTimeStamp).toBe('number');
+    expect(updatedEntry?.fulfilledTimeStamp).toBeGreaterThan(initialFulfilledTime as number);
   });
 
   it('updateProfile endpoint exists and is a mutation', () => {
