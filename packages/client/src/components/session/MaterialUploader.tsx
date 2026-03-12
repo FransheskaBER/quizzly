@@ -151,7 +151,7 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
 
     try {
       new URL(trimmed);
-    } catch (_err) {
+    } catch {
       setUrlError('Enter a valid URL (e.g. https://example.com/article).');
       return;
     }

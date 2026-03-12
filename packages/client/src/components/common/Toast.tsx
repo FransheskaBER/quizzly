@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 
 import { TOAST_DURATIONS, TOAST_EXIT_DELAY_MS } from './toast.constants';
@@ -43,16 +43,16 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
     [durationMs, isPaused],
   );
 
-  const requestDismiss = (): void => {
+  const requestDismiss = useCallback((): void => {
     if (isExiting) return;
     if (dismissTimeoutRef.current !== null) {
       window.clearTimeout(dismissTimeoutRef.current);
       dismissTimeoutRef.current = null;
     }
     setIsExiting(true);
-  };
+  }, [isExiting]);
 
-  const scheduleDismiss = (delayMs: number): void => {
+  const scheduleDismiss = useCallback((delayMs: number): void => {
     if (dismissTimeoutRef.current !== null) {
       window.clearTimeout(dismissTimeoutRef.current);
     }
@@ -60,7 +60,7 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
     dismissTimeoutRef.current = window.setTimeout(() => {
       requestDismiss();
     }, delayMs);
-  };
+  }, [requestDismiss]);
 
   useEffect(() => {
     remainingMsRef.current = durationMs;
@@ -72,7 +72,7 @@ export const Toast = ({ id, variant, title, description, onDismiss }: ToastProps
         dismissTimeoutRef.current = null;
       }
     };
-  }, [durationMs]);
+  }, [durationMs, scheduleDismiss]);
 
   useEffect(() => {
     if (!isExiting) return;

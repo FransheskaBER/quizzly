@@ -93,7 +93,7 @@ const QuizTakingPage = () => {
           showError(userMessage.title, userMessage.description);
         }
       });
-  }, [showError]);
+  }, [showError, quiz?.sessionId]);
 
   const handleAnswerChange = useCallback(
     (questionId: string, answer: string) => {
