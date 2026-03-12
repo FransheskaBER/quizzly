@@ -67,15 +67,15 @@ export const errorHandler = (
 
   // Known Prisma errors that map to 4xx.
   if (err instanceof PrismaClientKnownRequestError) {
-    logger.warn({ err, ...requestContext }, 'Handled Prisma request error');
-    Sentry.captureException(err, {
-      extra: {
-        ...requestContext,
-        operation: 'error.middleware.prismaKnownError',
-        prismaCode: err.code,
-      },
-    });
     if (err.code === 'P2002') {
+      logger.warn({ err, ...requestContext }, 'Handled Prisma request error');
+      Sentry.captureException(err, {
+        extra: {
+          ...requestContext,
+          operation: 'error.middleware.prismaKnownError',
+          prismaCode: err.code,
+        },
+      });
       res.status(409).json({
         error: {
           code: 'CONFLICT',
@@ -85,6 +85,14 @@ export const errorHandler = (
       return;
     }
     if (err.code === 'P2025') {
+      logger.warn({ err, ...requestContext }, 'Handled Prisma request error');
+      Sentry.captureException(err, {
+        extra: {
+          ...requestContext,
+          operation: 'error.middleware.prismaKnownError',
+          prismaCode: err.code,
+        },
+      });
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
@@ -94,6 +102,14 @@ export const errorHandler = (
       return;
     }
     if (err.code === 'P2003') {
+      logger.warn({ err, ...requestContext }, 'Handled Prisma request error');
+      Sentry.captureException(err, {
+        extra: {
+          ...requestContext,
+          operation: 'error.middleware.prismaKnownError',
+          prismaCode: err.code,
+        },
+      });
       res.status(400).json({
         error: {
           code: 'BAD_REQUEST',

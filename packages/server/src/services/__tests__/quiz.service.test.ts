@@ -46,6 +46,7 @@ import { prisma } from '../../config/database.js';
 import { Sentry } from '../../config/sentry.js';
 import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from '../llm.service.js';
 import { decrypt } from '../../utils/encryption.utils.js';
+import { markErrorAsCaptured } from '../../utils/sentry.utils.js';
 import {
   prepareGeneration,
   executeGeneration,
@@ -567,6 +568,20 @@ describe('executeGeneration', () => {
     const writer = vi.fn();
 
     await expect(executeGeneration(BASE_EXECUTION_PARAMS, writer)).resolves.toBeUndefined();
+  });
+
+  it('does not recapture generation errors already captured upstream', async () => {
+    const capturedError = new Error('Already captured upstream');
+    markErrorAsCaptured(capturedError);
+    vi.mocked(llmGenerateQuiz).mockRejectedValue(capturedError);
+    const writer = vi.fn();
+
+    await executeGeneration(BASE_EXECUTION_PARAMS, writer);
+
+    expect(Sentry.captureException).not.toHaveBeenCalledWith(
+      capturedError,
+      expect.objectContaining({ extra: expect.objectContaining({ sessionId: SESSION_ID }) }),
+    );
   });
 
   it('passes materialsText as null to the LLM when the session has no materials', async () => {

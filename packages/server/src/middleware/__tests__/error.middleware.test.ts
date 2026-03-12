@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { errorHandler } from '../error.middleware.js';
 import { Sentry } from '../../config/sentry.js';
 import { EmailDeliveryError, ValidationError } from '../../utils/errors.js';
@@ -25,6 +26,10 @@ const createMockRes = (): Response => {
 };
 
 describe('errorHandler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns 502 with EMAIL_DELIVERY_ERROR for EmailDeliveryError', () => {
     const res = createMockRes();
     const err = new EmailDeliveryError('Failed to send verification email');
@@ -65,6 +70,29 @@ describe('errorHandler', () => {
       err,
       expect.objectContaining({
         extra: expect.objectContaining({ operation: 'error.middleware.appError' }),
+      }),
+    );
+  });
+
+  it('captures Prisma unknown code only once in unhandled path', () => {
+    const res = createMockRes();
+    const prismaError = Object.assign(
+      Object.create(PrismaClientKnownRequestError.prototype) as PrismaClientKnownRequestError,
+      {
+        code: 'P9999',
+        message: 'Unknown Prisma request error',
+        name: 'PrismaClientKnownRequestError',
+      },
+    );
+
+    errorHandler(prismaError, mockReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      prismaError,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'error.middleware.unhandled' }),
       }),
     );
   });

@@ -11,7 +11,6 @@ import {
   type AnswerFormat,
 } from '@skills-trainer/shared';
 import defaultClient from '../config/anthropic.js';
-import { Sentry } from '../config/sentry.js';
 import {
   LLM_MODEL,
   LLM_MAX_TOKENS,
@@ -26,6 +25,7 @@ import { buildGradingSystemPrompt } from '../prompts/grading/system.prompt.js';
 import { buildGradingUserMessage } from '../prompts/grading/user.prompt.js';
 import { sanitizeForPrompt, logSuspiciousPatterns } from '../utils/sanitize.utils.js';
 import { BadRequestError } from '../utils/errors.js';
+import { captureExceptionOnce, markErrorAsCaptured } from '../utils/sentry.utils.js';
 
 const logger = pino({ name: 'llm.service' });
 
@@ -118,16 +118,18 @@ async function callLlmStream(
       { err, provider: 'anthropic', model: LLM_MODEL, operation: 'callLlmStream' },
       'LLM stream request failed',
     );
-    Sentry.captureException(err, {
+    captureExceptionOnce(err, {
       extra: { provider: 'anthropic', model: LLM_MODEL, operation: 'callLlmStream' },
     });
 
     // Sanitize Anthropic auth errors so the raw SDK message (which may contain
     // key-related details) is never forwarded to the client.
     if (err instanceof Anthropic.AuthenticationError) {
-      throw new BadRequestError(
+      const sanitizedError = new BadRequestError(
         'Invalid API key. Please check your key and try again.',
       );
+      markErrorAsCaptured(sanitizedError);
+      throw sanitizedError;
     }
     throw err;
   }
@@ -150,7 +152,7 @@ async function parseBlock<T>(
     return result.success ? result.data : null;
   } catch (err) {
     logger.error({ err, blockName, operation: 'parseBlock' }, 'Failed to parse LLM response block');
-    Sentry.captureException(err, {
+    captureExceptionOnce(err, {
       extra: { blockName, operation: 'parseBlock' },
     });
     return null;
