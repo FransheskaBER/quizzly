@@ -55,7 +55,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
 
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ error: { status: 401 } }),
+      expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
           operation: 'getMeHydration',
@@ -66,5 +66,43 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
         }),
       }),
     );
+  });
+
+  it('captures non-401 getMe hydration failures with normalized Error', async () => {
+    const onQueryStarted = (
+      authApi.endpoints as unknown as {
+        getMe: {
+          onQueryStarted: (
+            args: void,
+            api: {
+              dispatch: () => void;
+              queryFulfilled: Promise<unknown>;
+              getState: () => unknown;
+            }
+          ) => Promise<void>;
+        };
+      }
+    ).getMe.onQueryStarted;
+
+    await onQueryStarted(undefined, {
+      dispatch: vi.fn(),
+      queryFulfilled: Promise.reject({ error: { status: 500 } }),
+      getState: () => ({ auth: { token: 'token-1' } }),
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          operation: 'getMeHydration',
+          route: '/auth/me',
+          reason: 'non-401',
+          status: 500,
+        }),
+      }),
+    );
+    const capturedError = mockCaptureException.mock.calls[0][0] as Error;
+    expect(capturedError.message).toBe('getMe hydration failed (status: 500)');
   });
 });
