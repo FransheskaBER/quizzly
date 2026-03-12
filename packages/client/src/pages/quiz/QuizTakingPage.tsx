@@ -148,18 +148,8 @@ const QuizTakingPage = () => {
         showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
       })
       .catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error('Quiz submit failed:', err);
-        Sentry.captureException(err, {
-          extra: {
-            operation: 'submitQuiz',
-            stage: 'submit',
-            quizId: id,
-            sessionId: quiz.sessionId,
-          },
-        });
-        // Keep this as a non-blocking best-effort submission. If it fails, the
-        // session poll will keep the user informed via attempt status.
+        // RTK Query rejects SSE submit requests with PARSING_ERROR + 2xx once the
+        // stream has started; treat that as success and avoid false-positive telemetry.
         const fbqErr = err as FetchBaseQueryError;
         const isStreamStarted =
           typeof err === 'object' &&
@@ -173,6 +163,16 @@ const QuizTakingPage = () => {
         if (isStreamStarted) {
           showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
         } else {
+          // eslint-disable-next-line no-console
+          console.error('Quiz submit failed:', err);
+          Sentry.captureException(err, {
+            extra: {
+              operation: 'submitQuiz',
+              stage: 'submit',
+              quizId: id,
+              sessionId: quiz.sessionId,
+            },
+          });
           const { code } = parseApiError(err);
           const status = extractHttpStatus(err);
           const userMessage = getUserMessage(code, 'submit-quiz', status);

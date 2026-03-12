@@ -135,4 +135,35 @@ describe('QuizTakingPage telemetry catches (FE-011)', () => {
       }),
     );
   });
+
+  it('does not capture Sentry exception for submit PARSING_ERROR when stream already started', async () => {
+    const user = userEvent.setup();
+    mockSaveAnswers.mockReturnValue({
+      unwrap: vi.fn().mockResolvedValue({ saved: 1 }),
+    });
+    mockSubmitQuiz.mockReturnValue({
+      unwrap: vi.fn().mockRejectedValue({
+        status: 'PARSING_ERROR',
+        originalStatus: 200,
+      }),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/quiz/quiz-1']}>
+        <Routes>
+          <Route path="/quiz/:id" element={<QuizTakingPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /answer q1/i }));
+    await user.click(screen.getByRole('button', { name: /complete quiz/i }));
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockShowSuccess).toHaveBeenCalledWith(
+      'Submitted your quiz!',
+      'Sit tight - your answers are being graded.',
+    );
+    expect(mockShowError).not.toHaveBeenCalled();
+  });
 });
