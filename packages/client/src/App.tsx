@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { RootErrorBoundary, RouteErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ToastContainer } from '@/components/common/ToastContainer';
 import { useAppSelector, useAppDispatch } from '@/store/store';
 import { selectIsAuthenticated, selectCurrentUser, logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
@@ -89,6 +90,7 @@ export const App = () => {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Suspense>
+        <ToastContainer />
       </AuthGate>
     </RootErrorBoundary>
   );

@@ -16,13 +16,11 @@ const VerifyEmailPage = () => {
   const [verifyEmail] = useVerifyEmailMutation();
 
   const [state, setState] = useState<VerifyState>(token ? 'loading' : 'no-token');
-  const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
     if (!token) return;
 
     setState('loading');
-    setErrorMessage('');
 
     let cancelled = false;
 
@@ -32,11 +30,10 @@ const VerifyEmailPage = () => {
         if (!cancelled) setState('success');
       } catch (err) {
         if (!cancelled) {
-          const { code, message } = parseApiError(err);
+          const { code } = parseApiError(err);
           if (code === 'CONFLICT') {
             setState('already-verified');
           } else {
-            setErrorMessage(message);
             setState('error');
           }
         }
@@ -108,7 +105,7 @@ const VerifyEmailPage = () => {
       <div className={styles.card}>
         <span className={styles.icon}>❌</span>
         <h1 className={styles.title}>Verification failed</h1>
-        <p className={styles.errorText}>{errorMessage}</p>
+        <p className={styles.errorText}>That verification link did not work.</p>
         <p className={styles.text}>
           Need a new link? <Link to="/signup">Sign up again</Link> or{' '}
           <Link to="/login">go to sign in</Link>.

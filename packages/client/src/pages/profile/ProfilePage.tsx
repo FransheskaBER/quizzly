@@ -25,9 +25,10 @@ import {
 } from '@/api/user.api';
 import { authApi } from '@/api/auth.api';
 import { FormField } from '@/components/common/FormField';
-import { FormError } from '@/components/common/FormError';
 import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
+import { useToast } from '@/hooks/useToast';
+import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { useAppDispatch } from '@/store/store';
 import styles from './ProfilePage.module.css';
 
@@ -42,11 +43,11 @@ const changePasswordFormSchema = changePasswordSchema
 type ChangePasswordFormValues = z.infer<typeof changePasswordFormSchema>;
 
 const UsernameSection = () => {
+  const { showError } = useToast();
   const { data: meData } = useGetMeQuery();
   const dispatch = useAppDispatch();
   const [updateProfile, { isLoading }] = useUpdateProfileMutation();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -59,13 +60,15 @@ const UsernameSection = () => {
 
   const onSubmit = async (data: UpdateProfileRequest): Promise<void> => {
     setSuccessMessage(null);
-    setErrorMessage(null);
     try {
       await updateProfile(data).unwrap();
       void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
       setSuccessMessage('Username updated.');
     } catch (err) {
-      setErrorMessage(parseApiError(err).message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, null, status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -74,7 +77,6 @@ const UsernameSection = () => {
       <h2 className={styles.sectionTitle}>Username</h2>
       <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
         <FormField label="Username" {...register('username')} error={errors.username?.message} />
-        <FormError message={errorMessage} />
         <div className={styles.actions}>
           <Button type="submit" disabled={isLoading || !isDirty}>
             {isLoading ? 'Saving…' : 'Save'}
@@ -87,9 +89,9 @@ const UsernameSection = () => {
 };
 
 const PasswordSection = () => {
+  const { showError } = useToast();
   const [changePassword, { isLoading }] = useChangePasswordMutation();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -102,14 +104,16 @@ const PasswordSection = () => {
 
   const onSubmit = async (data: ChangePasswordFormValues): Promise<void> => {
     setSuccessMessage(null);
-    setErrorMessage(null);
     try {
       const { currentPassword, newPassword } = data;
       const result = await changePassword({ currentPassword, newPassword }).unwrap();
       setSuccessMessage(result.message);
       reset();
     } catch (err) {
-      setErrorMessage(parseApiError(err).message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, null, status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -136,7 +140,6 @@ const PasswordSection = () => {
           error={errors.confirmNewPassword?.message}
         />
         <p className={styles.hint}>Minimum {PASSWORD_MIN_LENGTH} characters</p>
-        <FormError message={errorMessage} />
         <div className={styles.actions}>
           <Button type="submit" disabled={isLoading}>
             {isLoading ? 'Changing…' : 'Change Password'}
@@ -149,13 +152,12 @@ const PasswordSection = () => {
 };
 
 const ApiKeySection = () => {
+  const { showError, showSuccess } = useToast();
   const dispatch = useAppDispatch();
   const { data: keyStatus, isLoading: isLoadingStatus } = useGetApiKeyStatusQuery();
   const [saveApiKey, { isLoading: isSaving }] = useSaveApiKeyMutation();
   const [deleteApiKey, { isLoading: isDeleting }] = useDeleteApiKeyMutation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -167,28 +169,30 @@ const ApiKeySection = () => {
   });
 
   const onSave = async (data: SaveApiKeyRequest): Promise<void> => {
-    setSuccessMessage(null);
-    setErrorMessage(null);
     try {
       await saveApiKey(data).unwrap();
       void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
-      setSuccessMessage('API key saved.');
+      showSuccess('Saved your API key');
       reset();
     } catch (err) {
-      setErrorMessage(parseApiError(err).message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'save-api-key', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
   const onDelete = async (): Promise<void> => {
-    setSuccessMessage(null);
-    setErrorMessage(null);
     try {
       await deleteApiKey().unwrap();
       void dispatch(authApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
       setShowDeleteConfirm(false);
-      setSuccessMessage('API key removed.');
+      showSuccess('Removed your API key');
     } catch (err) {
-      setErrorMessage(parseApiError(err).message);
+      const { code } = parseApiError(err);
+      const status = extractHttpStatus(err);
+      const userMessage = getUserMessage(code, 'delete-api-key', status);
+      showError(userMessage.title, userMessage.description);
     }
   };
 
@@ -197,7 +201,6 @@ const ApiKeySection = () => {
   return (
     <div className={styles.section}>
       <h2 className={styles.sectionTitle}>Anthropic API Key</h2>
-      <FormError message={errorMessage} />
 
       {keyStatus?.hasApiKey ? (
         <>
@@ -218,7 +221,6 @@ const ApiKeySection = () => {
               </Button>
             )}
           </div>
-          {successMessage && <span className={styles.successMessage}>{successMessage}</span>}
         </>
       ) : (
         <form className={styles.form} onSubmit={handleSubmit(onSave)} noValidate>
@@ -234,7 +236,6 @@ const ApiKeySection = () => {
             <Button type="submit" disabled={isSaving}>
               {isSaving ? 'Saving…' : 'Save Key'}
             </Button>
-            {successMessage && <span className={styles.successMessage}>{successMessage}</span>}
           </div>
         </form>
       )}
