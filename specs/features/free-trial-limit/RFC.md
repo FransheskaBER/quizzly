@@ -16,12 +16,12 @@
 
 **Goals:**
 1. Limit each user to exactly 1 free quiz generation using the server's API key
-2. Lock free-tier generations to exactly 5 questions (user picks difficulty + format only)
+2. Lock free-tier generations to exactly 5 multiple-choice questions (user picks difficulty only)
 3. Track free trial usage per user via `freeTrialUsedAt` timestamp on the User model
 4. After trial is consumed, block generation with a clear message about needing their own key
 
 **Non-goals:**
-- BYOK implementation (separate feature spec — stage 2)
+- Introducing new API-key storage/encryption architecture (covered by dedicated BYOK specs)
 - Changing the LLM service, prompt architecture, or streaming flow
 - Payment integration or subscription logic
 - Modifying existing rate limits
@@ -32,15 +32,18 @@
 
 **Database:** Add `freeTrialUsedAt DateTime?` to User model. Nullable — null means trial available.
 
-**Quiz service (`prepareGeneration`):** After session/ownership validation, check `freeTrialUsedAt`. If not null, throw `ForbiddenError`. Return `isFreeTrialGeneration: true` in `PreparedGeneration`.
+**Quiz service (`prepareGeneration`):** After session/ownership validation, check `freeTrialUsedAt` and saved API-key presence:
+- Trial unused (`freeTrialUsedAt = null`) → `isFreeTrialGeneration: true`
+- Trial used + saved API key exists → `isFreeTrialGeneration: false` (BYOK generation)
+- Trial used + no saved API key → throw 403 `TRIAL_EXHAUSTED` with a message to save an API key
 
-**Quiz service (`executeGeneration`):** When `isFreeTrialGeneration`, override `questionCount = 5`. After successful generation (status → `in_progress`), set `freeTrialUsedAt = now()`. If generation fails, trial stays unconsumed.
+**Quiz service (`executeGeneration`):** When `isFreeTrialGeneration`, override `questionCount = 5` and `answerFormat = mcq` regardless of query params. Enforce strict output validation for free trial: exactly 5 questions and all must be MCQ. Any violation is treated as generation failure (SSE error; no complete event). After successful generation (status → `in_progress`), set `freeTrialUsedAt = now()`. If generation fails, trial stays unconsumed and the failed attempt is cleaned up so retry is immediately possible.
 
 **Auth service (`getMe`):** Return `hasUsedFreeTrial: boolean` derived from `freeTrialUsedAt !== null`.
 
 **Shared schemas:** Add `hasUsedFreeTrial` to `userResponseSchema`. Add `FREE_TRIAL_QUESTION_COUNT = 5` constant.
 
-**Frontend (`QuizPreferences`):** When trial is available, hide count input and show "5 questions" as fixed. When trial is exhausted, parent renders a message instead of the form.
+**Frontend (`QuizPreferences`):** When trial is available, hide count and format inputs and show "5 multiple-choice questions" as fixed. When trial is exhausted, parent renders a message instead of the form.
 
 ### What stays the same
 - LLM service (`anthropic.ts`, `llm.service.ts`) — no changes
@@ -61,8 +64,8 @@
 - *Rejected:* Set on attempt creation — penalizes users for server/LLM failures.
 - *Reasoning:* User should only lose their trial when they actually receive questions.
 
-**Count enforcement:** Backend overrides `questionCount` to 5 regardless of client-sent value.
-- *Reasoning:* Security — prevents request manipulation. Frontend hides the input as a UX convenience, but the backend is the source of truth.
+**Trial policy enforcement:** Backend overrides `questionCount` to 5 and `answerFormat` to `mcq` regardless of client-sent values.
+- *Reasoning:* Security — prevents request manipulation. Frontend hides the inputs as a UX convenience, but the backend is the source of truth.
 
 ## 4. Blast Radius
 
@@ -89,12 +92,13 @@
 
 ## 6. Acceptance Criteria
 
-1. **Given** a new user **When** they view the generation form **Then** count is locked to 5 and a trial note is shown
-2. **Given** a new user **When** they generate a quiz **Then** exactly 5 questions are generated and `freeTrialUsedAt` is set
+1. **Given** a new user **When** they view the generation form **Then** count is locked to 5, format is locked to multiple-choice, and a trial note is shown
+2. **Given** a new user **When** they generate a quiz **Then** exactly 5 multiple-choice questions are generated and `freeTrialUsedAt` is set
 3. **Given** a user whose trial is used **When** they try to generate **Then** they get a 403 with a message about needing their own API key
 4. **Given** a user whose trial is used **When** they view the session dashboard **Then** they see a "trial used" message instead of the generation form
 5. **Given** a generation that fails mid-stream **When** the user retries **Then** they can still generate (trial not consumed on failure)
 6. **Given** an existing user (pre-migration) **When** they visit after deployment **Then** they still have one free trial available
+7. **Given** a new user **When** they submit `format=free_text` or `format=mixed` in the generation query **Then** the backend still generates `mcq` format for the free trial
 
 ## 7. TDD Updates Required (not implementation scope)
 
