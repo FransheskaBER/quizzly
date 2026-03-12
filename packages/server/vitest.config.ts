@@ -22,6 +22,8 @@ export default defineConfig({
       JWT_EXPIRES_IN: '7d',
       CLIENT_URL: 'http://localhost:5173',
       PORT: '3001',
+      // Fixed 64-char hex key (32 bytes) — for encryption integration tests only.
+      API_KEY_ENCRYPTION_KEY: '0'.repeat(64),
     },
     coverage: {
       provider: 'v8',
