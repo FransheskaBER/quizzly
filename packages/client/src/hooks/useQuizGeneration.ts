@@ -42,7 +42,6 @@ export interface UseQuizGenerationResult {
 export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
   const dispatch = useAppDispatch();
   const quizStream = useAppSelector(selectQuizStream);
-  const token = useAppSelector((state) => state.auth.token) ?? '';
 
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
@@ -118,7 +117,7 @@ export function useQuizGeneration(sessionId: string): UseQuizGenerationResult {
     }
   };
 
-  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete, token });
+  const { start, close, warning } = useSSEStream({ onEvent, onError, onComplete });
 
   // Keep close in a ref so the unmount effect always calls the latest version.
   const closeRef = useRef(close);

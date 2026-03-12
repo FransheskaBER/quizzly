@@ -7,13 +7,7 @@ export const API_BASE_URL = `${API_BASE}/api`;
 
 const baseQuery = fetchBaseQuery({
   baseUrl: API_BASE_URL,
-  prepareHeaders: (headers) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    return headers;
-  },
+  credentials: 'include',
 });
 
 export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
@@ -34,6 +28,12 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
       Sentry.captureException(result.error, { extra: telemetryContext });
       const { dispatch } = api;
       const { logout } = await import('./slices/auth.slice');
+      // Clear session cookie server-side (httpOnly cookie cannot be cleared from client)
+      try {
+        await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch {
+        // Ignore — cookie clear is best-effort; state clear below ensures UI updates
+      }
       dispatch(logout());
     }
 

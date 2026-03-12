@@ -992,10 +992,21 @@ Auth: None | Rate Limit: 10/IP/15min
 Request:
 { "email": "user@example.com", "password": "securePass123" }
 
-200: { "token": "eyJ...", "user": { "id": "uuid", "email": "...", "username": "Alex" } }
+200: { "user": { "id": "uuid", "email": "...", "username": "Alex" } }
+    + Set-Cookie: quizzly_session=<opaque-token>; HttpOnly; Path=/api; ...
+    (no token in response body — session stored in httpOnly cookie)
 401: UNAUTHORIZED ("Invalid email or password" — same for both)
 401: EMAIL_NOT_VERIFIED
 429: RATE_LIMITED
+```
+
+#### POST /api/auth/logout
+
+```
+Auth: None
+
+200: { "message": "Logged out" }
+    + Set-Cookie: quizzly_session=; Max-Age=0; Path=/api (clears cookie)
 ```
 
 #### POST /api/auth/verify-email
@@ -1321,7 +1332,8 @@ Auth: None
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | /api/auth/signup | No | Create account |
-| POST | /api/auth/login | No | Login, get JWT |
+| POST | /api/auth/login | No | Login, get session cookie |
+| POST | /api/auth/logout | No | Logout, clear cookie |
 | POST | /api/auth/verify-email | No | Verify email |
 | POST | /api/auth/resend-verification | No | Resend verification |
 | POST | /api/auth/forgot-password | No | Request reset |
@@ -1357,15 +1369,16 @@ Auth: None
 ### 6.1 Authentication Strategy
 
 ```
-METHOD: Stateless JWT (access token only)
+METHOD: DB-backed opaque session token (access token only)
 
 Token Lifecycle:
-├── Login → JWT with { userId, email } payload
-├── Expiry: 7 days
-├── Storage: localStorage
-├── Every request: Authorization: Bearer <token>
+├── Login → creates access_tokens row (token hash), sets httpOnly cookie
+├── Expiry: from JWT_EXPIRES_IN (e.g. 7 days)
+├── Storage: httpOnly cookie (quizzly_session, Path /api) — no localStorage
+├── Every request: cookie sent automatically (credentials: 'include'); server also accepts Authorization: Bearer (for tests, API clients)
+├── Logout → clears cookie; token row can remain until expiry
 ├── On expiry: user logs in again (no refresh token for MVP)
-└── On password change: no token invalidation (stateless trade-off)
+└── On password change: no token invalidation (unchanged per TDD)
 
 Why no refresh tokens: adds complexity, 7-day expiry acceptable,
 no financial data. Add when BL-012 payments make it higher stakes.
@@ -1386,7 +1399,7 @@ no financial data. Add when BL-012 payments make it higher stakes.
 ```
 SIMPLE OWNERSHIP:
 ├── Every resource belongs to a user
-├── Auth middleware extracts userId from JWT
+├── Auth middleware extracts userId from session token (cookie or Bearer)
 ├── Service layer: resource.userId === req.user.id
 ├── Failure: 403 FORBIDDEN
 └── No admin role, no shared resources for MVP
@@ -1396,7 +1409,7 @@ SIMPLE OWNERSHIP:
 
 **Transport:** HTTPS (Render default), HSTS via helmet.
 
-**Headers:** helmet middleware with custom CSP: `script-src 'self'`, `connect-src 'self'`. CORS restricted to frontend domain.
+**Headers:** helmet middleware with custom CSP: `script-src 'self'`, `connect-src 'self'`. CORS restricted to frontend domain. **Credentials:** `credentials: true` in CORS config so browsers send httpOnly session cookies with cross-origin requests to the API.
 
 **Header Redaction:** pino-http uses a custom request serializer that strips `x-anthropic-key` from logged headers. User-provided API keys must never appear in logs.
 
@@ -1878,5 +1891,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-12] Updated Section 5 per specs/features/profile-refactor-api-key/RFC.md
 - [2026-03-11] Updated Sections 3.5, 4.2, 4.3, 5.2, 5.5, 5.6–5.9, 6.4 per specs/features/byok-api-key-storage/RFC.md
 - [2026-03-12] Updated Section 4 per specs/features/refactor-quiz-key-source/RFC.md
+- [2026-03-13] Updated Sections 5.2, 5.9, 6.1, 6.4 per specs/features/auth-db-backed-sessions/RFC.md
 
 *End of Technical Design Document*

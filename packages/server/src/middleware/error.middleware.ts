@@ -4,7 +4,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import pino from 'pino';
 
 import { Sentry } from '../config/sentry.js';
-import { AppError } from '../utils/errors.js';
+import { AppError, UnauthorizedError } from '../utils/errors.js';
 
 const logger = pino({ name: 'error-handler' });
 
@@ -27,12 +27,18 @@ export const errorHandler = (
   // 4xx — expected business errors.
   if (err instanceof AppError) {
     logger.warn({ err, ...requestContext }, 'Handled application error');
-    Sentry.captureException(err, {
-      extra: {
-        ...requestContext,
-        operation: 'error.middleware.appError',
-      },
-    });
+    const isExpectedLoginFailure =
+      err instanceof UnauthorizedError &&
+      err.message === 'Invalid email or password' &&
+      req.path === '/api/auth/login';
+    if (!isExpectedLoginFailure) {
+      Sentry.captureException(err, {
+        extra: {
+          ...requestContext,
+          operation: 'error.middleware.appError',
+        },
+      });
+    }
     res.status(err.statusCode).json({
       error: {
         code: err.code,
