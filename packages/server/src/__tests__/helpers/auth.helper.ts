@@ -1,7 +1,16 @@
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+import { REFRESH_TOKEN_EXPIRY } from '@skills-trainer/shared';
+
 import { prisma } from './db.helper.js';
-import { generateOpaqueAccessToken, parseExpiresInMs } from '../../utils/token.utils.js';
-import { generateVerificationToken } from '../../utils/token.utils.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateVerificationToken,
+  hashToken,
+  parseExpiresInMs,
+} from '../../utils/token.utils.js';
 import { env } from '../../config/env.js';
 
 // Cost factor 1 for speed — bcrypt.compare works regardless of cost factor.
@@ -63,24 +72,45 @@ export const createUnverifiedUser = async (overrides: TestUserOverrides & { expi
 };
 
 /**
- * Creates an access token for a user and returns the raw token — used to
- * authenticate requests to protected endpoints without going through the login flow.
+ * Generates a JWT access token for a user — no DB insert needed.
+ * Used to authenticate requests to protected endpoints without going through the login flow.
  */
-export const getAuthToken = async (user: { id: string; email: string }): Promise<string> => {
-  const { token, hash } = generateOpaqueAccessToken();
-  const expiresAt = new Date(Date.now() + parseExpiresInMs(env.JWT_EXPIRES_IN));
-  await prisma.accessToken.create({
-    data: { userId: user.id, tokenHash: hash, expiresAt },
+export const getAuthToken = (user: { id: string; email: string }): string =>
+  generateAccessToken({ userId: user.id, email: user.email });
+
+/** Returns an expired JWT access token for testing 401 expiry behavior. */
+export const getExpiredAuthToken = (user: { id: string; email: string }): string =>
+  jwt.sign({ userId: user.id, email: user.email }, env.JWT_SECRET, { expiresIn: '0s' });
+
+/**
+ * Generates a JWT refresh token and stores its hash in the RefreshToken table.
+ * Used for refresh endpoint tests.
+ */
+export const getRefreshToken = async (user: { id: string; email: string }): Promise<string> => {
+  const refreshToken = generateRefreshToken({ userId: user.id, email: user.email });
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + parseExpiresInMs(REFRESH_TOKEN_EXPIRY));
+
+  await prisma.refreshToken.create({
+    data: { userId: user.id, tokenHash, expiresAt },
   });
-  return token;
+
+  return refreshToken;
 };
 
-/** Returns an expired opaque token for testing 401 expiry behavior. */
-export const getExpiredAuthToken = async (user: { id: string; email: string }): Promise<string> => {
-  const { token, hash } = generateOpaqueAccessToken();
+/** Returns an expired JWT refresh token stored in DB — for testing refresh 401 behavior. */
+export const getExpiredRefreshToken = async (user: { id: string; email: string }): Promise<string> => {
+  const expiredRefreshToken = jwt.sign(
+    { userId: user.id, email: user.email },
+    env.REFRESH_SECRET,
+    { expiresIn: '0s' },
+  );
+  const tokenHash = hashToken(expiredRefreshToken);
   const expiresAt = new Date(Date.now() - 60_000); // 1 minute ago
-  await prisma.accessToken.create({
-    data: { userId: user.id, tokenHash: hash, expiresAt },
+
+  await prisma.refreshToken.create({
+    data: { userId: user.id, tokenHash, expiresAt },
   });
-  return token;
+
+  return expiredRefreshToken;
 };

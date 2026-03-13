@@ -27,12 +27,12 @@ model User {
   sessions       Session[]
   passwordResets PasswordReset[]
   quizAttempts   QuizAttempt[]
-  accessTokens   AccessToken[]
+  refreshTokens  RefreshToken[]
 
   @@map("users")
 }
 
-model AccessToken {
+model RefreshToken {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   tokenHash String   @unique @map("token_hash") @db.VarChar(255)
@@ -42,7 +42,7 @@ model AccessToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@map("access_tokens")
+  @@map("refresh_tokens")
 }
 
 model PasswordReset {

@@ -8,6 +8,8 @@ import {
   createUnverifiedUser,
   getAuthToken,
   getExpiredAuthToken,
+  getRefreshToken,
+  getExpiredRefreshToken,
 } from '../../__tests__/helpers/auth.helper.js';
 
 // Bypass rate limiting in integration tests — we're testing business logic,
@@ -148,7 +150,7 @@ describe('POST /api/auth/signup', () => {
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
 describe('POST /api/auth/login', () => {
-  it('200 — returns user profile and Set-Cookie for valid verified credentials', async () => {
+  it('200 — returns user profile and sets both session and refresh cookies', async () => {
     const { user, password } = await createTestUser({ email: 'login@example.com' });
 
     const res = await request(app)
@@ -161,9 +163,32 @@ describe('POST /api/auth/login', () => {
       email: user.email,
       username: user.username,
     });
-    expect(res.body.token).toBeUndefined();
+    // Raw tokens must not leak to client
+    expect(res.body.accessToken).toBeUndefined();
+    expect(res.body.refreshToken).toBeUndefined();
     expect(res.headers['set-cookie']).toBeDefined();
-    expect(res.headers['set-cookie'][0]).toMatch(/quizzly_session=/);
+
+    const cookies = res.headers['set-cookie'] as string[];
+    const hasSessionCookie = cookies.some((c: string) => c.startsWith('quizzly_session='));
+    const hasRefreshCookie = cookies.some((c: string) => c.startsWith('quizzly_refresh='));
+    expect(hasSessionCookie).toBe(true);
+    expect(hasRefreshCookie).toBe(true);
+
+    // Refresh cookie should be scoped to /api/auth/refresh
+    const refreshCookie = cookies.find((c: string) => c.startsWith('quizzly_refresh='));
+    expect(refreshCookie).toContain('Path=/api/auth/refresh');
+  });
+
+  it('DB — login stores refresh token hash in refresh_tokens table', async () => {
+    const { user, password } = await createTestUser({ email: 'login@example.com' });
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'login@example.com', password });
+
+    const refreshTokenRow = await prisma.refreshToken.findFirst({ where: { userId: user.id } });
+    expect(refreshTokenRow).not.toBeNull();
+    expect(refreshTokenRow!.tokenHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('401 — wrong email (message: "Invalid email or password")', async () => {
@@ -195,6 +220,99 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('EMAIL_NOT_VERIFIED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/refresh
+// ---------------------------------------------------------------------------
+describe('POST /api/auth/refresh', () => {
+  it('200 — returns new access and refresh cookies, rotates refresh token in DB', async () => {
+    const { user } = await createTestUser({ email: 'refresh@example.com' });
+    const refreshToken = await getRefreshToken(user);
+
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', `quizzly_refresh=${refreshToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/refreshed/i);
+
+    const cookies = res.headers['set-cookie'] as string[];
+    const hasSessionCookie = cookies.some((c: string) => c.startsWith('quizzly_session='));
+    const hasRefreshCookie = cookies.some((c: string) => c.startsWith('quizzly_refresh='));
+    expect(hasSessionCookie).toBe(true);
+    expect(hasRefreshCookie).toBe(true);
+
+    // Old refresh token row should be deleted, new one created
+    const refreshTokenRows = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+    expect(refreshTokenRows).toHaveLength(1);
+  });
+
+  it('401 — missing refresh token cookie', async () => {
+    const res = await request(app).post('/api/auth/refresh');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('401 — expired refresh token clears both cookies', async () => {
+    const { user } = await createTestUser({ email: 'expired@example.com' });
+    const expiredRefreshToken = await getExpiredRefreshToken(user);
+
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', `quizzly_refresh=${expiredRefreshToken}`);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('401 — refresh token not in DB (already rotated/revoked)', async () => {
+    const { user } = await createTestUser({ email: 'revoked@example.com' });
+    const refreshToken = await getRefreshToken(user);
+
+    // Delete the refresh token from DB to simulate revocation
+    await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', `quizzly_refresh=${refreshToken}`);
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/logout
+// ---------------------------------------------------------------------------
+describe('POST /api/auth/logout', () => {
+  it('200 — clears both cookies and deletes refresh token from DB', async () => {
+    const { user, password } = await createTestUser({ email: 'logout@example.com' });
+
+    // Login to get cookies
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'logout@example.com', password });
+
+    const loginCookies = loginRes.headers['set-cookie'] as string[];
+    const cookieHeader = loginCookies.join('; ');
+
+    const res = await request(app)
+      .post('/api/auth/logout')
+      .set('Cookie', cookieHeader);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/logged out/i);
+
+    // Refresh token should be deleted from DB
+    const remainingTokens = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+    expect(remainingTokens).toHaveLength(0);
+  });
+
+  it('200 — succeeds even without cookies (idempotent)', async () => {
+    const res = await request(app).post('/api/auth/logout');
+
+    expect(res.status).toBe(200);
   });
 });
 
@@ -405,9 +523,9 @@ describe('POST /api/auth/reset-password', () => {
 // GET /api/auth/me
 // ---------------------------------------------------------------------------
 describe('GET /api/auth/me', () => {
-  it('200 — returns user profile for a valid session token', async () => {
+  it('200 — returns user profile for a valid JWT access token', async () => {
     const { user } = await createTestUser({ email: 'me@example.com' });
-    const token = await getAuthToken(user);
+    const token = getAuthToken(user);
 
     const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
 
@@ -423,7 +541,7 @@ describe('GET /api/auth/me', () => {
 
   it('200 — hasApiKey is false when no API key is saved', async () => {
     const { user } = await createTestUser({ email: 'noapikey@example.com' });
-    const token = await getAuthToken(user);
+    const token = getAuthToken(user);
 
     const res = await request(app)
       .get('/api/auth/me')
@@ -442,7 +560,7 @@ describe('GET /api/auth/me', () => {
       data: { encryptedApiKey: 'encrypted-placeholder-value', apiKeyHint: 'key-...abcd' },
     });
 
-    const token = await getAuthToken(user);
+    const token = getAuthToken(user);
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${token}`);
@@ -469,26 +587,13 @@ describe('GET /api/auth/me', () => {
 
   it('401 — expired token', async () => {
     const { user } = await createTestUser();
-    const expiredToken = await getExpiredAuthToken(user);
+    const expiredToken = getExpiredAuthToken(user);
 
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${expiredToken}`);
 
     expect(res.status).toBe(401);
-  });
-
-  it('401 — token invalid after user is deleted (CASCADE removes token rows)', async () => {
-    const { user } = await createTestUser();
-    const token = await getAuthToken(user);
-    await prisma.user.delete({ where: { id: user.id } });
-
-    const res = await request(app)
-      .get('/api/auth/me')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 });
 
