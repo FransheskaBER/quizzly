@@ -1,10 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from 'vitest';
 
 const { mockBaseQuery, mockCaptureException, mockLogout } = vi.hoisted(() => ({
   mockBaseQuery: vi.fn(),
   mockCaptureException: vi.fn(),
   mockLogout: vi.fn(() => ({ type: 'auth/logout' })),
 }));
+
+const mockFetch = vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+  json: async () => ({}),
+  text: async () => '',
+});
+
+beforeAll(() => {
+  vi.stubGlobal('fetch', mockFetch);
+});
+
+afterEach(() => {
+  mockFetch.mockClear();
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 vi.mock('@/config/sentry', () => ({
   Sentry: { captureException: mockCaptureException },
