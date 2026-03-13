@@ -30,7 +30,7 @@ export const errorHandler = (
     const isExpectedLoginFailure =
       err instanceof UnauthorizedError &&
       err.message === 'Invalid email or password' &&
-      req.path === '/api/auth/login';
+      (req.originalUrl?.split('?')[0] ?? req.path) === '/api/auth/login';
     if (!isExpectedLoginFailure) {
       Sentry.captureException(err, {
         extra: {

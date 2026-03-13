@@ -80,7 +80,12 @@ describe('errorHandler', () => {
 
   it('does not capture expected login failure (Invalid email or password) on POST /api/auth/login', () => {
     const res = createMockRes();
-    const loginReq = { ...mockReq, path: '/api/auth/login', method: 'POST' } as unknown as Request;
+    const loginReq = {
+      ...mockReq,
+      path: '/api/auth/login',
+      originalUrl: '/api/auth/login',
+      method: 'POST',
+    } as unknown as Request;
     const err = new UnauthorizedError('Invalid email or password');
 
     errorHandler(err, loginReq, res, mockNext);

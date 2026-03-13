@@ -13,9 +13,6 @@ CREATE TABLE "access_tokens" (
 CREATE UNIQUE INDEX "access_tokens_token_hash_key" ON "access_tokens"("token_hash");
 
 -- CreateIndex
-CREATE INDEX "access_tokens_token_hash_idx" ON "access_tokens"("token_hash");
-
--- CreateIndex
 CREATE INDEX "access_tokens_user_id_idx" ON "access_tokens"("user_id");
 
 -- AddForeignKey

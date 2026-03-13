@@ -228,6 +228,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('DB — free-trial generation enforces MCQ format even when free_text is requested', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const freeTextQuery = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.FREE_TEXT}&count=${MIN_QUESTION_COUNT}`;
 
@@ -276,6 +277,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('passes materialsText from ready materials to the LLM call', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     await createMaterial(session.id, 'Specific extracted content for the test');
 
@@ -294,6 +296,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('passes materialsText as null when session has no ready materials', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await request(app)
@@ -319,6 +322,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
   it('generates quiz using the stored user API key after free trial is used', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Step 1: save the API key
@@ -354,6 +358,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
 
   it('403 TRIAL_EXHAUSTED when free trial is used but no key is saved', async () => {
     const { user } = await createTestUser({ email: 'exhausted@example.com', username: 'exhausted' });
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await prisma.user.update({
@@ -438,6 +443,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('409 — another generation is already in progress for the session', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Seed a GENERATING attempt directly to simulate the concurrency scenario.
@@ -545,6 +551,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
 describe('GET /api/quizzes/:id', () => {
   it('200 — returns quiz with questions (no correctAnswer exposed)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -560,6 +567,7 @@ describe('GET /api/quizzes/:id', () => {
 
   it('200 — question includes id, questionNumber, questionType, questionText, options', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -619,6 +627,7 @@ describe('GET /api/quizzes/:id', () => {
 describe('PATCH /api/quizzes/:id/answers', () => {
   it('200 — returns { saved: 1 } when one valid answer is submitted', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -633,6 +642,7 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('200 — returns { saved: 0 } for invalid questionId (silently filtered)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -657,6 +667,7 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('409 — quiz is not in_progress (completed)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -677,6 +688,7 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('400 — invalid body (answers is not an array)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -718,6 +730,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('409 — quiz is already completed', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
     await prisma.quizAttempt.update({
@@ -736,6 +749,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('400 — not all questions answered (empty payload, no prior answers)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -756,6 +770,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 describe('POST /api/quizzes/:id/submit — happy path', () => {
   it('200 with Content-Type text/event-stream', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -771,6 +786,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('SSE stream contains progress, graded, and complete events', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -788,6 +804,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('complete event carries quizAttemptId and score', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -809,6 +826,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('DB — quiz is COMPLETED with score 100 after correct MCQ answer', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -829,6 +847,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('DB — quiz is COMPLETED with score 0 after incorrect MCQ answer', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -854,6 +873,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 describe('GET /api/quizzes/:id/results', () => {
   it('200 — returns results with correctAnswer, explanation, and per-answer data', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -885,6 +905,7 @@ describe('GET /api/quizzes/:id/results', () => {
 
   it('200 — summary counts are correct (1 correct)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -906,6 +927,7 @@ describe('GET /api/quizzes/:id/results', () => {
 
   it('400 — quiz is not yet completed', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -941,6 +963,7 @@ describe('POST /api/quizzes/:id/regrade — pre-stream errors', () => {
 
   it('409 — quiz is IN_PROGRESS (not submitted_ungraded)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -961,6 +984,7 @@ describe('POST /api/quizzes/:id/regrade — pre-stream errors', () => {
 describe('POST /api/quizzes/:id/regrade — happy path', () => {
   it('200 with Content-Type text/event-stream for a SUBMITTED_UNGRADED quiz', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -988,6 +1012,7 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
 
   it('DB — quiz is COMPLETED after successful regrade', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
