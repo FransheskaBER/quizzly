@@ -9,6 +9,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import styles from './SignupPage.module.css';
@@ -32,10 +33,11 @@ const SignupPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Signup failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'signup failed'), {
         extra: {
           operation: 'signup',
           email: data.email,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);

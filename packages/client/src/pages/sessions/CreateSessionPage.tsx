@@ -5,6 +5,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import type { CreateSessionRequest } from '@skills-trainer/shared';
 import styles from './CreateSessionPage.module.css';
 
@@ -21,7 +22,9 @@ const CreateSessionPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Create session failed:', err);
-      Sentry.captureException(err, { extra: { operation: 'createSession' } });
+      Sentry.captureException(toSentryError(err, 'create session failed'), {
+        extra: { operation: 'createSession', originalError: err },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'create-session', status);

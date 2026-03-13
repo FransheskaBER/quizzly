@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 
 import { SSE_CLIENT_WARNING_TIMEOUT_MS } from '@skills-trainer/shared';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 
 export interface GenericSSEEvent {
   type: string;
@@ -160,7 +161,9 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
                 };
                 // eslint-disable-next-line no-console
                 console.error('Failed to parse SSE event payload', err, context);
-                Sentry.captureException(err, { extra: context });
+                Sentry.captureException(toSentryError(err, 'SSE event parse failed'), {
+                  extra: { ...context, originalError: err },
+                });
               }
             }
           }
@@ -178,7 +181,9 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
         };
         // eslint-disable-next-line no-console
         console.error('SSE stream failed', err, context);
-        Sentry.captureException(err, { extra: context });
+        Sentry.captureException(toSentryError(err, 'SSE stream failed'), {
+          extra: { ...context, originalError: err },
+        });
         onErrorRef.current('Connection failed. Please check your connection and try again.');
         setStatus('error');
       }

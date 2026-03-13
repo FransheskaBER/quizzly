@@ -9,6 +9,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import styles from './ResetPasswordPage.module.css';
@@ -48,10 +49,11 @@ const ResetPasswordPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Reset password failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'reset password failed'), {
         extra: {
           operation: 'resetPassword',
           hasToken: Boolean(token),
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);

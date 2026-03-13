@@ -17,6 +17,7 @@ import { api } from '@/store/api';
 import { useAppDispatch } from '@/store/store';
 import { submitFailureReported } from '@/store/slices/quizSubmit.slice';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import styles from './QuizTakingPage.module.css';
 
 const AUTOSAVE_DELAY_MS = 1000;
@@ -77,13 +78,14 @@ const QuizTakingPage = () => {
       .catch((err: unknown) => {
         // eslint-disable-next-line no-console
         console.error('Quiz autosave failed:', err);
-        Sentry.captureException(err, {
+        Sentry.captureException(toSentryError(err, 'quiz autosave failed'), {
           extra: {
             operation: 'saveAnswers',
             stage: 'doSave',
             quizId: idRef.current,
             sessionId: quiz?.sessionId ?? null,
             pendingAnswerCount: entries.length,
+            originalError: err,
           },
         });
         const { code } = parseApiError(err);
@@ -165,12 +167,13 @@ const QuizTakingPage = () => {
         } else {
           // eslint-disable-next-line no-console
           console.error('Quiz submit failed:', err);
-          Sentry.captureException(err, {
+          Sentry.captureException(toSentryError(err, 'quiz submit failed'), {
             extra: {
               operation: 'submitQuiz',
               stage: 'submit',
               quizId: id,
               sessionId: quiz.sessionId,
+              originalError: err,
             },
           });
           const { code } = parseApiError(err);

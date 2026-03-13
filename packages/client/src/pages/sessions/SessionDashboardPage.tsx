@@ -23,6 +23,7 @@ import { QuizStatus, type CreateSessionRequest, type QuizAttemptSummary } from '
 import { api } from '@/store/api';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import {
   submitFailureCleared,
   submitFailureReported,
@@ -52,7 +53,9 @@ const readViewedFeedbackIds = (): string[] => {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Failed to read viewed feedback ids from storage:', err);
-    Sentry.captureException(err, { extra: { operation: 'readViewedFeedbackIds' } });
+    Sentry.captureException(toSentryError(err, 'read viewed feedback IDs failed'), {
+      extra: { operation: 'readViewedFeedbackIds', originalError: err },
+    });
     return [];
   }
 };
@@ -174,11 +177,12 @@ const SessionDashboardPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Retry quiz submission failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'retry submission failed'), {
         extra: {
           operation: 'handleRetrySubmission',
           sessionId: session.id,
           quizAttemptId,
+          originalError: err,
         },
       });
       const fbqErr = err as FetchBaseQueryError;
@@ -221,10 +225,11 @@ const SessionDashboardPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Update session failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'update session failed'), {
         extra: {
           operation: 'handleUpdateSession',
           sessionId: session.id,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
@@ -242,10 +247,11 @@ const SessionDashboardPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Delete session failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'delete session failed'), {
         extra: {
           operation: 'handleDeleteSession',
           sessionId: session.id,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
