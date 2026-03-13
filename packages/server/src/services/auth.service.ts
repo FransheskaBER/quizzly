@@ -124,16 +124,15 @@ export const refreshAccessToken = async (oldRefreshToken: string): Promise<Refre
   }
 
   const oldTokenHash = hashToken(oldRefreshToken);
-  const storedToken = await prisma.refreshToken.findUnique({
+
+  // Atomic delete — if a concurrent request already rotated this token, count is 0.
+  const { count } = await prisma.refreshToken.deleteMany({
     where: { tokenHash: oldTokenHash },
   });
 
-  if (!storedToken) {
+  if (count === 0) {
     throw new UnauthorizedError('Invalid or expired refresh token');
   }
-
-  // Delete old refresh token
-  await prisma.refreshToken.delete({ where: { id: storedToken.id } });
 
   // Generate new token pair
   const tokenPayload = { userId: payload.userId, email: payload.email };
