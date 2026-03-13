@@ -153,13 +153,9 @@ export const refreshAccessToken = async (oldRefreshToken: string): Promise<Refre
   return { accessToken, refreshToken: newRefreshToken };
 };
 
-/** Delete refresh token from DB if present. */
-export const logout = async (refreshToken: string | undefined): Promise<void> => {
-  if (!refreshToken) return;
-
-  const tokenHash = hashToken(refreshToken);
-  // deleteMany avoids throwing if token is already gone
-  await prisma.refreshToken.deleteMany({ where: { tokenHash } });
+/** Delete all refresh tokens for a user (revoke all sessions). */
+export const logout = async (userId: string): Promise<void> => {
+  await prisma.refreshToken.deleteMany({ where: { userId } });
 };
 
 export const verifyEmail = async (data: VerifyEmailRequest): Promise<MessageResponse> => {
