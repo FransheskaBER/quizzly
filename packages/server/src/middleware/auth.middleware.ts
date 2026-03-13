@@ -1,24 +1,43 @@
 import type { Request, Response, NextFunction } from 'express';
 import pino from 'pino';
 import { Sentry } from '../config/sentry.js';
-import { verifyAccessToken } from '../utils/token.utils.js';
+import { prisma } from '../config/database.js';
+import { hashToken } from '../utils/token.utils.js';
+import { getSessionCookieName } from '../utils/cookie.utils.js';
 import { UnauthorizedError } from '../utils/errors.js';
 
 const logger = pino({ name: 'auth.middleware' });
 
-export const auth = (req: Request, _res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
+export const auth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+  const token =
+    req.cookies?.[getSessionCookieName()] ??
+    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     next(new UnauthorizedError('Missing or invalid token'));
     return;
   }
 
-  const token = authHeader.slice(7);
-
   try {
-    const payload = verifyAccessToken(token);
-    req.user = payload;
+    const tokenHash = hashToken(token);
+    const accessToken = await prisma.accessToken.findUnique({
+      where: { tokenHash },
+      select: {
+        userId: true,
+        expiresAt: true,
+        user: { select: { email: true } },
+      },
+    });
+
+    if (!accessToken || accessToken.expiresAt < new Date()) {
+      next(new UnauthorizedError('Invalid or expired token'));
+      return;
+    }
+
+    req.user = {
+      userId: accessToken.userId,
+      email: accessToken.user.email,
+    };
     next();
   } catch (err) {
     logger.warn(
@@ -30,13 +49,9 @@ export const auth = (req: Request, _res: Response, next: NextFunction): void => 
         requestId: req.requestId,
         method: req.method,
         path: req.path,
-        operation: 'auth.middleware.verifyAccessToken',
+        operation: 'auth.middleware.tokenLookup',
       },
     });
-    if (err instanceof Error && err.name === 'TokenExpiredError') {
-      next(new UnauthorizedError('Token expired'));
-    } else {
-      next(new UnauthorizedError('Invalid token'));
-    }
+    next(new UnauthorizedError('Invalid token'));
   }
 };

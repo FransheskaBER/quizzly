@@ -6,8 +6,8 @@ import { RootErrorBoundary, RouteErrorBoundary } from '@/components/common/Error
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ToastContainer } from '@/components/common/ToastContainer';
-import { useAppSelector, useAppDispatch } from '@/store/store';
-import { selectIsAuthenticated, selectCurrentUser, logout } from '@/store/slices/auth.slice';
+import { useAppDispatch } from '@/store/store';
+import { logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
 
 const LandingPage = lazy(() => import('@/pages/landing/LandingPage'));
@@ -25,30 +25,22 @@ const QuizResultsPage = lazy(() => import('@/pages/quiz/QuizResultsPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 
 /**
- * Handles the "token in localStorage but user not yet in Redux" case on page reload.
- * Fires getMe once, populates the auth slice via onQueryStarted, then renders children.
- * While loading: shows a full-page spinner so protected routes never flash a login redirect.
- * On 401: baseQueryWithAuth dispatches logout(), token clears, routes render and redirect to /login.
+ * Discovers session on app load via getMe (cookie sent automatically with credentials: 'include').
+ * While loading: shows spinner. On success: user set in Redux. On 401/error: logout, redirect to /login.
  */
 const AuthGate = ({ children }: { children: ReactNode }) => {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const user = useAppSelector(selectCurrentUser);
   const dispatch = useAppDispatch();
+  const { isLoading, isError } = useGetMeQuery(undefined);
 
-  const needsHydration = isAuthenticated && user === null;
-
-  const { isLoading, isError } = useGetMeQuery(undefined, { skip: !needsHydration });
-
-  // On network failure getMe errors without clearing the token. Dispatch logout so
-  // ProtectedRoute redirects to /login instead of spinning forever. (401s are already
-  // handled by baseQueryWithAuth, so this only fires on non-auth network errors.)
+  // On network failure getMe errors (non-401). Dispatch logout so ProtectedRoute redirects to /login.
+  // 401s are handled by baseQueryWithAuth.
   useEffect(() => {
     if (isError) {
       dispatch(logout());
     }
   }, [isError, dispatch]);
 
-  if (needsHydration && isLoading) {
+  if (isLoading) {
     return <LoadingSpinner fullPage />;
   }
 

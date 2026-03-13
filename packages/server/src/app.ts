@@ -5,6 +5,7 @@ import './config/sentry.js';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import pino from 'pino';
 
@@ -50,6 +51,7 @@ export const createApp = () => {
     }),
   );
   app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+  app.use(cookieParser());
   app.use(express.json({ limit: '1mb' }));
   // genReqId reads the requestId already attached by requestIdMiddleware so that
   // pino-http's req.log child logger carries it — no second pino instance needed.

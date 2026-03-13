@@ -124,7 +124,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 
   it('201 — returns materialId, uploadUrl, and expiresIn', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -140,7 +140,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 
   it('DB — material created with processing status and correct sessionId', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -157,7 +157,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 
   it('400 — rejects when session already has 10 materials', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Fill up to the limit
@@ -176,7 +176,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 
   it('400 — invalid fileType', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -190,7 +190,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/sessions/00000000-0000-0000-0000-000000000000/materials/upload-url')
@@ -205,7 +205,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com' });
     const { user: other } = await createTestUser({ email: 'other@example.com' });
     const session = await createSession(owner.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .post(`/api/sessions/${session.id}/materials/upload-url`)
@@ -231,7 +231,7 @@ describe('POST /api/sessions/:sessionId/materials/upload-url', () => {
 describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
   it('200 — returns material with ready status after PDF extraction', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id, { fileType: 'pdf' });
 
@@ -247,7 +247,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
 
   it('DB — updates material to ready with extracted text and token count', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id, { fileType: 'pdf' });
 
@@ -263,7 +263,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
 
   it('200 — also works for DOCX files', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id, { fileType: 'docx' });
 
@@ -278,7 +278,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
 
   it('400 — marks as failed when extracted text is too short', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id);
 
@@ -297,7 +297,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
 
   it('400 — marks as failed when processing would exceed token budget', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Existing ready material consumes nearly the entire budget
@@ -319,7 +319,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
 
   it('404 — material does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -334,7 +334,7 @@ describe('POST /api/sessions/:sessionId/materials/:id/process', () => {
     const { user: other } = await createTestUser({ email: 'other@example.com' });
     const session = await createSession(owner.id);
     const material = await createMaterial(session.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .post(`/api/sessions/${session.id}/materials/${material.id}/process`)
@@ -391,7 +391,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
 
   it('201 — creates a material from a URL', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     mockFetch();
 
@@ -409,7 +409,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
 
   it('DB — material persisted with correct fields', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     mockFetch();
 
@@ -427,7 +427,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
 
   it('400 — rejects when session is at 10 material limit', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     mockFetch();
 
@@ -446,7 +446,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
 
   it('400 — invalid URL body', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -462,7 +462,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
     const { user: owner } = await createTestUser({ email: 'owner2@example.com' });
     const { user: other } = await createTestUser({ email: 'other2@example.com' });
     const session = await createSession(owner.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .post(`/api/sessions/${session.id}/materials/extract-url`)
@@ -487,7 +487,7 @@ describe('POST /api/sessions/:sessionId/materials/extract-url', () => {
 describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
   it('204 — deletes the material', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id, { status: 'ready' });
 
@@ -500,7 +500,7 @@ describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
 
   it('DB — material is removed from database', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id);
 
@@ -514,7 +514,7 @@ describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
 
   it('calls deleteObject on S3 when material has an s3Key', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const s3Key = `sessions/${session.id}/file.pdf`;
     const material = await createMaterial(session.id, { s3Key });
@@ -528,7 +528,7 @@ describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
 
   it('does not call deleteObject when material has no s3Key (URL material)', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const material = await createMaterial(session.id, { s3Key: null, fileType: 'url' });
 
@@ -541,7 +541,7 @@ describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
 
   it('404 — material does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -556,7 +556,7 @@ describe('DELETE /api/sessions/:sessionId/materials/:id', () => {
     const { user: other } = await createTestUser({ email: 'other3@example.com' });
     const session = await createSession(owner.id);
     const material = await createMaterial(session.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .delete(`/api/sessions/${session.id}/materials/${material.id}`)

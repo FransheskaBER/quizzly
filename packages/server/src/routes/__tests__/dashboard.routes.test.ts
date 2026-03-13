@@ -90,7 +90,7 @@ describe('GET /api/dashboard — unauthenticated', () => {
 describe('GET /api/dashboard — new user', () => {
   it('returns zero counts and null fields for a user with no data', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/dashboard')
@@ -113,7 +113,7 @@ describe('GET /api/dashboard — new user', () => {
 describe('GET /api/dashboard — user with data', () => {
   it('returns correct aggregated stats', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const tsSession = await createSession(user.id, 'TypeScript');
     const jsSession = await createSession(user.id, 'JavaScript');
@@ -141,7 +141,7 @@ describe('GET /api/dashboard — user with data', () => {
 
   it('returns null averageScore when all quizzes are in-progress', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const session = await createSession(user.id, 'Python');
     await createQuizAttempt(user.id, session.id, { status: 'in_progress', score: null });
@@ -165,7 +165,7 @@ describe('GET /api/dashboard — data isolation', () => {
   it("User B sees only their own stats, not User A's", async () => {
     const { user: userA } = await createTestUser({ email: 'a@example.com', username: 'userA' });
     const { user: userB } = await createTestUser({ email: 'b@example.com', username: 'userB' });
-    const tokenB = getAuthToken(userB);
+    const tokenB = await getAuthToken(userB);
 
     // Seed data for User A only
     const session = await createSession(userA.id, 'TypeScript');

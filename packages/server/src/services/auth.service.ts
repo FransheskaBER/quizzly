@@ -19,11 +19,13 @@ import type {
 import { prisma } from '../config/database.js';
 import { hashPassword, comparePassword } from '../utils/password.utils.js';
 import {
-  generateAccessToken,
+  generateOpaqueAccessToken,
   generateVerificationToken,
   generateResetToken,
   hashToken,
+  parseExpiresInMs,
 } from '../utils/token.utils.js';
+import { env } from '../config/env.js';
 import {
   ConflictError,
   UnauthorizedError,
@@ -63,7 +65,10 @@ export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
   return { message: 'Account created. Please check your email to verify.' };
 };
 
-export const login = async (data: LoginRequest): Promise<LoginResponse> => {
+/** Internal: includes rawToken for cookie. Route strips before sending to client. */
+export type LoginResult = LoginResponse & { rawToken: string };
+
+export const login = async (data: LoginRequest): Promise<LoginResult> => {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
 
   // Same error message whether email or password is wrong — never reveal which
@@ -80,11 +85,20 @@ export const login = async (data: LoginRequest): Promise<LoginResponse> => {
     throw new EmailNotVerifiedError('Please verify your email before logging in');
   }
 
-  const token = generateAccessToken({ userId: user.id, email: user.email });
+  const { token: rawToken, hash: tokenHash } = generateOpaqueAccessToken();
+  const expiresAt = new Date(Date.now() + parseExpiresInMs(env.JWT_EXPIRES_IN));
+
+  await prisma.accessToken.create({
+    data: {
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    },
+  });
 
   return {
-    token,
     user: { id: user.id, email: user.email, username: user.username },
+    rawToken,
   };
 };
 
