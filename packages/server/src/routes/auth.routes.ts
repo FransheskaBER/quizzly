@@ -73,12 +73,20 @@ router.post(
   asyncHandler(async (req, res) => {
     const oldRefreshToken = req.cookies?.[getRefreshCookieName()] as string | undefined;
     if (!oldRefreshToken) {
+      clearSessionCookie(res);
+      clearRefreshCookie(res);
       throw new UnauthorizedError('Missing refresh token');
     }
-    const { accessToken, refreshToken } = await authService.refreshAccessToken(oldRefreshToken);
-    setSessionCookie(res, accessToken);
-    setRefreshCookie(res, refreshToken);
-    res.status(200).json({ message: 'Token refreshed' });
+    try {
+      const { accessToken, refreshToken } = await authService.refreshAccessToken(oldRefreshToken);
+      setSessionCookie(res, accessToken);
+      setRefreshCookie(res, refreshToken);
+      res.status(200).json({ message: 'Token refreshed' });
+    } catch (err) {
+      clearSessionCookie(res);
+      clearRefreshCookie(res);
+      throw err;
+    }
   }),
 );
 
