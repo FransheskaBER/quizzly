@@ -190,6 +190,15 @@ function findDuplicates(items: string[]): string[] { ... }
 - E2E tests: live in `e2e/` folder at project root, organized by user journey.
 - Test file naming: `{source-filename}.test.ts`. Example: `auth.service.ts` → `auth.service.test.ts`.
 
+## Test Database Isolation
+
+Tests must NEVER connect to a remote or production database. This is a non-negotiable safety rule — violating it causes irreversible data loss.
+
+- `TEST_DATABASE_URL` is required. The vitest config must call `requireEnv('TEST_DATABASE_URL')` — never fall back to `DATABASE_URL`.
+- `setup.ts` validates locality. The test setup file must reject any `DATABASE_URL` that doesn't contain `localhost` or `127.0.0.1`.
+- CI uses its own container. GitHub Actions spins up a disposable Postgres service — it never touches Neon or any remote database.
+- Never add a `??` fallback that uses `DATABASE_URL` when `TEST_DATABASE_URL` is missing. Fail loudly instead.
+
 ## Testing Conventions
 
 All coding conventions above apply to test code. Tests are code — they must be readable, descriptive, and maintainable. These additional rules apply:
