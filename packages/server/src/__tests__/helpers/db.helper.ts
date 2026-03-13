@@ -12,8 +12,12 @@ export const prisma = new PrismaClient({ datasourceUrl: testDbUrl });
 /**
  * Truncates all tables between tests to ensure isolation.
  * Cascades to all child tables (sessions, materials, quiz_attempts, etc.)
+ * No-op when USE_DB_COPY=1 — tests run against the full copied dataset.
  */
 export const cleanDatabase = async (): Promise<void> => {
+  if (process.env.USE_DB_COPY === '1' || process.env.USE_DB_COPY === 'true') {
+    return;
+  }
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE users, password_resets CASCADE',
   );

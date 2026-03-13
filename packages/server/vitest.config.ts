@@ -19,6 +19,7 @@ export default defineConfig({
     // Integration tests share a single Postgres database — run files serially
     // to prevent cleanDatabase() in one suite from deleting rows mid-test in another.
     fileParallelism: false,
+    globalSetup: ['src/__tests__/globalSetup.ts'],
     setupFiles: ['src/__tests__/setup.ts'],
     env: {
       NODE_ENV: 'test',
