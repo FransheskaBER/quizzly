@@ -54,7 +54,13 @@ export function toSentryError(err: unknown, fallbackMessage: string): Error {
   const inner = isObjectLike(err) ? err.error : undefined;
   if (inner instanceof Error) return inner;
 
-  const message = extractErrorMessage(err) ?? extractErrorMessage(inner) ?? fallbackMessage;
+  // Preserve primitive thrown values (e.g. string rejections) as the message
+  const primitiveMessage =
+    typeof err === 'string' ? err
+    : (!isObjectLike(err) && err != null) ? String(err)
+    : undefined;
+
+  const message = extractErrorMessage(err) ?? extractErrorMessage(inner) ?? primitiveMessage ?? fallbackMessage;
   const sentryError = new Error(message);
   (sentryError as Error & { originalError?: unknown }).originalError = err;
   return sentryError;
@@ -70,4 +76,5 @@ export const captureExceptionOnce = (error: unknown, context?: CaptureContext): 
   }
   Sentry.captureException(normalized, context);
   markErrorAsCaptured(error);
+  if (normalized !== error) markErrorAsCaptured(normalized);
 };
