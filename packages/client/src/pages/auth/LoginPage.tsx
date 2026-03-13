@@ -38,9 +38,9 @@ const LoginPage = () => {
     } catch (err) {
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
-      // 401 (wrong credentials) and 409 (duplicate email) are expected user errors.
-      // Only report unexpected failures (5xx, network errors) to Sentry.
-      const isExpectedAuthError = status === 401 || status === 409;
+      // 401 (wrong credentials) is an expected user error for login.
+      // Only report unexpected failures (5xx, network errors, unexpected statuses) to Sentry.
+      const isExpectedAuthError = status === 401;
       if (!isExpectedAuthError) {
         // eslint-disable-next-line no-console
         console.error('Login failed:', err);
