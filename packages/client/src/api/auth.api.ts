@@ -1,6 +1,7 @@
 import { api } from '@/store/api';
 import { setCredentials, logout } from '@/store/slices/auth.slice';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import type {
   SignupRequest,
   LoginRequest,
@@ -25,13 +26,6 @@ const shouldCaptureHydration401 = (): boolean => {
   lastHydration401CaptureAt = now;
   return true;
 };
-
-function toSentryError(err: unknown, fallbackMessage: string): Error {
-  if (err instanceof Error) return err;
-  const inner = (err as { error?: unknown })?.error;
-  if (inner instanceof Error) return inner;
-  return new Error(fallbackMessage);
-}
 
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -96,6 +90,7 @@ export const authApi = api.injectEndpoints({
                   reason: 'unauthorized',
                   status: 401,
                   telemetryMode: 'rate-limited',
+                  originalError: err,
                 },
               });
             }
@@ -112,6 +107,7 @@ export const authApi = api.injectEndpoints({
                 route: '/auth/me',
                 reason: 'non-401',
                 status: status ?? null,
+                originalError: err,
               },
             },
           );

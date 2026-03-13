@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { useAppDispatch } from '@/store/store';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import styles from './ProfilePage.module.css';
 
 const ApiKeySection = () => {
@@ -47,9 +48,10 @@ const ApiKeySection = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Save API key failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'save API key failed'), {
         extra: {
           operation: 'saveApiKey',
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
@@ -68,9 +70,10 @@ const ApiKeySection = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Delete API key failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'delete API key failed'), {
         extra: {
           operation: 'deleteApiKey',
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);

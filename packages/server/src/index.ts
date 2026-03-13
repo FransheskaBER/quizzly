@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import pino from 'pino';
 import { Sentry } from './config/sentry.js';
 import { createShutdownManager } from './utils/process-shutdown.utils.js';
+import { toSentryError } from './utils/sentry.utils.js';
 
 const logger = pino({ name: 'server' });
 const app = createApp();
@@ -27,11 +28,17 @@ process.on('SIGTERM', () => shutdown({ signal: 'SIGTERM', exitCode: 0, shouldFlu
 process.on('SIGINT', () => shutdown({ signal: 'SIGINT', exitCode: 0, shouldFlushSentry: false }));
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception');
-  Sentry.captureException(err, { extra: { operation: 'process.uncaughtException' } });
+  const sentryError = toSentryError(err, 'Uncaught exception');
+  Sentry.captureException(sentryError, {
+    extra: { operation: 'process.uncaughtException', originalError: err },
+  });
   shutdown({ exitCode: 1, shouldFlushSentry: true });
 });
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'Unhandled promise rejection');
-  Sentry.captureException(reason, { extra: { operation: 'process.unhandledRejection' } });
+  const sentryError = toSentryError(reason, 'Unhandled promise rejection');
+  Sentry.captureException(sentryError, {
+    extra: { operation: 'process.unhandledRejection', originalError: reason },
+  });
   shutdown({ exitCode: 1, shouldFlushSentry: true });
 });

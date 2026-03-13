@@ -9,6 +9,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import { FormField } from '@/components/common/FormField';
 import { Button } from '@/components/common/Button';
 import styles from './LoginPage.module.css';
@@ -39,12 +40,13 @@ const LoginPage = () => {
       const status = extractHttpStatus(err);
       // eslint-disable-next-line no-console
       console.error('Login failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'login failed'), {
         extra: {
           operation: 'login',
           email: data.email,
           code,
           status: status ?? null,
+          originalError: err,
         },
       });
       if (code === 'EMAIL_NOT_VERIFIED') {
@@ -65,10 +67,11 @@ const LoginPage = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Failed to resend verification email:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'resend verification failed'), {
         extra: {
           operation: 'resendVerification',
           email: unverifiedEmail,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
