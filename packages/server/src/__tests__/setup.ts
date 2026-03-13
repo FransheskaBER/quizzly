@@ -5,14 +5,22 @@
 
 // Safety guard: block tests from running against a remote database.
 // Prevents accidental data loss if TEST_DATABASE_URL points to production.
-const testDbUrl = process.env.TEST_DATABASE_URL ?? '';
+const testDbUrl = process.env.TEST_DATABASE_URL;
+
+if (!testDbUrl || !testDbUrl.trim()) {
+  throw new Error(
+    `TEST_DATABASE_URL environment variable is missing or empty.\n` +
+      `Set TEST_DATABASE_URL to your local Postgres for running tests (e.g., postgresql://postgres:postgres@localhost:5432/quizzly_test).`,
+  );
+}
+
 const isLocalDatabase = /localhost|127\.0\.0\.1/.test(testDbUrl);
 if (!isLocalDatabase) {
   throw new Error(
     `DANGER: TEST_DATABASE_URL appears to point to a remote database.\n` +
-    `URL: ${testDbUrl.replace(/\/\/.*:.*@/, '//***:***@')}\n` +
-    `Tests must run against a local database to prevent data loss.\n` +
-    `Set TEST_DATABASE_URL to your local Postgres (e.g., postgresql://postgres:postgres@localhost:5432/quizzly_test)`,
+      `URL: ${testDbUrl.replace(/\/\/.*:.*@/, '//***:***@')}\n` +
+      `Tests must run against a local database to prevent data loss.\n` +
+      `Set TEST_DATABASE_URL to your local Postgres (e.g., postgresql://postgres:postgres@localhost:5432/quizzly_test)`,
   );
 }
 
