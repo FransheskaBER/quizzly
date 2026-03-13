@@ -20,7 +20,10 @@ const app = createApp();
 const VALID_API_KEY = 'sk-ant-test-nonsecret-validation-value-1234567890';
 
 beforeAll(async () => {
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  execSync('npx prisma migrate deploy', {
+    env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+    stdio: 'inherit',
+  });
 });
 
 afterEach(async () => {

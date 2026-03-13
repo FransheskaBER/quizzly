@@ -194,8 +194,11 @@ function findDuplicates(items: string[]): string[] { ... }
 
 Tests must NEVER connect to a remote or production database. This is a non-negotiable safety rule — violating it causes irreversible data loss.
 
+- Tests use `TEST_DATABASE_URL` only — never reference `process.env.DATABASE_URL` in test code. Tests run against a copy of the original database.
+- `database.ts` and `db.helper.ts` use `datasourceUrl` override with `TEST_DATABASE_URL` when `NODE_ENV=test`.
 - `TEST_DATABASE_URL` is required. The vitest config must call `requireEnv('TEST_DATABASE_URL')` — never fall back to `DATABASE_URL`.
-- `setup.ts` validates locality. The test setup file must reject any `DATABASE_URL` that doesn't contain `localhost` or `127.0.0.1`.
+- `setup.ts` validates `TEST_DATABASE_URL` locality (localhost or 127.0.0.1).
+- For `prisma migrate deploy` in tests, pass `DATABASE_URL: process.env.TEST_DATABASE_URL` in `execSync` env only — satisfies Prisma CLI; test logic never uses `DATABASE_URL`.
 - CI uses its own container. GitHub Actions spins up a disposable Postgres service — it never touches Neon or any remote database.
 - Never add a `??` fallback that uses `DATABASE_URL` when `TEST_DATABASE_URL` is missing. Fail loudly instead.
 

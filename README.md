@@ -164,6 +164,7 @@ Open `http://localhost:5173`. The API is at `http://localhost:3000/api`.
 | *packages/server* | `start` | `node dist/index.js` |
 | *packages/server* | `typecheck` | `tsc --noEmit` |
 | *packages/server* | `test` | Vitest run (unit + integration) |
+| *packages/server* | `copy-db` | Deep copy DATABASE_URL → TEST_DATABASE_URL (when USE_DB_COPY=1) |
 | *packages/server* | `eval:generation` | Offline LLM generation eval |
 | *packages/server* | `eval:grading` | Offline LLM grading eval |
 | *packages/server* | `eval:scorecard` | Print scorecard from eval runs |
@@ -249,6 +250,17 @@ Use this checklist to keep a public repository secure:
 | **LLM Prompt Evaluation** | `npm run eval:generation -w packages/server` | `ANTHROPIC_API_KEY` in `packages/server/.env` |
 | | `npm run eval:grading -w packages/server` | Run after eval:generation |
 | | `npm run eval:scorecard -w packages/server` | Print scorecard from eval runs |
+
+### Deep full copy (optional)
+
+To run tests against a **copy** of your dev database (schema + data) instead of empty tables:
+
+1. Ensure `DATABASE_URL` points to your local dev DB (with data) and `TEST_DATABASE_URL` to a local test DB.
+2. Create the test DB if needed: `createdb quizzly_test` (or via Docker).
+3. Set `USE_DB_COPY=1` in `packages/server/.env` (or run `USE_DB_COPY=1 npm test`).
+4. Run tests: `npm test -w packages/server`.
+
+Requires `pg_dump` and `psql` (PostgreSQL client tools). When `USE_DB_COPY=1`, `cleanDatabase` is skipped so tests run against the copied data. In CI, the copy is skipped (no source with data); tests use migrations + fixtures.
 
 ---
 
