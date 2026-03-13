@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 
+import { safeMarkdownComponents } from './markdown-components';
 import styles from './MCQOptions.module.css';
 
 interface MCQOptionsProps {
@@ -32,7 +33,7 @@ export const MCQOptions = ({ options, selectedOption, groupName, onSelect }: MCQ
           />
           <span className={styles.optionLabel}>{label}.</span>
           <span className={styles.optionText}>
-            <ReactMarkdown>{option}</ReactMarkdown>
+            <ReactMarkdown components={safeMarkdownComponents}>{option}</ReactMarkdown>
           </span>
         </label>
       );
