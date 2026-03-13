@@ -56,7 +56,10 @@ const makePdfDoc = (text: string) => ({
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  execSync('npx prisma migrate deploy', {
+    env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+    stdio: 'inherit',
+  });
 });
 
 beforeEach(() => {
