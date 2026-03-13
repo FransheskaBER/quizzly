@@ -31,10 +31,12 @@
     "pdfjs-dist": "^5.4.296",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
+    "cookie-parser": "^1.4.7",
     "resend": "^4.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

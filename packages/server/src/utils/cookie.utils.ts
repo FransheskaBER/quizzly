@@ -6,13 +6,13 @@ const SESSION_COOKIE_NAME = 'quizzly_session';
 
 /** Sets the session cookie with the raw access token. */
 export const setSessionCookie = (res: Response, rawToken: string): void => {
-  const maxAgeSeconds = Math.floor(parseExpiresInMs(env.JWT_EXPIRES_IN) / 1000);
+  const maxAgeMs = parseExpiresInMs(env.JWT_EXPIRES_IN);
   res.cookie(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/api',
-    maxAge: maxAgeSeconds,
+    maxAge: maxAgeMs,
   });
 };
 

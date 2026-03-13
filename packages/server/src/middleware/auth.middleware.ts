@@ -22,7 +22,11 @@ export const auth = async (req: Request, _res: Response, next: NextFunction): Pr
     const tokenHash = hashToken(token);
     const accessToken = await prisma.accessToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      select: {
+        userId: true,
+        expiresAt: true,
+        user: { select: { email: true } },
+      },
     });
 
     if (!accessToken || accessToken.expiresAt < new Date()) {
