@@ -1,4 +1,8 @@
+import dotenv from 'dotenv';
 import { defineConfig } from 'vitest/config';
+
+// Load .env before reading env vars — process.env is empty at config time.
+dotenv.config();
 
 const requireEnv = (key: string): string => {
   const value = process.env[key];
@@ -18,7 +22,7 @@ export default defineConfig({
     setupFiles: ['src/__tests__/setup.ts'],
     env: {
       NODE_ENV: 'test',
-      DATABASE_URL: process.env.TEST_DATABASE_URL ?? requireEnv('DATABASE_URL'),
+      DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
       JWT_SECRET: requireEnv('JWT_SECRET'),
       JWT_EXPIRES_IN: '7d',
       CLIENT_URL: 'http://localhost:5173',
