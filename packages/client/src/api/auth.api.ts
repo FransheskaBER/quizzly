@@ -77,8 +77,14 @@ export const authApi = api.injectEndpoints({
             }),
           );
         } catch (err) {
+          const status = (err as { error?: { status?: number | string } })?.error?.status;
+
+          // Network failure (backend unreachable) — not actionable in Sentry.
+          // In production Render deploys both services; in dev the console
+          // already surfaces the connectivity error.
+          if (status === 'FETCH_ERROR') return;
+
           // 401 is handled globally by baseQueryWithAuth (dispatches logout()).
-          const status = (err as { error?: { status?: number } })?.error?.status;
           if (status === 401) {
             if (shouldCaptureHydration401()) {
               // eslint-disable-next-line no-console

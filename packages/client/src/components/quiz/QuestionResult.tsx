@@ -5,6 +5,7 @@ import type { QuestionResult as QuestionResultType } from '@skills-trainer/share
 import { QuestionType } from '@skills-trainer/shared';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { safeMarkdownComponents } from './markdown-components';
 import styles from './QuestionResult.module.css';
 
 interface QuestionResultProps {
@@ -31,7 +32,7 @@ const QuestionResultInner = ({ result }: QuestionResultProps) => {
       </div>
 
       <div className={styles.questionText}>
-        <ReactMarkdown>{result.questionText}</ReactMarkdown>
+        <ReactMarkdown components={safeMarkdownComponents}>{result.questionText}</ReactMarkdown>
       </div>
 
       {isMcq && result.options && (
@@ -64,7 +65,7 @@ const QuestionResultInner = ({ result }: QuestionResultProps) => {
           <div className={styles.answerBlock}>
             <span className={styles.answerLabel}>Model answer</span>
             <div className={styles.answerText}>
-              <ReactMarkdown>{result.correctAnswer}</ReactMarkdown>
+              <ReactMarkdown components={safeMarkdownComponents}>{result.correctAnswer}</ReactMarkdown>
             </div>
           </div>
         </div>
@@ -82,7 +83,7 @@ const QuestionResultInner = ({ result }: QuestionResultProps) => {
           Explanation
         </summary>
         <div className={styles.explanationText}>
-          <ReactMarkdown>{result.explanation}</ReactMarkdown>
+          <ReactMarkdown components={safeMarkdownComponents}>{result.explanation}</ReactMarkdown>
         </div>
       </details>
     </div>

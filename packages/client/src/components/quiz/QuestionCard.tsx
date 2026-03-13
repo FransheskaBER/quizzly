@@ -9,6 +9,7 @@ import type { Question } from '@skills-trainer/shared';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { MCQOptions } from './MCQOptions';
 import { FreeTextInput } from './FreeTextInput';
+import { safeMarkdownComponents } from './markdown-components';
 import styles from './QuestionCard.module.css';
 
 interface QuestionCardProps {
@@ -19,6 +20,7 @@ interface QuestionCardProps {
 }
 
 const codeComponents = {
+  ...safeMarkdownComponents,
   code({ className, children }: { className?: string; children?: React.ReactNode }) {
     const language = /language-(\w+)/.exec(className ?? '')?.[1];
     const codeString = Array.isArray(children) ? children.join('') : String(children ?? '');
