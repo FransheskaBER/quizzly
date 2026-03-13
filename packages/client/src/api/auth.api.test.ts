@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { mockCaptureException } = vi.hoisted(() => ({
   mockCaptureException: vi.fn(),
@@ -21,13 +21,9 @@ vi.mock('@/store/api', () => ({
 
 import { authApi } from './auth.api';
 
-describe('authApi getMe hydration telemetry (FE-013)', () => {
-  beforeEach(() => {
-    mockCaptureException.mockReset();
-  });
-
-  it('rate-limits 401 hydration telemetry and includes unauthorized context', async () => {
-    const endpoints = authApi.endpoints as unknown as {
+const getOnQueryStarted = () =>
+  (
+    authApi.endpoints as unknown as {
       getMe: {
         onQueryStarted: (
           args: void,
@@ -38,8 +34,36 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
           },
         ) => Promise<void>;
       };
-    };
-    const onQueryStarted = endpoints.getMe.onQueryStarted;
+    }
+  ).getMe.onQueryStarted;
+
+describe('authApi getMe hydration telemetry (FE-013)', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    mockCaptureException.mockReset();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('silently ignores FETCH_ERROR: no Sentry capture and no console.error', async () => {
+    const onQueryStarted = getOnQueryStarted();
+
+    await onQueryStarted(undefined, {
+      dispatch: vi.fn(),
+      queryFulfilled: Promise.reject({ error: { status: 'FETCH_ERROR' } }),
+      getState: () => ({}),
+    });
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits 401 hydration telemetry and includes unauthorized context', async () => {
+    const onQueryStarted = getOnQueryStarted();
 
     await onQueryStarted(undefined, {
       dispatch: vi.fn(),
@@ -69,20 +93,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
   });
 
   it('captures non-401 getMe hydration failures with normalized Error', async () => {
-    const onQueryStarted = (
-      authApi.endpoints as unknown as {
-        getMe: {
-          onQueryStarted: (
-            args: void,
-            api: {
-              dispatch: () => void;
-              queryFulfilled: Promise<unknown>;
-              getState: () => unknown;
-            }
-          ) => Promise<void>;
-        };
-      }
-    ).getMe.onQueryStarted;
+    const onQueryStarted = getOnQueryStarted();
 
     await onQueryStarted(undefined, {
       dispatch: vi.fn(),
