@@ -1,35 +1,102 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import jwt from 'jsonwebtoken';
+
+import { env } from '../../config/env.js';
 import {
-  generateOpaqueAccessToken,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
   parseExpiresInMs,
   generateVerificationToken,
   generateResetToken,
   hashToken,
 } from '../token.utils.js';
 
-describe('generateOpaqueAccessToken', () => {
-  it('returns a token string and a hash', () => {
-    const { token, hash } = generateOpaqueAccessToken();
-    expect(typeof token).toBe('string');
-    expect(typeof hash).toBe('string');
+describe('generateAccessToken', () => {
+  it('returns a valid JWT signed with JWT_SECRET', () => {
+    const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+    expect(decoded.userId).toBe('user-123');
+    expect(decoded.email).toBe('test@example.com');
   });
 
-  it('token is ~64 hex characters (32 bytes)', () => {
-    const { token } = generateOpaqueAccessToken();
-    expect(token).toMatch(/^[0-9a-f]{64}$/);
+  it('sets expiry to 15 minutes', () => {
+    const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    const decoded = jwt.decode(token) as jwt.JwtPayload;
+    const expiryDuration = decoded.exp! - decoded.iat!;
+    expect(expiryDuration).toBe(15 * 60);
   });
 
-  it('hash is SHA-256 of the token', () => {
-    const { token, hash } = generateOpaqueAccessToken();
-    expect(hashToken(token)).toBe(hash);
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  it('two calls produce different tokens (different iat)', () => {
+    vi.useFakeTimers();
+    const tokenA = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    vi.advanceTimersByTime(1000); // advance 1 second so iat differs
+    const tokenB = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    vi.useRealTimers();
+    expect(tokenA).not.toBe(tokenB);
+  });
+});
+
+describe('generateRefreshToken', () => {
+  it('returns a valid JWT signed with REFRESH_SECRET', () => {
+    const token = generateRefreshToken({ userId: 'user-123', email: 'test@example.com' });
+    const decoded = jwt.verify(token, env.REFRESH_SECRET) as jwt.JwtPayload;
+    expect(decoded.userId).toBe('user-123');
+    expect(decoded.email).toBe('test@example.com');
   });
 
-  it('two calls produce different tokens', () => {
-    const a = generateOpaqueAccessToken();
-    const b = generateOpaqueAccessToken();
-    expect(a.token).not.toBe(b.token);
-    expect(a.hash).not.toBe(b.hash);
+  it('sets expiry to 7 days', () => {
+    const token = generateRefreshToken({ userId: 'user-123', email: 'test@example.com' });
+    const decoded = jwt.decode(token) as jwt.JwtPayload;
+    const expiryDuration = decoded.exp! - decoded.iat!;
+    expect(expiryDuration).toBe(7 * 24 * 60 * 60);
+  });
+});
+
+describe('verifyAccessToken', () => {
+  it('returns payload for a valid access token', () => {
+    const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    const payload = verifyAccessToken(token);
+    expect(payload).toEqual({ userId: 'user-123', email: 'test@example.com' });
+  });
+
+  it('returns null for an expired access token', () => {
+    const token = jwt.sign({ userId: 'user-123', email: 'test@example.com' }, env.JWT_SECRET, { expiresIn: '0s' });
+    const payload = verifyAccessToken(token);
+    expect(payload).toBeNull();
+  });
+
+  it('returns null for a token signed with wrong secret', () => {
+    const token = jwt.sign({ userId: 'user-123', email: 'test@example.com' }, 'wrong-secret');
+    const payload = verifyAccessToken(token);
+    expect(payload).toBeNull();
+  });
+
+  it('returns null for a refresh token (signed with REFRESH_SECRET)', () => {
+    const token = generateRefreshToken({ userId: 'user-123', email: 'test@example.com' });
+    const payload = verifyAccessToken(token);
+    expect(payload).toBeNull();
+  });
+});
+
+describe('verifyRefreshToken', () => {
+  it('returns payload for a valid refresh token', () => {
+    const token = generateRefreshToken({ userId: 'user-123', email: 'test@example.com' });
+    const payload = verifyRefreshToken(token);
+    expect(payload).toEqual({ userId: 'user-123', email: 'test@example.com' });
+  });
+
+  it('returns null for an expired refresh token', () => {
+    const token = jwt.sign({ userId: 'user-123', email: 'test@example.com' }, env.REFRESH_SECRET, { expiresIn: '0s' });
+    const payload = verifyRefreshToken(token);
+    expect(payload).toBeNull();
+  });
+
+  it('returns null for an access token (signed with JWT_SECRET)', () => {
+    const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    const payload = verifyRefreshToken(token);
+    expect(payload).toBeNull();
   });
 });
 

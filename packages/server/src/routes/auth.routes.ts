@@ -17,7 +17,13 @@ import {
   resetPasswordSchema,
 } from '@skills-trainer/shared';
 import { UnauthorizedError } from '../utils/errors.js';
-import { setSessionCookie, clearSessionCookie } from '../utils/cookie.utils.js';
+import {
+  setSessionCookie,
+  clearSessionCookie,
+  setRefreshCookie,
+  clearRefreshCookie,
+  getRefreshCookieName,
+} from '../utils/cookie.utils.js';
 
 const router = Router();
 
@@ -44,17 +50,35 @@ router.post(
   loginLimiter,
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
-    const { rawToken, ...result } = await authService.login(req.body);
-    setSessionCookie(res, rawToken);
+    const { accessToken, refreshToken, ...result } = await authService.login(req.body);
+    setSessionCookie(res, accessToken);
+    setRefreshCookie(res, refreshToken);
     res.status(200).json(result);
   }),
 );
 
 router.post(
   '/logout',
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const refreshToken = req.cookies?.[getRefreshCookieName()] as string | undefined;
+    await authService.logout(refreshToken);
     clearSessionCookie(res);
+    clearRefreshCookie(res);
     res.status(200).json({ message: 'Logged out' });
+  }),
+);
+
+router.post(
+  '/refresh',
+  asyncHandler(async (req, res) => {
+    const oldRefreshToken = req.cookies?.[getRefreshCookieName()] as string | undefined;
+    if (!oldRefreshToken) {
+      throw new UnauthorizedError('Missing refresh token');
+    }
+    const { accessToken, refreshToken } = await authService.refreshAccessToken(oldRefreshToken);
+    setSessionCookie(res, accessToken);
+    setRefreshCookie(res, refreshToken);
+    res.status(200).json({ message: 'Token refreshed' });
   }),
 );
 

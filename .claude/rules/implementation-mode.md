@@ -101,3 +101,16 @@ Do not add features, utilities, abstractions, or "nice-to-haves" that are not in
 - No error handling for scenarios the spec doesn't identify as failure paths.
 
 If you think something is missing from the spec, go back to Rule 1: STOP and ask.
+
+## Rule 8: Failure-Path Side Effects
+
+When an acceptance criterion specifies side effects on the error path (e.g., "returns 401, clears both cookies"), implement explicit error handling in the route handler. Do not rely on error middleware or `asyncHandler` for resource cleanup — they only handle response formatting.
+
+Specifically:
+- If the spec says "on failure, clear cookies" — add a try/catch that clears cookies before re-throwing.
+- If the spec says "on failure, delete DB record" — add explicit cleanup logic in the handler.
+- If the spec says "on failure, invalidate cache" — handle it at the route level, not in middleware.
+
+Error middleware owns response formatting. Route handlers own resource cleanup on failure. These are separate responsibilities.
+
+When writing tests for failure-path side effects, assert the side effect explicitly — not just the status code. A test named "returns 401 and clears cookies" must verify both the 401 AND the cookie-clearing headers.

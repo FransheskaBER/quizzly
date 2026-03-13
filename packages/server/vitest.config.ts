@@ -24,6 +24,7 @@ export default defineConfig({
       NODE_ENV: 'test',
       DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
       JWT_SECRET: requireEnv('JWT_SECRET'),
+      REFRESH_SECRET: requireEnv('REFRESH_SECRET'),
       JWT_EXPIRES_IN: '7d',
       CLIENT_URL: 'http://localhost:5173',
       PORT: '3001',

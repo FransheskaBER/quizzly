@@ -1,7 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { Sentry } from '@/config/sentry';
-import { toSentryError } from '@/utils/sentry.utils';
+import type { Mutex } from 'async-mutex';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 export const API_BASE_URL = `${API_BASE}/api`;
@@ -11,37 +10,64 @@ const baseQuery = fetchBaseQuery({
   credentials: 'include',
 });
 
+// Lazy-loaded mutex to prevent concurrent refresh calls
+let refreshMutex: Mutex | null = null;
+
+const getRefreshMutex = async (): Promise<Mutex> => {
+  if (!refreshMutex) {
+    const { Mutex: MutexClass } = await import('async-mutex');
+    refreshMutex = new MutexClass();
+  }
+  return refreshMutex;
+};
+
 export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
   async (args, api, extraOptions) => {
-    const result = await baseQuery(args, api, extraOptions);
+    let result = await baseQuery(args, api, extraOptions);
 
     if (result.error && result.error.status === 401) {
       const endpoint = typeof args === 'string' ? args : args.url;
-      const method = typeof args === 'string' ? 'GET' : (args.method ?? 'GET');
-      const telemetryContext = {
-        operation: 'autoLogoutOnUnauthorized',
-        endpoint,
-        method,
-        status: result.error.status,
-      };
-      // /auth/me 401 = "not logged in" — expected, not an error worth reporting.
-      const isSessionCheck = endpoint === '/auth/me' && method === 'GET';
-      if (!isSessionCheck) {
-        // eslint-disable-next-line no-console
-        console.error('Auto logout triggered by unauthorized API response', result.error, telemetryContext);
-        Sentry.captureException(toSentryError(result.error, 'auto-logout: unauthorized API response'), {
-          extra: { ...telemetryContext, originalError: result.error },
-        });
+
+      // Don't try to refresh if the refresh endpoint itself returned 401
+      const isRefreshRequest = endpoint === '/auth/refresh';
+      const isSessionCheck = endpoint === '/auth/me';
+
+      if (!isRefreshRequest && !isSessionCheck) {
+        const mutex = await getRefreshMutex();
+
+        if (mutex.isLocked()) {
+          // Another refresh is in progress — wait for it, then retry
+          await mutex.waitForUnlock();
+          result = await baseQuery(args, api, extraOptions);
+        } else {
+          const release = await mutex.acquire();
+          try {
+            const refreshResult = await baseQuery(
+              { url: '/auth/refresh', method: 'POST' },
+              api,
+              extraOptions,
+            );
+
+            if (!refreshResult.error) {
+              // Refresh succeeded — retry original request
+              result = await baseQuery(args, api, extraOptions);
+            } else {
+              // Refresh failed — logout
+              const { dispatch } = api;
+              const { logout } = await import('./slices/auth.slice');
+              dispatch(logout());
+            }
+          } finally {
+            release();
+          }
+        }
+      } else if (isRefreshRequest) {
+        // Refresh endpoint itself failed — logout
+        const { dispatch } = api;
+        const { logout } = await import('./slices/auth.slice');
+        dispatch(logout());
       }
-      const { dispatch } = api;
-      const { logout } = await import('./slices/auth.slice');
-      // Clear session cookie server-side (httpOnly cookie cannot be cleared from client)
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
-      } catch {
-        // Ignore — cookie clear is best-effort; state clear below ensures UI updates
-      }
-      dispatch(logout());
+      // isSessionCheck 401 = "not logged in" — no action needed
     }
 
     return result;
