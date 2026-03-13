@@ -62,7 +62,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
-  it('rate-limits 401 hydration telemetry and includes unauthorized context', async () => {
+  it('silently ignores 401: no Sentry capture and no console.error', async () => {
     const onQueryStarted = getOnQueryStarted();
 
     await onQueryStarted(undefined, {
@@ -70,26 +70,9 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
       queryFulfilled: Promise.reject({ error: { status: 401 } }),
       getState: () => ({ auth: { token: 'token-1' } }),
     });
-    await onQueryStarted(undefined, {
-      dispatch: vi.fn(),
-      queryFulfilled: Promise.reject({ error: { status: 401 } }),
-      getState: () => ({ auth: { token: 'token-1' } }),
-    });
 
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({
-          operation: 'getMeHydration',
-          route: '/auth/me',
-          reason: 'unauthorized',
-          status: 401,
-          telemetryMode: 'rate-limited',
-          originalError: expect.objectContaining({ error: { status: 401 } }),
-        }),
-      }),
-    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('captures non-401 getMe hydration failures with normalized Error', async () => {
