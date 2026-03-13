@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 const { mockVerifyEmail, mockCaptureException, mockParseApiError } = vi.hoisted(() => ({
   mockVerifyEmail: vi.fn(),
   mockCaptureException: vi.fn(),
-  mockParseApiError: vi.fn((_err?: unknown) => ({ code: 'CONFLICT', message: 'Conflict' })),
+  mockParseApiError: vi.fn(() => ({ code: 'CONFLICT', message: 'Conflict' })),
 }));
 
 vi.mock('@/api/auth.api', () => ({
@@ -15,7 +15,7 @@ vi.mock('@/config/sentry', () => ({
   Sentry: { captureException: mockCaptureException },
 }));
 vi.mock('@/hooks/useApiError', () => ({
-  parseApiError: (err: unknown) => mockParseApiError(err),
+  parseApiError: () => mockParseApiError(),
 }));
 
 import VerifyEmailPage from './VerifyEmailPage';

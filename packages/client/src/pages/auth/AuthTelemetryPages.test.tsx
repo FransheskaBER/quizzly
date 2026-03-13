@@ -22,7 +22,7 @@ const {
   mockShowError: vi.fn(),
   mockShowSuccess: vi.fn(),
   mockCaptureException: vi.fn(),
-  mockParseApiError: vi.fn((_err?: unknown) => ({ code: 'INTERNAL_SERVER_ERROR', message: 'failure' })),
+  mockParseApiError: vi.fn(() => ({ code: 'INTERNAL_SERVER_ERROR', message: 'failure' })),
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -41,7 +41,7 @@ vi.mock('@/config/sentry', () => ({
   Sentry: { captureException: mockCaptureException },
 }));
 vi.mock('@/hooks/useApiError', () => ({
-  parseApiError: (err: unknown) => mockParseApiError(err),
+  parseApiError: () => mockParseApiError(),
 }));
 
 import SignupPage from './SignupPage';
