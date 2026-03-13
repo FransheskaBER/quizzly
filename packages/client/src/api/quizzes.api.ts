@@ -1,5 +1,6 @@
 import { api } from '@/store/api';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import type { QuizAttemptResponse, SaveAnswersRequest, QuizResultsResponse } from '@skills-trainer/shared';
 
 type AnswerInput = SaveAnswersRequest['answers'][number];
@@ -48,10 +49,11 @@ const quizzesApi = api.injectEndpoints({
         } catch (err) {
           // eslint-disable-next-line no-console
           console.error('saveAnswers optimistic update failed:', err);
-          Sentry.captureException(err, {
+          Sentry.captureException(toSentryError(err, 'saveAnswers optimistic update failed'), {
             extra: {
               endpoint: 'saveAnswers',
               quizId: id,
+              originalError: err,
             },
           });
           patchResult.undo();

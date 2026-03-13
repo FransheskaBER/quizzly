@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 export const API_BASE_URL = `${API_BASE}/api`;
@@ -25,7 +26,9 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
       };
       // eslint-disable-next-line no-console
       console.error('Auto logout triggered by unauthorized API response', result.error, telemetryContext);
-      Sentry.captureException(result.error, { extra: telemetryContext });
+      Sentry.captureException(toSentryError(result.error, 'auto-logout: unauthorized API response'), {
+        extra: { ...telemetryContext, originalError: result.error },
+      });
       const { dispatch } = api;
       const { logout } = await import('./slices/auth.slice');
       // Clear session cookie server-side (httpOnly cookie cannot be cleared from client)

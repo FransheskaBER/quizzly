@@ -39,13 +39,14 @@ describe('baseQueryWithAuth unauthorized telemetry (FE-014)', () => {
     );
 
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 401 }),
+      expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
           operation: 'autoLogoutOnUnauthorized',
           endpoint: '/auth/me',
           method: 'GET',
           status: 401,
+          originalError: expect.objectContaining({ status: 401 }),
         }),
       }),
     );

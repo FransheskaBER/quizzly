@@ -63,6 +63,7 @@ describe('authApi getMe hydration telemetry (FE-013)', () => {
           reason: 'unauthorized',
           status: 401,
           telemetryMode: 'rate-limited',
+          originalError: expect.objectContaining({ error: { status: 401 } }),
         }),
       }),
     );
