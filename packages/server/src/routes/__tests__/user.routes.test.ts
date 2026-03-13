@@ -39,10 +39,11 @@ afterAll(async () => {
 describe('GET /api/users/api-key/status', () => {
   it('returns hasApiKey:false when no key is saved', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/users/api-key/status')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ hasApiKey: false, hint: null });
@@ -62,10 +63,11 @@ describe('GET /api/users/api-key/status', () => {
 describe('POST /api/users/api-key', () => {
   it('saves a valid API key and returns status with hint', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: VALID_API_KEY });
 
     expect(res.status).toBe(200);
@@ -75,25 +77,27 @@ describe('POST /api/users/api-key', () => {
 
   it('persists the key — status returns hasApiKey:true after save', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: VALID_API_KEY });
 
     const statusRes = await request(app)
       .get('/api/users/api-key/status')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(statusRes.body.hasApiKey).toBe(true);
   });
 
   it('stores encrypted ciphertext, not plaintext', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: VALID_API_KEY });
 
     const dbUser = await prisma.user.findUnique({
@@ -107,10 +111,11 @@ describe('POST /api/users/api-key', () => {
 
   it('returns 400 for invalid API key format', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: 'bad-prefix-key' });
 
     expect(res.status).toBe(400);
@@ -132,33 +137,35 @@ describe('POST /api/users/api-key', () => {
 describe('DELETE /api/users/api-key', () => {
   it('removes a saved API key', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     // Save first
     await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: VALID_API_KEY });
 
     const res = await request(app)
       .delete('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(204);
 
     // Verify removal
     const statusRes = await request(app)
       .get('/api/users/api-key/status')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(statusRes.body.hasApiKey).toBe(false);
   });
 
   it('returns 204 even when no key exists (idempotent)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .delete('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(204);
   });
@@ -171,7 +178,7 @@ describe('DELETE /api/users/api-key', () => {
 describe('Removed legacy profile endpoints', () => {
   it('returns 404 for PATCH /api/users/profile and PUT /api/users/password', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const patchRes = await request(app)
       .patch('/api/users/profile')

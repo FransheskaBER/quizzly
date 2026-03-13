@@ -13,9 +13,8 @@ interface UseSSEStreamOptions {
   onEvent: (event: GenericSSEEvent) => void;
   onError: (message: string) => void;
   onComplete: () => void;
-  token: string;
   /** Optional fetch overrides (e.g. method: 'POST', body: '...'). Headers and signal are managed internally. */
-  fetchInit?: Omit<RequestInit, 'headers' | 'signal'>;
+  fetchInit?: Omit<RequestInit, 'headers' | 'signal' | 'credentials'>;
 }
 
 export interface UseSSEStreamResult {
@@ -40,8 +39,8 @@ const SSE_EVENT_CHUNK_PREVIEW_MAX_CHARS = 120;
 
 /**
  * Generic SSE hook backed by fetch + ReadableStream.
- * Uses fetch (not EventSource) because the backend auth middleware reads only
- * from the Authorization header, which EventSource does not support.
+ * Uses fetch (not EventSource) because EventSource cannot set credentials.
+ * Auth: sends httpOnly session cookie via credentials: 'include'.
  *
  * No auto-reconnect — on error or disconnect, status moves to 'error' and
  * the caller is responsible for displaying a manual-retry UI.
@@ -55,13 +54,11 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
   const onEventRef = useRef(options.onEvent);
   const onErrorRef = useRef(options.onError);
   const onCompleteRef = useRef(options.onComplete);
-  const tokenRef = useRef(options.token);
   const fetchInitRef = useRef(options.fetchInit);
 
   onEventRef.current = options.onEvent;
   onErrorRef.current = options.onError;
   onCompleteRef.current = options.onComplete;
-  tokenRef.current = options.token;
   fetchInitRef.current = options.fetchInit;
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -100,9 +97,7 @@ export function useSSEStream(options: UseSSEStreamOptions): UseSSEStreamResult {
       try {
         const response = await fetch(url, {
           ...fetchInitRef.current,
-          headers: {
-            Authorization: `Bearer ${tokenRef.current}`,
-          },
+          credentials: 'include',
           signal: controller.signal,
         });
 

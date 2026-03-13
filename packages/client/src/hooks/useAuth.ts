@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/store';
-import { setCredentials, logout as logoutAction, selectCurrentUser, selectIsAuthenticated } from '@/store/slices/auth.slice';
+import { setCredentials, selectCurrentUser, selectIsAuthenticated } from '@/store/slices/auth.slice';
 import {
   useLoginMutation,
+  useLogoutMutation,
   useSignupMutation,
   useVerifyEmailMutation,
   useResendVerificationMutation,
@@ -23,6 +24,7 @@ export const useAuth = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [loginMutation] = useLoginMutation();
+  const [logoutMutation] = useLogoutMutation();
   const [signupMutation] = useSignupMutation();
   const [verifyEmailMutation] = useVerifyEmailMutation();
   const [resendVerificationMutation] = useResendVerificationMutation();
@@ -31,7 +33,7 @@ export const useAuth = () => {
 
   const login = async (data: LoginRequest) => {
     const result = await loginMutation(data).unwrap();
-    dispatch(setCredentials({ token: result.token, user: result.user }));
+    dispatch(setCredentials({ user: result.user }));
     return result.user;
   };
 
@@ -40,7 +42,7 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    dispatch(logoutAction());
+    void logoutMutation();
     navigate('/login');
   };
 

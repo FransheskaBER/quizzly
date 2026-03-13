@@ -109,11 +109,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('200 with Content-Type text/event-stream', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     expect(res.status).toBe(200);
@@ -123,11 +124,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('SSE stream contains progress, question, and complete events', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const types = parseSSEEvents(res.text).map((e) => e.type);
@@ -140,11 +142,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('question SSE event does NOT include correctAnswer or explanation', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -160,11 +163,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('question SSE event includes id, questionNumber, questionType, questionText, options', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -179,11 +183,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('complete event carries a quizAttemptId', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -198,11 +203,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('DB — quiz_attempt is in_progress with correct questionCount after successful generation', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -222,12 +228,13 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('DB — free-trial generation enforces MCQ format even when free_text is requested', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const freeTextQuery = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.FREE_TEXT}&count=${MIN_QUESTION_COUNT}`;
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${freeTextQuery}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -245,11 +252,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('DB — one question and one answer record exist after successful generation', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -269,12 +277,13 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('passes materialsText from ready materials to the LLM call', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     await createMaterial(session.id, 'Specific extracted content for the test');
 
     await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
@@ -287,11 +296,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('passes materialsText as null when session has no ready materials', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     expect(llmGenerateQuiz).toHaveBeenCalledWith(
@@ -312,12 +322,13 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
   it('generates quiz using the stored user API key after free trial is used', async () => {
     vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Step 1: save the API key
     const saveRes = await request(app)
       .post('/api/users/api-key')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ apiKey: BYOK_API_KEY });
     expect(saveRes.status).toBe(200);
     expect(saveRes.body.hasApiKey).toBe(true);
@@ -331,7 +342,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
     // Step 3: generate — should succeed using the stored key
     const genRes = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     expect(genRes.status).toBe(200);
@@ -347,6 +358,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
 
   it('403 TRIAL_EXHAUSTED when free trial is used but no key is saved', async () => {
     const { user } = await createTestUser({ email: 'exhausted@example.com', username: 'exhausted' });
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await prisma.user.update({
@@ -356,7 +368,7 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('TRIAL_EXHAUSTED');
@@ -379,11 +391,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('400 — invalid difficulty value', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?difficulty=invalid&format=mcq&count=5`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -391,11 +404,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('400 — missing required query params', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -403,10 +417,11 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get(`/api/sessions/00000000-0000-0000-0000-000000000001/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
@@ -415,11 +430,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
   it('403 — session belongs to a different user', async () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com', username: 'owner' });
     const { user: other } = await createTestUser({ email: 'other@example.com', username: 'other' });
+    const tokenOther = await getAuthToken(other);
     const session = await createSession(owner.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(other)}`);
+      .set('Authorization', `Bearer ${tokenOther}`);
 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
@@ -427,6 +443,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
   it('409 — another generation is already in progress for the session', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     // Seed a GENERATING attempt directly to simulate the concurrency scenario.
@@ -445,7 +462,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('CONFLICT');
@@ -460,11 +477,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
   it('sends an SSE error event (not a JSON error) when the LLM throws', async () => {
     vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     // Headers were already written (200) before the error occurred.
@@ -477,11 +495,12 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
   it('does not send a complete event when the LLM throws', async () => {
     vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
     const events = parseSSEEvents(res.text);
@@ -492,7 +511,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
     vi.mocked(llmGenerateQuiz).mockRejectedValueOnce(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
     const session = await createSession(user.id);
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const failedRes = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
@@ -532,12 +551,13 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
 describe('GET /api/quizzes/:id', () => {
   it('200 — returns quiz with questions (no correctAnswer exposed)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(attemptId);
@@ -547,12 +567,13 @@ describe('GET /api/quizzes/:id', () => {
 
   it('200 — question includes id, questionNumber, questionType, questionText, options', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     const q = res.body.questions[0] as Record<string, unknown>;
     expect(q).toHaveProperty('id');
@@ -573,10 +594,11 @@ describe('GET /api/quizzes/:id', () => {
 
   it('404 — quiz attempt does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/quizzes/00000000-0000-0000-0000-000000000001')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
@@ -585,12 +607,13 @@ describe('GET /api/quizzes/:id', () => {
   it('403 — quiz belongs to a different user', async () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com', username: 'owner' });
     const { user: other } = await createTestUser({ email: 'other@example.com', username: 'other' });
+    const tokenOther = await getAuthToken(other);
     const session = await createSession(owner.id);
     const { attemptId } = await createQuizWithAnswers(owner.id, session.id);
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}`)
-      .set('Authorization', `Bearer ${getAuthToken(other)}`);
+      .set('Authorization', `Bearer ${tokenOther}`);
 
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
@@ -604,12 +627,13 @@ describe('GET /api/quizzes/:id', () => {
 describe('PATCH /api/quizzes/:id/answers', () => {
   it('200 — returns { saved: 1 } when one valid answer is submitted', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .patch(`/api/quizzes/${attemptId}/answers`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A typed superset of JavaScript' }] });
 
     expect(res.status).toBe(200);
@@ -618,12 +642,13 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('200 — returns { saved: 0 } for invalid questionId (silently filtered)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .patch(`/api/quizzes/${attemptId}/answers`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({
         answers: [{ questionId: '00000000-0000-0000-0000-000000000001', answer: 'X' }],
       });
@@ -642,6 +667,7 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('409 — quiz is not in_progress (completed)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -653,7 +679,7 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
     const res = await request(app)
       .patch(`/api/quizzes/${attemptId}/answers`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A' }] });
 
     expect(res.status).toBe(409);
@@ -662,12 +688,13 @@ describe('PATCH /api/quizzes/:id/answers', () => {
 
   it('400 — invalid body (answers is not an array)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .patch(`/api/quizzes/${attemptId}/answers`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: 'not-an-array' });
 
     expect(res.status).toBe(400);
@@ -690,10 +717,11 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('404 — quiz attempt does not exist', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/quizzes/00000000-0000-0000-0000-000000000001/submit')
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [] });
 
     expect(res.status).toBe(404);
@@ -702,6 +730,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('409 — quiz is already completed', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
     await prisma.quizAttempt.update({
@@ -711,7 +740,7 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [] });
 
     expect(res.status).toBe(409);
@@ -720,12 +749,13 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 
   it('400 — not all questions answered (empty payload, no prior answers)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [] });
 
     expect(res.status).toBe(400);
@@ -740,12 +770,13 @@ describe('POST /api/quizzes/:id/submit — pre-stream errors', () => {
 describe('POST /api/quizzes/:id/submit — happy path', () => {
   it('200 with Content-Type text/event-stream', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A typed superset of JavaScript' }] })
       .buffer(true);
 
@@ -755,12 +786,13 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('SSE stream contains progress, graded, and complete events', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A typed superset of JavaScript' }] })
       .buffer(true);
 
@@ -772,12 +804,13 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('complete event carries quizAttemptId and score', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A typed superset of JavaScript' }] })
       .buffer(true);
 
@@ -793,12 +826,13 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('DB — quiz is COMPLETED with score 100 after correct MCQ answer', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'A typed superset of JavaScript' }] })
       .buffer(true);
 
@@ -813,12 +847,13 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 
   it('DB — quiz is COMPLETED with score 0 after incorrect MCQ answer', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/submit`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({ answers: [{ questionId, answer: 'Wrong answer' }] })
       .buffer(true);
 
@@ -838,6 +873,7 @@ describe('POST /api/quizzes/:id/submit — happy path', () => {
 describe('GET /api/quizzes/:id/results', () => {
   it('200 — returns results with correctAnswer, explanation, and per-answer data', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -858,7 +894,7 @@ describe('GET /api/quizzes/:id/results', () => {
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}/results`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.questions[0]).toHaveProperty('correctAnswer');
@@ -869,6 +905,7 @@ describe('GET /api/quizzes/:id/results', () => {
 
   it('200 — summary counts are correct (1 correct)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -883,19 +920,20 @@ describe('GET /api/quizzes/:id/results', () => {
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}/results`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.body.summary).toMatchObject({ correct: 1, partial: 0, incorrect: 0, total: 1 });
   });
 
   it('400 — quiz is not yet completed', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .get(`/api/quizzes/${attemptId}/results`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`);
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('BAD_REQUEST');
@@ -925,12 +963,13 @@ describe('POST /api/quizzes/:id/regrade — pre-stream errors', () => {
 
   it('409 — quiz is IN_PROGRESS (not submitted_ungraded)', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId } = await createQuizWithAnswers(user.id, session.id);
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/regrade`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({});
 
     expect(res.status).toBe(409);
@@ -945,6 +984,7 @@ describe('POST /api/quizzes/:id/regrade — pre-stream errors', () => {
 describe('POST /api/quizzes/:id/regrade — happy path', () => {
   it('200 with Content-Type text/event-stream for a SUBMITTED_UNGRADED quiz', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -960,7 +1000,7 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/regrade`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({})
       .buffer(true);
 
@@ -972,6 +1012,7 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
 
   it('DB — quiz is COMPLETED after successful regrade', async () => {
     const { user } = await createTestUser();
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
     const { attemptId, questionId } = await createQuizWithAnswers(user.id, session.id);
 
@@ -986,7 +1027,7 @@ describe('POST /api/quizzes/:id/regrade — happy path', () => {
 
     const res = await request(app)
       .post(`/api/quizzes/${attemptId}/regrade`)
-      .set('Authorization', `Bearer ${getAuthToken(user)}`)
+      .set('Authorization', `Bearer ${token}`)
       .send({})
       .buffer(true);
 

@@ -1,6 +1,5 @@
 import { api } from '@/store/api';
-import { setCredentials } from '@/store/slices/auth.slice';
-import type { RootState } from '@/store/store';
+import { setCredentials, logout } from '@/store/slices/auth.slice';
 import { Sentry } from '@/config/sentry';
 import type {
   SignupRequest,
@@ -60,22 +59,29 @@ export const authApi = api.injectEndpoints({
       query: (body) => ({ url: '/auth/reset-password', method: 'POST', body }),
     }),
 
-    // Called on app load when token exists but user is null (page reload).
+    logout: builder.mutation<{ message: string }, void>({
+      query: () => ({ url: '/auth/logout', method: 'POST' }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+        } finally {
+          dispatch(logout());
+        }
+      },
+    }),
+
+    // Called on app load to discover session (cookie-based; cannot check session without requesting).
     // onQueryStarted hydrates the auth slice with the fetched user data.
     getMe: builder.query<UserResponse, void>({
       query: () => '/auth/me',
-      async onQueryStarted(_, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          const token = (getState() as RootState).auth.token;
-          if (token) {
-            dispatch(
-              setCredentials({
-                token,
-                user: { id: data.id, email: data.email, username: data.username },
-              }),
-            );
-          }
+          dispatch(
+            setCredentials({
+              user: { id: data.id, email: data.email, username: data.username },
+            }),
+          );
         } catch (err) {
           // 401 is handled globally by baseQueryWithAuth (dispatches logout()).
           const status = (err as { error?: { status?: number } })?.error?.status;
@@ -122,5 +128,6 @@ export const {
   useResendVerificationMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
+  useLogoutMutation,
   useGetMeQuery,
 } = authApi;

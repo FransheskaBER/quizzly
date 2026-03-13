@@ -39,7 +39,6 @@ describe('useSSEStream telemetry catches (FE-002, FE-004)', () => {
         onEvent,
         onError,
         onComplete,
-        token: 'token',
       }),
     );
 
@@ -76,7 +75,6 @@ describe('useSSEStream telemetry catches (FE-002, FE-004)', () => {
         onEvent,
         onError,
         onComplete,
-        token: 'token',
       }),
     );
 

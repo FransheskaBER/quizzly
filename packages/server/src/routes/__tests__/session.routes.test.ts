@@ -51,7 +51,7 @@ const createSession = async (userId: string, overrides: Partial<{ name: string; 
 describe('POST /api/sessions', () => {
   it('201 — creates and returns a session', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/sessions')
@@ -67,7 +67,7 @@ describe('POST /api/sessions', () => {
 
   it('DB — session is persisted with correct userId', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/sessions')
@@ -81,7 +81,7 @@ describe('POST /api/sessions', () => {
 
   it('400 — missing required fields', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/sessions')
@@ -94,7 +94,7 @@ describe('POST /api/sessions', () => {
 
   it('400 — name exceeds 200 characters', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .post('/api/sessions')
@@ -121,7 +121,7 @@ describe('POST /api/sessions', () => {
 describe('GET /api/sessions', () => {
   it('200 — returns empty list when user has no sessions', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/sessions')
@@ -135,7 +135,7 @@ describe('GET /api/sessions', () => {
   it('200 — returns sessions for the authenticated user only', async () => {
     const { user: user1 } = await createTestUser({ email: 'user1@example.com' });
     const { user: user2 } = await createTestUser({ email: 'user2@example.com' });
-    const token1 = getAuthToken(user1);
+    const token1 = await getAuthToken(user1);
 
     await createSession(user1.id, { name: 'Session A' });
     await createSession(user1.id, { name: 'Session B' });
@@ -152,7 +152,7 @@ describe('GET /api/sessions', () => {
 
   it('200 — nextCursor is set when there are more results', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     // Create 3 sessions
     for (let i = 0; i < 3; i++) {
@@ -170,7 +170,7 @@ describe('GET /api/sessions', () => {
 
   it('200 — cursor pagination fetches the next page', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     for (let i = 0; i < 3; i++) {
       await createSession(user.id, { name: `Session ${i}` });
@@ -203,7 +203,7 @@ describe('GET /api/sessions', () => {
 describe('GET /api/sessions/:id', () => {
   it('200 — returns session detail with empty materials and quizAttempts', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -218,7 +218,7 @@ describe('GET /api/sessions/:id', () => {
 
   it('200 — returns seeded materials and quiz attempts in response', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const material = await prisma.material.create({
@@ -261,7 +261,7 @@ describe('GET /api/sessions/:id', () => {
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/sessions/00000000-0000-0000-0000-000000000000')
@@ -275,7 +275,7 @@ describe('GET /api/sessions/:id', () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com' });
     const { user: other } = await createTestUser({ email: 'other@example.com' });
     const session = await createSession(owner.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .get(`/api/sessions/${session.id}`)
@@ -287,7 +287,7 @@ describe('GET /api/sessions/:id', () => {
 
   it('400 — invalid UUID param', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .get('/api/sessions/not-a-uuid')
@@ -310,7 +310,7 @@ describe('GET /api/sessions/:id', () => {
 describe('PATCH /api/sessions/:id', () => {
   it('200 — updates only the provided fields', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id, { name: 'Original Name' });
 
     const res = await request(app)
@@ -325,7 +325,7 @@ describe('PATCH /api/sessions/:id', () => {
 
   it('DB — persists the update', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await request(app)
@@ -339,7 +339,7 @@ describe('PATCH /api/sessions/:id', () => {
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .patch('/api/sessions/00000000-0000-0000-0000-000000000000')
@@ -353,7 +353,7 @@ describe('PATCH /api/sessions/:id', () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com' });
     const { user: other } = await createTestUser({ email: 'other@example.com' });
     const session = await createSession(owner.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .patch(`/api/sessions/${session.id}`)
@@ -378,7 +378,7 @@ describe('PATCH /api/sessions/:id', () => {
 describe('DELETE /api/sessions/:id', () => {
   it('204 — deletes the session', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const res = await request(app)
@@ -390,7 +390,7 @@ describe('DELETE /api/sessions/:id', () => {
 
   it('DB — session is removed after delete', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     await request(app)
@@ -403,7 +403,7 @@ describe('DELETE /api/sessions/:id', () => {
 
   it('DB — cascade deletes materials and quiz attempts', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
     const session = await createSession(user.id);
 
     const material = await prisma.material.create({
@@ -442,7 +442,7 @@ describe('DELETE /api/sessions/:id', () => {
 
   it('404 — session does not exist', async () => {
     const { user } = await createTestUser();
-    const token = getAuthToken(user);
+    const token = await getAuthToken(user);
 
     const res = await request(app)
       .delete('/api/sessions/00000000-0000-0000-0000-000000000000')
@@ -455,7 +455,7 @@ describe('DELETE /api/sessions/:id', () => {
     const { user: owner } = await createTestUser({ email: 'owner@example.com' });
     const { user: other } = await createTestUser({ email: 'other@example.com' });
     const session = await createSession(owner.id);
-    const tokenOther = getAuthToken(other);
+    const tokenOther = await getAuthToken(other);
 
     const res = await request(app)
       .delete(`/api/sessions/${session.id}`)

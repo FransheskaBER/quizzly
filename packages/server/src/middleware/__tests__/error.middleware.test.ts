@@ -3,7 +3,11 @@ import type { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { errorHandler } from '../error.middleware.js';
 import { Sentry } from '../../config/sentry.js';
-import { EmailDeliveryError, ValidationError } from '../../utils/errors.js';
+import {
+  EmailDeliveryError,
+  UnauthorizedError,
+  ValidationError,
+} from '../../utils/errors.js';
 
 vi.mock('pino', () => ({ default: () => ({ error: vi.fn(), warn: vi.fn() }) }));
 vi.mock('../../config/sentry.js', () => ({
@@ -63,6 +67,52 @@ describe('errorHandler', () => {
       error: {
         code: 'VALIDATION_ERROR',
         message: 'bad input',
+        details: undefined,
+      },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'error.middleware.appError' }),
+      }),
+    );
+  });
+
+  it('does not capture expected login failure (Invalid email or password) on POST /api/auth/login', () => {
+    const res = createMockRes();
+    const loginReq = {
+      ...mockReq,
+      path: '/api/auth/login',
+      originalUrl: '/api/auth/login',
+      method: 'POST',
+    } as unknown as Request;
+    const err = new UnauthorizedError('Invalid email or password');
+
+    errorHandler(err, loginReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Invalid email or password',
+        details: undefined,
+      },
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('captures UnauthorizedError on other paths (e.g. missing token on /api/auth/me)', () => {
+    const res = createMockRes();
+    const meReq = { ...mockReq, path: '/api/auth/me', method: 'GET' } as unknown as Request;
+    const err = new UnauthorizedError('Not authenticated');
+
+    errorHandler(err, meReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Not authenticated',
         details: undefined,
       },
     });
