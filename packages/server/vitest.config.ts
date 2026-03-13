@@ -22,7 +22,7 @@ export default defineConfig({
     setupFiles: ['src/__tests__/setup.ts'],
     env: {
       NODE_ENV: 'test',
-      DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
+      TEST_DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
       JWT_SECRET: requireEnv('JWT_SECRET'),
       JWT_EXPIRES_IN: '7d',
       CLIENT_URL: 'http://localhost:5173',
