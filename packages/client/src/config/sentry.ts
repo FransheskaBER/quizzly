@@ -6,7 +6,7 @@ export const initSentry = (): void => {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
     environment: import.meta.env.MODE,
-    enabled: !!import.meta.env.VITE_SENTRY_DSN && import.meta.env.MODE !== 'test',
+    enabled: !!import.meta.env.VITE_SENTRY_DSN && !['test', 'development'].includes(import.meta.env.MODE),
   });
 };
 

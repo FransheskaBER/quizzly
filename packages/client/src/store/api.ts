@@ -24,11 +24,15 @@ export const baseQueryWithAuth: BaseQueryFn<string | FetchArgs, unknown, FetchBa
         method,
         status: result.error.status,
       };
-      // eslint-disable-next-line no-console
-      console.error('Auto logout triggered by unauthorized API response', result.error, telemetryContext);
-      Sentry.captureException(toSentryError(result.error, 'auto-logout: unauthorized API response'), {
-        extra: { ...telemetryContext, originalError: result.error },
-      });
+      // /auth/me 401 = "not logged in" — expected, not an error worth reporting.
+      const isSessionCheck = endpoint === '/auth/me' && method === 'GET';
+      if (!isSessionCheck) {
+        // eslint-disable-next-line no-console
+        console.error('Auto logout triggered by unauthorized API response', result.error, telemetryContext);
+        Sentry.captureException(toSentryError(result.error, 'auto-logout: unauthorized API response'), {
+          extra: { ...telemetryContext, originalError: result.error },
+        });
+      }
       const { dispatch } = api;
       const { logout } = await import('./slices/auth.slice');
       // Clear session cookie server-side (httpOnly cookie cannot be cleared from client)

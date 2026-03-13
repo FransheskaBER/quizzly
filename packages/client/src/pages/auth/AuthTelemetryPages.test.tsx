@@ -140,7 +140,7 @@ describe('Auth page telemetry catches (FE-009)', () => {
     );
   });
 
-  it('captures login failures with login operation metadata', async () => {
+  it('captures unexpected login failures with login operation metadata', async () => {
     const user = userEvent.setup();
     mockLogin.mockRejectedValue(new Error('login failed'));
 
@@ -163,5 +163,22 @@ describe('Auth page telemetry catches (FE-009)', () => {
         }),
       }),
     );
+  });
+
+  it('skips Sentry capture for expected 401 login failures (wrong credentials)', async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValue({ status: 401, data: { error: { message: 'Invalid email or password' } } });
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText(/^email$/i), 'user@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'wrongpassword');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

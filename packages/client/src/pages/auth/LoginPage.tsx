@@ -38,17 +38,22 @@ const LoginPage = () => {
     } catch (err) {
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
-      // eslint-disable-next-line no-console
-      console.error('Login failed:', err);
-      Sentry.captureException(toSentryError(err, 'login failed'), {
-        extra: {
-          operation: 'login',
-          email: data.email,
-          code,
-          status: status ?? null,
-          originalError: err,
-        },
-      });
+      // 401 (wrong credentials) and 409 (duplicate email) are expected user errors.
+      // Only report unexpected failures (5xx, network errors) to Sentry.
+      const isExpectedAuthError = status === 401 || status === 409;
+      if (!isExpectedAuthError) {
+        // eslint-disable-next-line no-console
+        console.error('Login failed:', err);
+        Sentry.captureException(toSentryError(err, 'login failed'), {
+          extra: {
+            operation: 'login',
+            email: data.email,
+            code,
+            status: status ?? null,
+            originalError: err,
+          },
+        });
+      }
       if (code === 'EMAIL_NOT_VERIFIED') {
         setUnverifiedEmail(data.email);
       } else {
