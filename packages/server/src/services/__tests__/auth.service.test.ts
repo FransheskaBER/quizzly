@@ -275,17 +275,14 @@ describe('login', () => {
 // refreshAccessToken
 // ---------------------------------------------------------------------------
 describe('refreshAccessToken', () => {
-  it('verifies refresh token JWT, deletes old DB row, creates new token pair and DB row', async () => {
-    // Generate a real refresh token JWT
+  it('verifies refresh token JWT, atomically deletes old DB row, creates new token pair and DB row', async () => {
     const oldRefreshToken = jwt.sign(
       { userId: mockUser.id, email: mockUser.email },
       env.REFRESH_SECRET,
       { expiresIn: '7d' },
     );
-    const storedRow = { id: 'token-row-id', userId: mockUser.id, tokenHash: 'hash', expiresAt: new Date(), createdAt: new Date() };
 
-    vi.mocked(prisma.refreshToken.findUnique).mockResolvedValue(storedRow);
-    vi.mocked(prisma.refreshToken.delete).mockResolvedValue(storedRow);
+    vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 1 });
     vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as never);
 
     const result = await authService.refreshAccessToken(oldRefreshToken);
@@ -294,7 +291,9 @@ describe('refreshAccessToken', () => {
     expect(result.refreshToken).toBeTypeOf('string');
     expect(result.accessToken.split('.')).toHaveLength(3);
     expect(result.refreshToken.split('.')).toHaveLength(3);
-    expect(prisma.refreshToken.delete).toHaveBeenCalledWith({ where: { id: storedRow.id } });
+    expect(prisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { tokenHash: expect.any(String) },
+    });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
   });
 
@@ -306,19 +305,20 @@ describe('refreshAccessToken', () => {
     );
 
     await expect(authService.refreshAccessToken(expiredRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
-    expect(prisma.refreshToken.findUnique).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('throws UnauthorizedError when refresh token hash is not in DB', async () => {
+  it('throws UnauthorizedError when refresh token hash is not in DB (concurrent rotation)', async () => {
     const validRefreshToken = jwt.sign(
       { userId: mockUser.id, email: mockUser.email },
       env.REFRESH_SECRET,
       { expiresIn: '7d' },
     );
 
-    vi.mocked(prisma.refreshToken.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 0 });
 
     await expect(authService.refreshAccessToken(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
   });
 });
 
