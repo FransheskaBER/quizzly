@@ -78,6 +78,12 @@ describe('verifyAccessToken', () => {
     const payload = verifyAccessToken(token);
     expect(payload).toBeNull();
   });
+
+  it('returns null for a token with missing claims', () => {
+    const token = jwt.sign({ sub: 'user-123' }, env.JWT_SECRET);
+    const payload = verifyAccessToken(token);
+    expect(payload).toBeNull();
+  });
 });
 
 describe('verifyRefreshToken', () => {
@@ -95,6 +101,12 @@ describe('verifyRefreshToken', () => {
 
   it('returns null for an access token (signed with JWT_SECRET)', () => {
     const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
+    const payload = verifyRefreshToken(token);
+    expect(payload).toBeNull();
+  });
+
+  it('returns null for a token with missing claims', () => {
+    const token = jwt.sign({ sub: 'user-123' }, env.REFRESH_SECRET);
     const payload = verifyRefreshToken(token);
     expect(payload).toBeNull();
   });

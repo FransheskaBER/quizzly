@@ -53,21 +53,29 @@ export const generateRefreshToken = (payload: TokenPayload): string =>
     expiresIn: REFRESH_TOKEN_EXPIRY,
   });
 
-/** Verifies a JWT access token. Returns payload or null if invalid/expired. */
+/** Validates that a decoded JWT contains the expected userId and email claims. */
+const extractPayload = (decoded: jwt.JwtPayload): TokenPayload | null => {
+  if (typeof decoded.userId !== 'string' || typeof decoded.email !== 'string') {
+    return null;
+  }
+  return { userId: decoded.userId, email: decoded.email };
+};
+
+/** Verifies a JWT access token. Returns payload or null if invalid/expired/malformed. */
 export const verifyAccessToken = (token: string): TokenPayload | null => {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
-    return { userId: decoded.userId as string, email: decoded.email as string };
+    return extractPayload(decoded);
   } catch {
     return null;
   }
 };
 
-/** Verifies a JWT refresh token. Returns payload or null if invalid/expired. */
+/** Verifies a JWT refresh token. Returns payload or null if invalid/expired/malformed. */
 export const verifyRefreshToken = (token: string): TokenPayload | null => {
   try {
     const decoded = jwt.verify(token, env.REFRESH_SECRET) as jwt.JwtPayload;
-    return { userId: decoded.userId as string, email: decoded.email as string };
+    return extractPayload(decoded);
   } catch {
     return null;
   }
