@@ -326,19 +326,14 @@ describe('refreshAccessToken', () => {
 // logout
 // ---------------------------------------------------------------------------
 describe('logout', () => {
-  it('deletes refresh token from DB when provided', async () => {
+  it('deletes all refresh tokens for the user', async () => {
     vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 1 });
 
-    await authService.logout('some-refresh-token');
+    await authService.logout(mockUser.id);
 
     expect(prisma.refreshToken.deleteMany).toHaveBeenCalledWith({
-      where: { tokenHash: expect.any(String) },
+      where: { userId: mockUser.id },
     });
-  });
-
-  it('does nothing when refresh token is undefined', async () => {
-    await authService.logout(undefined);
-    expect(prisma.refreshToken.deleteMany).not.toHaveBeenCalled();
   });
 });
 

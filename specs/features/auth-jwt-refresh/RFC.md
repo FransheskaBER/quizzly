@@ -66,12 +66,12 @@ Replace DB lookup with `verifyAccessToken(token)`. No Prisma import needed. On v
 
 - `login()`: Generate JWT access token + JWT refresh token. Store refresh token hash in `RefreshToken` table. Return both tokens to route handler.
 - New `refreshAccessToken(refreshToken)`: Verify JWT → hash token → find in DB → if valid: delete old refresh token, generate new access + refresh tokens, store new refresh hash → return both tokens. If invalid: throw `UnauthorizedError`.
-- `logout(refreshToken)`: Delete refresh token from DB if present.
+- `logout(userId)`: Delete all refresh tokens for the user from DB.
 
 ### 3.7 Auth routes changes
 
 - Login handler: set both cookies via `setSessionCookie` + `setRefreshCookie`.
-- Logout handler: read refresh token from cookie, call `authService.logout(refreshToken)`, clear both cookies.
+- Logout handler: require `auth` middleware, call `authService.logout(req.user.userId)`, clear both cookies. Note: the refresh cookie is scoped to `/api/auth/refresh` so it won't be sent to `/api/auth/logout` by browsers — revoking by userId avoids this path-scoping limitation.
 - New `POST /refresh`: read refresh token from cookie, call `authService.refreshAccessToken()`, set both new cookies.
 
 ### 3.8 Env config
@@ -152,7 +152,7 @@ Update `baseQueryWithAuth`: on 401 → if not the refresh endpoint itself and no
 2. Auth middleware verifies JWT without DB call, attaches `{ userId, email }` to `req.user`.
 3. `POST /api/auth/refresh` with valid refresh token returns new access token cookie, rotates refresh token (new cookie + new DB row, old row deleted).
 4. `POST /api/auth/refresh` with expired refresh token returns 401, clears both cookies.
-5. Logout clears both cookies and deletes refresh token from DB.
+5. Logout requires authentication, clears both cookies, and deletes all refresh tokens for the user from DB.
 6. Frontend intercepts 401, calls refresh, retries original request. Mutex prevents concurrent refreshes.
 7. Failed login, unauthenticated `/me` check, `EmailNotVerifiedError`, validation errors on auth routes, `ConflictError` on signup, `BadRequestError` on auth routes, and refresh 401 are all excluded from Sentry.
 8. Signup, email verification, password reset, and resend verification flows work unchanged.

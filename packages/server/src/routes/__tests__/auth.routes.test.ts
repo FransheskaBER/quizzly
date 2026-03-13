@@ -286,7 +286,7 @@ describe('POST /api/auth/refresh', () => {
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 describe('POST /api/auth/logout', () => {
-  it('200 — clears both cookies and deletes refresh token from DB', async () => {
+  it('200 — clears both cookies and deletes all refresh tokens for user', async () => {
     const { user, password } = await createTestUser({ email: 'logout@example.com' });
 
     // Login to get cookies
@@ -304,15 +304,15 @@ describe('POST /api/auth/logout', () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toMatch(/logged out/i);
 
-    // Refresh token should be deleted from DB
+    // All refresh tokens for user should be deleted from DB
     const remainingTokens = await prisma.refreshToken.findMany({ where: { userId: user.id } });
     expect(remainingTokens).toHaveLength(0);
   });
 
-  it('200 — succeeds even without cookies (idempotent)', async () => {
+  it('401 — requires authentication', async () => {
     const res = await request(app).post('/api/auth/logout');
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 });
 

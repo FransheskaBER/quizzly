@@ -59,9 +59,9 @@ router.post(
 
 router.post(
   '/logout',
+  auth,
   asyncHandler(async (req, res) => {
-    const refreshToken = req.cookies?.[getRefreshCookieName()] as string | undefined;
-    await authService.logout(refreshToken);
+    await authService.logout(req.user!.userId);
     clearSessionCookie(res);
     clearRefreshCookie(res);
     res.status(200).json({ message: 'Logged out' });
