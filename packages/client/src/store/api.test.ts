@@ -1,10 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from 'vitest';
 
 const { mockBaseQuery, mockCaptureException, mockLogout } = vi.hoisted(() => ({
   mockBaseQuery: vi.fn(),
   mockCaptureException: vi.fn(),
   mockLogout: vi.fn(() => ({ type: 'auth/logout' })),
 }));
+
+const mockFetch = vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+  json: async () => ({}),
+  text: async () => '',
+});
+
+beforeAll(() => {
+  vi.stubGlobal('fetch', mockFetch);
+});
+
+afterEach(() => {
+  mockFetch.mockClear();
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 vi.mock('@/config/sentry', () => ({
   Sentry: { captureException: mockCaptureException },
@@ -26,7 +45,7 @@ describe('baseQueryWithAuth unauthorized telemetry (FE-014)', () => {
     mockLogout.mockClear();
   });
 
-  it('captures 401 auto-logout context with endpoint and method', async () => {
+  it('skips Sentry capture for GET /auth/me 401 (expected session check)', async () => {
     const dispatch = vi.fn();
     mockBaseQuery.mockResolvedValue({
       error: { status: 401, data: { message: 'Unauthorized' } },
@@ -38,15 +57,30 @@ describe('baseQueryWithAuth unauthorized telemetry (FE-014)', () => {
       {} as never,
     );
 
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ type: 'auth/logout' });
+  });
+
+  it('captures 401 to Sentry for non-session-check endpoints', async () => {
+    const dispatch = vi.fn();
+    mockBaseQuery.mockResolvedValue({
+      error: { status: 401, data: { message: 'Unauthorized' } },
+    });
+
+    await baseQueryWithAuth(
+      { url: '/sessions', method: 'GET' },
+      { dispatch } as never,
+      {} as never,
+    );
+
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
           operation: 'autoLogoutOnUnauthorized',
-          endpoint: '/auth/me',
+          endpoint: '/sessions',
           method: 'GET',
           status: 401,
-          originalError: expect.objectContaining({ status: 401 }),
         }),
       }),
     );
