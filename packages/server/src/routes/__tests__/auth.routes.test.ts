@@ -249,11 +249,17 @@ describe('POST /api/auth/refresh', () => {
     expect(refreshTokenRows).toHaveLength(1);
   });
 
-  it('401 — missing refresh token cookie', async () => {
+  it('401 — missing refresh token cookie clears both cookies', async () => {
     const res = await request(app).post('/api/auth/refresh');
 
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNAUTHORIZED');
+
+    const cookies = res.headers['set-cookie'] as string[];
+    const sessionCleared = cookies.some((c: string) => c.startsWith('quizzly_session=;'));
+    const refreshCleared = cookies.some((c: string) => c.startsWith('quizzly_refresh=;'));
+    expect(sessionCleared).toBe(true);
+    expect(refreshCleared).toBe(true);
   });
 
   it('401 — expired refresh token clears both cookies', async () => {
@@ -265,6 +271,12 @@ describe('POST /api/auth/refresh', () => {
       .set('Cookie', `quizzly_refresh=${expiredRefreshToken}`);
 
     expect(res.status).toBe(401);
+
+    const cookies = res.headers['set-cookie'] as string[];
+    const sessionCleared = cookies.some((c: string) => c.startsWith('quizzly_session=;'));
+    const refreshCleared = cookies.some((c: string) => c.startsWith('quizzly_refresh=;'));
+    expect(sessionCleared).toBe(true);
+    expect(refreshCleared).toBe(true);
   });
 
   it('401 — refresh token not in DB (already rotated/revoked)', async () => {
