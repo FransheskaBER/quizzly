@@ -17,6 +17,7 @@ import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import { Button } from '@/components/common/Button';
 import styles from './MaterialUploader.module.css';
 
@@ -104,12 +105,13 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Material upload failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'upload file failed'), {
         extra: {
           operation: 'uploadFile',
           sessionId,
           fileName: file.name,
           fileSize: file.size,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
@@ -167,11 +169,12 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Material URL extraction failed:', err);
-      Sentry.captureException(err, {
+      Sentry.captureException(toSentryError(err, 'URL extraction failed'), {
         extra: {
           operation: 'handleUrlSubmit',
           sessionId,
           url: trimmed,
+          originalError: err,
         },
       });
       const { code } = parseApiError(err);
@@ -188,7 +191,9 @@ export const MaterialUploader = ({ sessionId, materials }: MaterialUploaderProps
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete material:', err);
-      Sentry.captureException(err, { extra: { sessionId, materialId } });
+      Sentry.captureException(toSentryError(err, 'delete material failed'), {
+        extra: { sessionId, materialId, originalError: err },
+      });
       const { code } = parseApiError(err);
       const status = extractHttpStatus(err);
       const userMessage = getUserMessage(code, 'delete-material', status);

@@ -4,6 +4,7 @@ import { useVerifyEmailMutation } from '@/api/auth.api';
 import { parseApiError } from '@/hooks/useApiError';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Sentry } from '@/config/sentry';
+import { toSentryError } from '@/utils/sentry.utils';
 import styles from './VerifyEmailPage.module.css';
 
 type VerifyState = 'loading' | 'success' | 'already-verified' | 'error' | 'no-token';
@@ -40,7 +41,9 @@ const VerifyEmailPage = () => {
         };
         // eslint-disable-next-line no-console
         console.error('Verify email failed:', err, context);
-        Sentry.captureException(err, { extra: context });
+        Sentry.captureException(toSentryError(err, 'verify email failed'), {
+          extra: { ...context, originalError: err },
+        });
         if (!cancelled) {
           if (code === 'CONFLICT') {
             setState('already-verified');
