@@ -27,11 +27,16 @@ export const errorHandler = (
   // 4xx — expected business errors.
   if (err instanceof AppError) {
     logger.warn({ err, ...requestContext }, 'Handled application error');
-    const isExpectedLoginFailure =
+    const routePath = req.originalUrl?.split('?')[0] ?? req.path;
+    const isExpectedUnauthorized =
       err instanceof UnauthorizedError &&
-      err.message === 'Invalid email or password' &&
-      (req.originalUrl?.split('?')[0] ?? req.path) === '/api/auth/login';
-    if (!isExpectedLoginFailure) {
+      (
+        // Failed login attempt (wrong email/password) — normal user behavior
+        (err.message === 'Invalid email or password' && routePath === '/api/auth/login') ||
+        // Unauthenticated session check (user not logged in yet)
+        (err.message === 'Missing or invalid token' && routePath === '/api/auth/me')
+      );
+    if (!isExpectedUnauthorized) {
       Sentry.captureException(err, {
         extra: {
           ...requestContext,

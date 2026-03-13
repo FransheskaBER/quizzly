@@ -101,7 +101,30 @@ describe('errorHandler', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
-  it('captures UnauthorizedError on other paths (e.g. missing token on /api/auth/me)', () => {
+  it('does not capture expected unauthenticated session check on GET /api/auth/me', () => {
+    const res = createMockRes();
+    const meReq = {
+      ...mockReq,
+      path: '/api/auth/me',
+      originalUrl: '/api/auth/me',
+      method: 'GET',
+    } as unknown as Request;
+    const err = new UnauthorizedError('Missing or invalid token');
+
+    errorHandler(err, meReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Missing or invalid token',
+        details: undefined,
+      },
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('captures UnauthorizedError with unexpected message on /api/auth/me', () => {
     const res = createMockRes();
     const meReq = { ...mockReq, path: '/api/auth/me', method: 'GET' } as unknown as Request;
     const err = new UnauthorizedError('Not authenticated');

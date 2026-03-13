@@ -14,19 +14,6 @@ import type {
   MessageResponse,
 } from '@skills-trainer/shared';
 
-const HYDRATION_401_CAPTURE_INTERVAL_MS = 60_000;
-let lastHydration401CaptureAt = 0;
-
-const shouldCaptureHydration401 = (): boolean => {
-  const now = Date.now();
-  if (now - lastHydration401CaptureAt < HYDRATION_401_CAPTURE_INTERVAL_MS) {
-    return false;
-  }
-
-  lastHydration401CaptureAt = now;
-  return true;
-};
-
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     signup: builder.mutation<MessageResponse, SignupRequest>({
@@ -84,24 +71,8 @@ export const authApi = api.injectEndpoints({
           // already surfaces the connectivity error.
           if (status === 'FETCH_ERROR') return;
 
-          // 401 is handled globally by baseQueryWithAuth (dispatches logout()).
-          if (status === 401) {
-            if (shouldCaptureHydration401()) {
-              // eslint-disable-next-line no-console
-              console.error('getMe hydration unauthorized:', err);
-              Sentry.captureException(toSentryError(err, 'getMe hydration unauthorized (401)'), {
-                extra: {
-                  operation: 'getMeHydration',
-                  route: '/auth/me',
-                  reason: 'unauthorized',
-                  status: 401,
-                  telemetryMode: 'rate-limited',
-                  originalError: err,
-                },
-              });
-            }
-            return;
-          }
+          // 401 = "not logged in" — expected on app load. Handled by baseQueryWithAuth.
+          if (status === 401) return;
 
           // eslint-disable-next-line no-console
           console.error('getMe hydration failed:', err);
