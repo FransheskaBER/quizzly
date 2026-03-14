@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
-import { QuizStatus } from '@skills-trainer/shared';
+import { QuizStatus, type Question } from '@skills-trainer/shared';
 
 import { useGetQuizQuery, useSaveAnswersMutation, useSubmitQuizMutation } from '@/api/quizzes.api';
 import { parseApiError } from '@/hooks/useApiError';
@@ -12,22 +12,26 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Button } from '@/components/common/Button';
 import { ComponentErrorBoundary } from '@/components/common/ErrorBoundary';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
+import { QuestionFailedCard } from '@/components/quiz/QuestionFailedCard';
 import { QuestionNav } from '@/components/quiz/QuestionNav';
 import { api } from '@/store/api';
 import { useAppDispatch } from '@/store/store';
 import { submitFailureReported } from '@/store/slices/quizSubmit.slice';
+import { useQuizGenerationContext } from '@/providers/QuizGenerationProvider';
 import { Sentry } from '@/config/sentry';
 import { toSentryError } from '@/utils/sentry.utils';
 import styles from './QuizTakingPage.module.css';
 
 const AUTOSAVE_DELAY_MS = 1000;
+const TIER_1_MS = 5000;
+const TIER_2_MS = 15000;
 
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
 const QuizTakingPage = () => {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id = '', sessionId = '' } = useParams<{ id: string; sessionId: string }>();
   const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
   const dispatch = useAppDispatch();
@@ -36,14 +40,33 @@ const QuizTakingPage = () => {
   const [saveAnswers] = useSaveAnswersMutation();
   const [submitQuiz, { isLoading: isSubmitting }] = useSubmitQuizMutation();
 
-  // UI-only state — the only local state besides dirty answers
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const {
+    status: generationStatus,
+    questions: streamingQuestions,
+    failedSlots,
+  } = useQuizGenerationContext();
 
-  // Tracks answers the user has typed but not yet confirmed saved by the server.
-  // NOT a copy of API data — this only holds what the user typed this session.
+  const isGenerationInProgress = generationStatus === 'connecting' || generationStatus === 'generating';
+
+  // Merge DB questions with streaming questions (dedup by id)
+  const mergedQuestions: Question[] = useMemo(() => {
+    const dbQuestions = quiz?.questions ?? [];
+    if (!isGenerationInProgress || streamingQuestions.length === 0) return dbQuestions;
+
+    const dbIds = new Set(dbQuestions.map((q) => q.id));
+    const newFromStream = streamingQuestions.filter((q) => !dbIds.has(q.id));
+    return [...dbQuestions, ...newFromStream];
+  }, [quiz?.questions, streamingQuestions, isGenerationInProgress]);
+
+  // UI-only state
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [dirtyAnswers, setDirtyAnswers] = useState<Record<string, string>>({});
 
-  // Refs for stable access from callbacks and cleanup — avoid stale closures
+  // Tiered "Next" button waiting state
+  const [waitStartTime, setWaitStartTime] = useState<number | null>(null);
+  const [waitElapsed, setWaitElapsed] = useState(0);
+
+  // Refs for stable access from callbacks and cleanup
   const dirtyRef = useRef<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveRef = useRef(saveAnswers);
@@ -52,9 +75,34 @@ const QuizTakingPage = () => {
   saveRef.current = saveAnswers;
   idRef.current = id;
 
-  // Sends all current dirty answers to the server. Returns a promise so the
-  // submit flow can await it before triggering grading.
-  // On success: removes the sent entries from dirty (new edits made while in-flight are kept).
+  // Failed slots beyond the last question are navigable (user can see the info card)
+  const trailingFailedSlots = failedSlots.filter(
+    (f) => f.questionNumber > mergedQuestions.length,
+  ).length;
+  const totalSlots = mergedQuestions.length + trailingFailedSlots;
+
+  // Track if the next question is not yet available
+  const nextQuestionExists = currentIndex + 1 < totalSlots;
+  const isWaitingForNext = !nextQuestionExists && isGenerationInProgress;
+
+  // Start/stop wait timer for tiered messaging
+  useEffect(() => {
+    if (isWaitingForNext && waitStartTime === null) {
+      setWaitStartTime(Date.now());
+    } else if (!isWaitingForNext) {
+      setWaitStartTime(null);
+      setWaitElapsed(0);
+    }
+  }, [isWaitingForNext, waitStartTime]);
+
+  useEffect(() => {
+    if (waitStartTime === null) return;
+    const interval = setInterval(() => {
+      setWaitElapsed(Date.now() - waitStartTime);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [waitStartTime]);
+
   const doSave = useCallback((): Promise<void> => {
     const entries = Object.entries(dirtyRef.current);
     if (!entries.length) return Promise.resolve();
@@ -66,7 +114,6 @@ const QuizTakingPage = () => {
       })
       .unwrap()
       .then(() => {
-        // Remove only the keys that were sent — edits made while in-flight are preserved
         const remaining = Object.fromEntries(
           Object.entries(dirtyRef.current).filter(([k]) => !sentKeys.has(k)),
         );
@@ -109,7 +156,6 @@ const QuizTakingPage = () => {
     [doSave],
   );
 
-  // Flush any pending debounced save when the user navigates away
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -119,39 +165,33 @@ const QuizTakingPage = () => {
     };
   }, [doSave]);
 
-  // Redirect to results when quiz is already submitted (grading, completed, submitted_ungraded)
+  // Redirect to results when quiz is already submitted
   useEffect(() => {
     if (quiz && [QuizStatus.GRADING, QuizStatus.COMPLETED, QuizStatus.SUBMITTED_UNGRADED].includes(quiz.status)) {
-      navigate(`/quiz/${id}/results`, { replace: true });
+      navigate(`/sessions/${sessionId}/quiz/${id}/results`, { replace: true });
     }
-  }, [quiz, id, navigate]);
+  }, [quiz, id, sessionId, navigate]);
 
   const handleSubmit = async () => {
     if (!quiz) return;
 
-    // Flush pending debounced save before submitting
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
     await doSave();
 
-    // Build the full answer list from merged state for the submit payload
     const finalAnswers = quiz.answers.map((a) => ({
       questionId: a.questionId,
       answer: dirtyRef.current[a.questionId] ?? a.userAnswer ?? '',
     }));
 
-    // Submit starts a grading SSE stream on the server. Do not await here:
-    // we want to return users to the session page immediately.
     const submitPromise = submitQuiz({ id, answers: finalAnswers }).unwrap();
     void submitPromise
       .then(() => {
         showSuccess('Submitted your quiz!', 'Sit tight - your answers are being graded.');
       })
       .catch((err: unknown) => {
-        // RTK Query rejects SSE submit requests with PARSING_ERROR + 2xx once the
-        // stream has started; treat that as success and avoid false-positive telemetry.
         const fbqErr = err as FetchBaseQueryError;
         const isStreamStarted =
           typeof err === 'object' &&
@@ -192,7 +232,6 @@ const QuizTakingPage = () => {
         }
       });
 
-    // Force session and quiz cache refresh so session list and results page see correct status.
     dispatch(api.util.invalidateTags([{ type: 'Session', id: quiz.sessionId }, { type: 'Quiz', id }]));
     navigate(`/sessions/${quiz.sessionId}`, { replace: true, state: { justSubmittedQuizId: id } });
   };
@@ -217,23 +256,24 @@ const QuizTakingPage = () => {
     );
   }
 
-  if (!quiz) return null;
+  // Allow rendering with streaming questions even if quiz API hasn't returned yet
+  if (!quiz && mergedQuestions.length === 0) return null;
 
-  // Prevent flash: if the quiz is already submitted, show a spinner while the
-  // useEffect redirect fires (runs after first paint without this guard).
+  // Prevent flash for already-submitted quizzes
   if (
+    quiz &&
     [QuizStatus.GRADING, QuizStatus.COMPLETED, QuizStatus.SUBMITTED_UNGRADED].includes(quiz.status)
   ) {
     return <LoadingSpinner fullPage />;
   }
 
-  // Merge dirty (pending) answers over cached server answers for display
-  const effectiveAnswers = quiz.answers.map((a) => ({
+  // Merge dirty answers over cached server answers for display
+  const effectiveAnswers = (quiz?.answers ?? []).map((a) => ({
     ...a,
     userAnswer: dirtyAnswers[a.questionId] !== undefined ? dirtyAnswers[a.questionId] : a.userAnswer,
   }));
 
-  const allAnswered = effectiveAnswers.every(
+  const allAnswered = !isGenerationInProgress && effectiveAnswers.every(
     (a) => a.userAnswer !== null && a.userAnswer !== '',
   );
 
@@ -241,17 +281,35 @@ const QuizTakingPage = () => {
     (a) => a.userAnswer === null || a.userAnswer === '',
   ).length;
 
-  const currentQuestion = quiz.questions[currentIndex];
+  const currentQuestion = mergedQuestions[currentIndex];
   const currentAnswer =
     effectiveAnswers.find((a) => a.questionId === currentQuestion?.id)?.userAnswer ?? null;
+
+  // Check if current question is a failed slot
+  const currentFailedSlot = currentQuestion
+    ? failedSlots.find((f) => f.questionNumber === currentQuestion.questionNumber)
+    : failedSlots.find((f) => f.questionNumber === currentIndex + 1);
+
+  // Tiered "Next" button text
+  const getNextButtonContent = (): { text: string; showSaveLink: boolean } => {
+    if (!isWaitingForNext) return { text: 'Next', showSaveLink: false };
+    if (waitElapsed < TIER_1_MS) return { text: 'Preparing next question...', showSaveLink: false };
+    if (waitElapsed < TIER_2_MS) return { text: 'Still working on it — this can take a few seconds...', showSaveLink: false };
+    return { text: 'This is taking longer than expected.', showSaveLink: true };
+  };
+
+  const nextButton = getNextButtonContent();
+  const isLastQuestion = !isGenerationInProgress && currentIndex === totalSlots - 1;
 
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
         <QuestionNav
-          questions={quiz.questions}
+          questions={mergedQuestions}
           answers={effectiveAnswers}
+          failedSlots={failedSlots}
           currentIndex={currentIndex}
+          totalSlots={totalSlots}
           onNavigate={setCurrentIndex}
         />
 
@@ -266,7 +324,13 @@ const QuizTakingPage = () => {
             {isSubmitting ? 'Submitting…' : 'Complete Quiz'}
           </Button>
 
-          {!allAnswered && (
+          {isGenerationInProgress && (
+            <p className={styles.hint}>
+              Quiz generation in progress...
+            </p>
+          )}
+
+          {!allAnswered && !isGenerationInProgress && (
             <p className={styles.hint}>
               {unansweredCount} question{unansweredCount !== 1 ? 's' : ''} unanswered
             </p>
@@ -276,7 +340,7 @@ const QuizTakingPage = () => {
             type="button"
             variant="secondary"
             disabled={isSubmitting}
-            onClick={() => navigate(`/sessions/${quiz.sessionId}`)}
+            onClick={() => navigate(`/sessions/${sessionId}`)}
           >
             Save &amp; Quit
           </Button>
@@ -284,15 +348,61 @@ const QuizTakingPage = () => {
       </aside>
 
       <main className={styles.main}>
-        {currentQuestion && (
+        {/* Failed slot card */}
+        {currentFailedSlot && !currentQuestion && (
+          <QuestionFailedCard
+            questionNumber={currentFailedSlot.questionNumber}
+            message={currentFailedSlot.message}
+          />
+        )}
+
+        {/* Normal question card */}
+        {currentQuestion && !currentFailedSlot && (
           <ComponentErrorBoundary>
             <QuestionCard
               question={currentQuestion}
               currentAnswer={currentAnswer}
               onAnswerChange={handleAnswerChange}
-              totalQuestions={quiz.questions.length}
+              totalQuestions={totalSlots}
             />
           </ComponentErrorBoundary>
+        )}
+
+        {/* Navigation buttons */}
+        <div className={styles.navButtons}>
+          {currentIndex > 0 && (
+            <Button
+              variant="secondary"
+              onClick={() => setCurrentIndex(currentIndex - 1)}
+            >
+              Previous
+            </Button>
+          )}
+
+          {!isLastQuestion && (
+            <Button
+              variant="secondary"
+              disabled={isWaitingForNext}
+              onClick={() => setCurrentIndex(currentIndex + 1)}
+            >
+              {isWaitingForNext && waitElapsed < TIER_2_MS && (
+                <LoadingSpinner inline size="sm" />
+              )}
+              {isWaitingForNext ? nextButton.text : 'Next'}
+            </Button>
+          )}
+        </div>
+
+        {nextButton.showSaveLink && (
+          <p className={styles.hint}>
+            <button
+              type="button"
+              className="text-link"
+              onClick={() => navigate(`/sessions/${sessionId}`)}
+            >
+              Save progress and come back later
+            </button>
+          </p>
         )}
       </main>
     </div>

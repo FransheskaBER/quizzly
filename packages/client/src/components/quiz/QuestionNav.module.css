@@ -42,6 +42,12 @@
   color: #fff;
 }
 
+.navBtn.failed {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
 .prevNext {
   display: flex;
   gap: var(--spacing-sm);

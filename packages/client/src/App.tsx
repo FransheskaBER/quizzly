@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
+import QuizGenerationProvider from '@/providers/QuizGenerationProvider';
+
 import { RootErrorBoundary, RouteErrorBoundary } from '@/components/common/ErrorBoundary';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -72,9 +74,11 @@ export const App = () => {
               <Route path="/dashboard" element={withRouteBoundary(<HomeDashboardPage />)} />
               <Route path="/sessions" element={withRouteBoundary(<SessionListPage />)} />
               <Route path="/sessions/new" element={withRouteBoundary(<CreateSessionPage />)} />
-              <Route path="/sessions/:id" element={withRouteBoundary(<SessionDashboardPage />)} />
-              <Route path="/quiz/:id" element={withRouteBoundary(<QuizTakingPage />)} />
-              <Route path="/quiz/:id/results" element={withRouteBoundary(<QuizResultsPage />)} />
+              <Route path="/sessions/:sessionId" element={<QuizGenerationProvider />}>
+                <Route index element={withRouteBoundary(<SessionDashboardPage />)} />
+                <Route path="quiz/:id" element={withRouteBoundary(<QuizTakingPage />)} />
+                <Route path="quiz/:id/results" element={withRouteBoundary(<QuizResultsPage />)} />
+              </Route>
               <Route path="/profile" element={withRouteBoundary(<ProfilePage />)} />
             </Route>
 

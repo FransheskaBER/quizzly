@@ -116,10 +116,12 @@ Strategy: accumulate the stream text. When inside the `<questions>` block, use a
 
 #### Replacement flow
 
+**Implementation:** Use `callLlmStream` + `parseBlock` directly — do NOT use `runWithRetry`. `runWithRetry` is designed for batch validation with automatic retries and corrective prompts, which is wrong here. Replacement calls are single-question, one-shot attempts — if the output is invalid, the slot is permanently failed. No retry loop, no corrective message.
+
 After the main LLM stream completes, if there are malformed slots:
 
 1. For each malformed slot (max iterations = malformed count):
-   - Make a single LLM call requesting 1 question, with context about what's already been generated (question numbers, topics covered via tags) to avoid duplicates.
+   - Make a single LLM call (via `callLlmStream` + `parseBlock`) requesting 1 question, with context about what's already been generated (question numbers, topics covered via tags) to avoid duplicates.
    - Validate the single question against `llmGeneratedQuestionSchema`.
    - If valid: save to DB with the next sequential `questionNumber`, send SSE `question` event.
    - If invalid: this slot has exhausted its 1-retry budget. Mark as permanently failed.
@@ -216,7 +218,12 @@ Replace the current flow (call `llmGenerateQuiz` → iterate saved questions) wi
 6. Send complete SSE event                              — unchanged
 ```
 
-**Free trial validation change:** Currently validates that the LLM returned exactly `FREE_TRIAL_QUESTION_COUNT` MCQ questions. With per-question streaming, this check moves to after all questions (including replacements) are processed. The check becomes: `validCount === FREE_TRIAL_QUESTION_COUNT && all questions are MCQ`. If a free trial generation has any permanently failed questions, the entire attempt fails (free trial must produce exactly 5 questions — no partial results for unpaid users).
+**Free trial validation change:** Currently validates that the LLM returned exactly `FREE_TRIAL_QUESTION_COUNT` MCQ questions. With per-question streaming, this check moves to after all questions (including replacements) are processed. The check becomes:
+
+1. `validCount === FREE_TRIAL_QUESTION_COUNT` — exactly 5 valid questions.
+2. Every valid question has `answerFormat === 'mcq'` — free trial only allows MCQ. Verify each question's `answerFormat` field individually after validation, not just the request parameter (the LLM could ignore the instruction).
+
+If either condition fails, the entire attempt fails (free trial must produce exactly 5 MCQ questions — no partial results for unpaid users).
 
 ### 3.5 Frontend: Early Quiz Start via Redux Bridge
 
@@ -332,13 +339,21 @@ When the user reaches a question that hasn't arrived yet (rare — see timing an
 
 **Important limitation:** Reconnection only works if the backend process is the same one running the generation. Render's single-instance web service means this is always true for a single user's generation. If the server restarts mid-generation, the quiz attempt stays in `GENERATING` status with partial questions. The reconnect endpoint detects this (no in-memory generation found) and returns a `complete` event with the partial results, updating status to `IN_PROGRESS`.
 
-### 3.8 New SSE Event Type: `question_failed`
+### 3.8 New SSE Event Types: `generation_started` and `question_failed`
 
 **File:** `packages/shared/src/schemas/quiz.schema.ts`
 
-Add a new SSE event schema:
+Add two new SSE event schemas:
 
 ```typescript
+export const sseGenerationStartedEventSchema = z.object({
+  type: z.literal('generation_started'),
+  data: z.object({
+    quizAttemptId: z.string().uuid(),
+    totalExpected: z.number(),
+  }),
+});
+
 export const sseQuestionFailedEventSchema = z.object({
   type: z.literal('question_failed'),
   data: z.object({
@@ -348,13 +363,16 @@ export const sseQuestionFailedEventSchema = z.object({
 });
 ```
 
+**`generation_started` purpose:** Sent immediately after the quiz attempt is created, before the LLM stream begins. Provides the `quizAttemptId` and `totalExpected` question count to the frontend so the Redux slice can initialize state and the "Start Quiz" button can link to the correct quiz. This replaces the current approach of embedding these values in the `complete` event — the frontend needs them much earlier in the streaming flow.
+
 **File:** `packages/shared/src/types/index.ts`
 
 ```typescript
+export type SseGenerationStartedEvent = z.infer<typeof sseGenerationStartedEventSchema>;
 export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema>;
 ```
 
-**Frontend handling:** `useQuizGeneration` receives `question_failed` events and dispatches a new Redux action `questionFailed` that stores the failed slot info. `QuizTakingPage` checks for failed slots when rendering the question at a given index and shows the reassuring note card instead of a `QuestionCard`.
+**Frontend handling:** `useQuizGeneration` receives `generation_started` events and dispatches a new Redux action `generationStarted` that stores the `quizAttemptId` and `totalExpected`. It receives `question_failed` events and dispatches `questionFailed` that stores the failed slot info. `QuizTakingPage` checks for failed slots when rendering the question at a given index and shows the reassuring note card instead of a `QuestionCard`.
 
 ## 4. Blast Radius
 
@@ -362,12 +380,12 @@ export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema
 
 | File | Change |
 |------|--------|
-| `packages/server/src/services/llm.service.ts` | Add `streamQuestions()` function. `generateQuiz()` updated to call it. `runWithRetry`, `callLlmStream`, `parseBlock` unchanged. |
+| `packages/server/src/services/llm.service.ts` | Add `streamQuestions()` and `generateReplacementQuestion()`. Remove `generateQuiz()` (replaced by `streamQuestions()`). `runWithRetry`, `callLlmStream`, `parseBlock` unchanged. |
 | `packages/server/src/services/quiz.service.ts` | `executeGeneration()` rewritten to use `streamQuestions()`, per-question save+SSE, malformed recovery, Sentry capture, `question_failed` events. |
 | `packages/server/src/routes/quiz.routes.ts` | Add `reconnect` query param handling for SSE reconnection. |
 | `packages/server/src/utils/sse.utils.ts` | No changes — `sendSSEEvent` and `SseWriter` already support any event shape. |
-| `packages/shared/src/schemas/quiz.schema.ts` | Add `sseQuestionFailedEventSchema`. Add single-question validation schema (`llmGeneratedQuestionSchema` — may already exist as part of the array schema). |
-| `packages/shared/src/types/index.ts` | Add `SseQuestionFailedEvent` type export. |
+| `packages/shared/src/schemas/quiz.schema.ts` | Add `sseGenerationStartedEventSchema` and `sseQuestionFailedEventSchema`. Add single-question validation schema (`llmGeneratedQuestionSchema` — may already exist as part of the array schema). |
+| `packages/shared/src/types/index.ts` | Add `SseGenerationStartedEvent` and `SseQuestionFailedEvent` type exports. |
 | `packages/client/src/providers/QuizGenerationProvider.tsx` | **New file.** React context wrapping session routes. |
 | `packages/client/src/hooks/useQuizGeneration.ts` | Move SSE + Redux logic into provider. This file becomes a thin wrapper or is removed. |
 | `packages/client/src/store/slices/quizStream.slice.ts` | Add `questionFailed` action and `failedSlots` state. |
@@ -471,7 +489,7 @@ export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema
 
 ## 7. TDD Updates Required (not implementation scope)
 
-1. **TDD Section on LLM Integration:** Document the new `streamQuestions()` function alongside existing `generateQuiz()`. Note that quiz generation uses incremental parsing while grading uses batch `runWithRetry`.
+1. **TDD Section on LLM Integration:** Document the new `streamQuestions()` function which replaces the removed `generateQuiz()`. Note that quiz generation uses incremental parsing while grading uses batch `runWithRetry`.
 2. **TDD Section on SSE Events:** Add `question_failed` event type to the SSE event inventory.
 3. **TDD Section on Error Handling:** Document `QuizQuestionGenerationFailed` Sentry capture pattern — not a thrown error, but a structured Sentry event with specific tags and context fields.
 4. **TDD Section on Frontend Architecture:** Document `QuizGenerationProvider` pattern — React context wrapping session routes, surviving page navigation, providing generation state to both dashboard and quiz-taking pages.
