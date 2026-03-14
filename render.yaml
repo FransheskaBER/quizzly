@@ -4,7 +4,7 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    buildCommand: npm ci && npx prisma generate --schema=packages/server/prisma/schema.prisma && npm run build --workspace=packages/shared && npm run build --workspace=packages/server
+    buildCommand: npm ci && npx prisma generate --schema=packages/server/prisma/schema.prisma && npx prisma migrate deploy --schema=packages/server/prisma/schema.prisma && npm run build --workspace=packages/shared && npm run build --workspace=packages/server
     startCommand: NODE_ENV=production node packages/server/dist/index.js
     healthCheckPath: /api/health
     envVars:
