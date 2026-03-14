@@ -13,7 +13,7 @@
 
 ## Executive Summary
 
-Quizzly has a **strong security foundation** — AES-256-GCM encrypted API key storage, bcrypt password hashing, Zod validation on all routes, ownership checks on every resource endpoint, multi-tier rate limiting, CSP headers, and LLM response validation with exfiltration detection. The audit identified **4 HIGH** and **3 MEDIUM** severity findings. The most critical are: (1) SSRF vulnerability in URL fetching with no private IP blocking, (2) XML tag injection in LLM prompts allowing prompt boundary escape, (3) unpinned JWT algorithm, and (4) missing refresh token revocation on password reset. All findings have straightforward fixes.
+Quizzly has a **strong security foundation** — AES-256-GCM encrypted API key storage, bcrypt password hashing, Zod validation on all routes, ownership checks on every resource endpoint, multi-tier rate limiting, CSP headers, and LLM response validation with exfiltration detection. The audit identified **4 HIGH** and **3 MEDIUM** severity findings. **All 4 HIGH findings and 2 of 3 MEDIUM findings have been fixed.** MEDIUM-1 (suspicious pattern blocking) was reviewed and accepted as logging-only, since the structural defenses (XML escaping + NFKC normalization) prevent the underlying attack.
 
 ---
 
