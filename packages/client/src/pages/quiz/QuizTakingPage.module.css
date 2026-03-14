@@ -61,20 +61,6 @@
   margin-top: var(--spacing-md);
 }
 
-.saveLink {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-primary);
-  font-size: var(--font-size-sm);
-  padding: 0;
-  text-decoration: underline;
-}
-
-.saveLink:hover {
-  color: var(--color-primary-hover);
-}
-
 /* ---- Error / loading states ---- */
 
 .errorPage {

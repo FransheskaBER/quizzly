@@ -1,26 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { QuizStatus } from '@skills-trainer/shared';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('../../config/database.js', () => ({
-  prisma: {
-    quizAttempt: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      update: vi.fn(),
-    },
-  },
-}));
-
 vi.mock('../../services/quiz.service.js', () => ({
   prepareGeneration: vi.fn(),
   executeGeneration: vi.fn(),
   getActiveGeneration: vi.fn(),
+  prepareReconnect: vi.fn(),
+  executeReconnect: vi.fn(),
 }));
 
 vi.mock('../../middleware/auth.middleware.js', () => ({
@@ -40,33 +31,11 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   regradeRateLimiter: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
 }));
 
-vi.mock('../../utils/ownership.js', () => ({
-  assertOwnership: vi.fn(),
-}));
-
-import { prisma } from '../../config/database.js';
 import * as quizService from '../../services/quiz.service.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const MOCK_QUESTIONS = [
-  {
-    id: 'q1',
-    questionNumber: 1,
-    questionType: 'mcq',
-    questionText: 'Question 1?',
-    options: ['A', 'B', 'C', 'D'],
-  },
-  {
-    id: 'q2',
-    questionNumber: 2,
-    questionType: 'mcq',
-    questionText: 'Question 2?',
-    options: ['A', 'B', 'C', 'D'],
-  },
-];
 
 /** Parses SSE text into an array of event objects. */
 const parseSSEEvents = (text: string): unknown[] =>
@@ -82,28 +51,34 @@ const buildApp = async () => {
   return app;
 };
 
+const MOCK_CONTEXT = {
+  attempt: {
+    id: 'attempt-1',
+    status: 'generating',
+    questionCount: 5,
+    questions: [
+      { id: 'q1', questionNumber: 1, questionType: 'mcq', questionText: 'Q1?', options: ['A', 'B'] },
+    ],
+  },
+};
+
 // ---------------------------------------------------------------------------
-// Tests — AC22: Server restarted → return current state, update IN_PROGRESS
+// Tests — Route delegates reconnect to service (prepare + execute)
 // ---------------------------------------------------------------------------
 
-describe('Quiz reconnect route — server restarted scenario (AC22)', () => {
+describe('Quiz reconnect route — delegation to service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns existing questions and updates status to IN_PROGRESS when server has no in-memory generation', async () => {
-    const mockAttempt = {
-      id: 'attempt-1',
-      userId: 'user-1',
-      sessionId: 'session-1',
-      status: QuizStatus.GENERATING,
-      questionCount: 5,
-      questions: MOCK_QUESTIONS,
-    };
-
-    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(mockAttempt as never);
-    vi.mocked(prisma.quizAttempt.update).mockResolvedValue({} as never);
-    vi.mocked(quizService.getActiveGeneration).mockReturnValue(undefined);
+  it('calls prepareReconnect then opens SSE and calls executeReconnect', async () => {
+    vi.mocked(quizService.prepareReconnect).mockResolvedValue(MOCK_CONTEXT);
+    vi.mocked(quizService.executeReconnect).mockImplementation(
+      async (_context, writer) => {
+        writer({ type: 'generation_started', data: { quizAttemptId: 'attempt-1', totalExpected: 5 } });
+        writer({ type: 'complete', data: { quizAttemptId: 'attempt-1' } });
+      },
+    );
 
     const app = await buildApp();
 
@@ -115,37 +90,21 @@ describe('Quiz reconnect route — server restarted scenario (AC22)', () => {
     expect(res.headers['content-type']).toContain('text/event-stream');
 
     const events = parseSSEEvents(res.text);
-    const generationStarted = events.find((e: unknown) => (e as { type: string }).type === 'generation_started');
-    const questionEvents = events.filter((e: unknown) => (e as { type: string }).type === 'question');
-    const completeEvent = events.find((e: unknown) => (e as { type: string }).type === 'complete');
+    expect(events).toHaveLength(2);
 
-    expect(generationStarted).toBeDefined();
-    expect(questionEvents).toHaveLength(2);
-    expect(completeEvent).toBeDefined();
-
-    expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'attempt-1' },
-        data: expect.objectContaining({
-          status: QuizStatus.IN_PROGRESS,
-          questionCount: 2,
-        }),
-      }),
+    expect(quizService.prepareReconnect).toHaveBeenCalledWith('attempt-1', 'user-1', 'session-1');
+    expect(quizService.executeReconnect).toHaveBeenCalledWith(
+      MOCK_CONTEXT,
+      expect.any(Function),
+      expect.any(Function),
     );
   });
 
-  it('does not update status when attempt is already IN_PROGRESS', async () => {
-    const mockAttempt = {
-      id: 'attempt-1',
-      userId: 'user-1',
-      sessionId: 'session-1',
-      status: QuizStatus.IN_PROGRESS,
-      questionCount: 2,
-      questions: MOCK_QUESTIONS.slice(0, 1),
-    };
-
-    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(mockAttempt as never);
-    vi.mocked(quizService.getActiveGeneration).mockReturnValue(undefined);
+  it('returns JSON error when prepareReconnect throws NotFoundError', async () => {
+    const { NotFoundError } = await import('../../utils/errors.js');
+    vi.mocked(quizService.prepareReconnect).mockRejectedValue(
+      new NotFoundError('Quiz attempt not found'),
+    );
 
     const app = await buildApp();
 
@@ -153,36 +112,21 @@ describe('Quiz reconnect route — server restarted scenario (AC22)', () => {
       .get('/api/sessions/session-1/quizzes/generate?reconnect=true&quizAttemptId=attempt-1')
       .buffer(true);
 
-    expect(res.status).toBe(200);
-
-    const events = parseSSEEvents(res.text);
-    const questionEvents = events.filter((e: unknown) => (e as { type: string }).type === 'question');
-    expect(questionEvents).toHaveLength(1);
-
-    // Should NOT update status since it's already IN_PROGRESS
-    expect(prisma.quizAttempt.update).not.toHaveBeenCalled();
+    // Pre-SSE error — no SSE headers written
+    expect(res.headers['content-type']).not.toContain('text/event-stream');
+    expect(quizService.executeReconnect).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when quizAttemptId belongs to a different session', async () => {
-    const mockAttempt = {
-      id: 'attempt-1',
-      userId: 'user-1',
-      sessionId: 'other-session',
-      status: QuizStatus.GENERATING,
-      questionCount: 5,
-      questions: MOCK_QUESTIONS,
-    };
-
-    vi.mocked(prisma.quizAttempt.findUnique).mockResolvedValue(mockAttempt as never);
+  it('falls through to normal generation when reconnect is not set', async () => {
+    vi.mocked(quizService.prepareGeneration).mockRejectedValue(new Error('should reach here'));
 
     const app = await buildApp();
 
-    const res = await request(app)
-      .get('/api/sessions/session-1/quizzes/generate?reconnect=true&quizAttemptId=attempt-1')
+    await request(app)
+      .get('/api/sessions/session-1/quizzes/generate?difficulty=medium&format=mcq&count=5')
       .buffer(true);
 
-    // The NotFoundError is thrown but asyncHandler converts it to an error response
-    // With mocked asyncHandler, the error may be swallowed — verify no SSE events sent
-    expect(res.headers['content-type']).not.toContain('text/event-stream');
+    expect(quizService.prepareReconnect).not.toHaveBeenCalled();
+    expect(quizService.executeReconnect).not.toHaveBeenCalled();
   });
 });

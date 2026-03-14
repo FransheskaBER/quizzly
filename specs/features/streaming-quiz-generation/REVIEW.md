@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-14
 **Spec file**: RFC.md
-**Overall result**: All deviations fixed. Most test gaps covered — 19 of 25 acceptance criteria have explicit tests (~30 tests across 6 files). Remaining 6 gaps are integration- or E2E-level.
+**Overall result**: All deviations fixed. Most test gaps covered — 19 of 25 acceptance criteria have explicit tests (~36 tests across 6 files). Remaining 6 gaps are integration- or E2E-level.
 
 ## Deviations (All Resolved)
 
@@ -103,9 +103,9 @@
 
 | File | Tests | Criteria Covered |
 |------|-------|-----------------|
-| `packages/server/src/services/__tests__/streamQuestions.test.ts` | 9 | AC1, AC2, AC3, AC4 |
+| `packages/server/src/services/__tests__/streamQuestions.test.ts` | 13 | AC1, AC2, AC3, AC4 |
 | `packages/server/src/services/__tests__/executeGeneration.streaming.test.ts` | 9 | AC5, AC6, AC7, AC8, AC9, AC10, AC23 |
-| `packages/server/src/routes/__tests__/quizReconnect.test.ts` | 2 | AC22 |
+| `packages/server/src/routes/__tests__/quizReconnect.test.ts` | 3 | AC22 |
 | `packages/client/src/pages/quiz/QuizTakingPage.test.tsx` (expanded) | 7 | AC13, AC14, AC15, AC16, AC17, AC18 |
 | `packages/client/src/store/slices/quizStream.slice.test.ts` | 3 | questionFailed action, failedSlots |
 

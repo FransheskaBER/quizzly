@@ -380,7 +380,7 @@ export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema
 
 | File | Change |
 |------|--------|
-| `packages/server/src/services/llm.service.ts` | Add `streamQuestions()` function. `generateQuiz()` updated to call it. `runWithRetry`, `callLlmStream`, `parseBlock` unchanged. |
+| `packages/server/src/services/llm.service.ts` | Add `streamQuestions()` and `generateReplacementQuestion()`. Remove `generateQuiz()` (replaced by `streamQuestions()`). `runWithRetry`, `callLlmStream`, `parseBlock` unchanged. |
 | `packages/server/src/services/quiz.service.ts` | `executeGeneration()` rewritten to use `streamQuestions()`, per-question save+SSE, malformed recovery, Sentry capture, `question_failed` events. |
 | `packages/server/src/routes/quiz.routes.ts` | Add `reconnect` query param handling for SSE reconnection. |
 | `packages/server/src/utils/sse.utils.ts` | No changes — `sendSSEEvent` and `SseWriter` already support any event shape. |
@@ -489,7 +489,7 @@ export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema
 
 ## 7. TDD Updates Required (not implementation scope)
 
-1. **TDD Section on LLM Integration:** Document the new `streamQuestions()` function alongside existing `generateQuiz()`. Note that quiz generation uses incremental parsing while grading uses batch `runWithRetry`.
+1. **TDD Section on LLM Integration:** Document the new `streamQuestions()` function which replaces the removed `generateQuiz()`. Note that quiz generation uses incremental parsing while grading uses batch `runWithRetry`.
 2. **TDD Section on SSE Events:** Add `question_failed` event type to the SSE event inventory.
 3. **TDD Section on Error Handling:** Document `QuizQuestionGenerationFailed` Sentry capture pattern — not a thrown error, but a structured Sentry event with specific tags and context fields.
 4. **TDD Section on Frontend Architecture:** Document `QuizGenerationProvider` pattern — React context wrapping session routes, surviving page navigation, providing generation state to both dashboard and quiz-taking pages.

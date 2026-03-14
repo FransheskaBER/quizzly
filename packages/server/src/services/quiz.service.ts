@@ -186,6 +186,110 @@ export const getActiveGeneration = (quizAttemptId: string): Set<SseWriter> | und
   activeGenerations.get(quizAttemptId);
 
 // ---------------------------------------------------------------------------
+// Reconnection (RFC §3.7)
+// ---------------------------------------------------------------------------
+
+const RECONNECT_POLL_INTERVAL_MS = 500;
+
+interface ReconnectContext {
+  attempt: {
+    id: string;
+    status: string;
+    questionCount: number;
+    questions: Array<{
+      id: string;
+      questionNumber: number;
+      questionType: string;
+      questionText: string;
+      options: unknown;
+    }>;
+  };
+}
+
+/**
+ * Pre-SSE validation for reconnection. Verifies ownership, session match,
+ * and returns the attempt with its questions.
+ * Throws AppError subclasses on failure so asyncHandler returns JSON.
+ */
+export const prepareReconnect = async (
+  quizAttemptId: string,
+  userId: string,
+  sessionId: string,
+): Promise<ReconnectContext> => {
+  const attempt = await prisma.quizAttempt.findUnique({
+    where: { id: quizAttemptId },
+    include: {
+      questions: { orderBy: { questionNumber: 'asc' } },
+    },
+  });
+
+  if (!attempt) throw new NotFoundError('Quiz attempt not found');
+  assertOwnership(attempt.userId, userId);
+
+  if (attempt.sessionId !== sessionId) {
+    throw new NotFoundError('Quiz attempt not found');
+  }
+
+  return { attempt };
+};
+
+/**
+ * SSE streaming for reconnection. Sends existing questions and subscribes
+ * to active generation if still running. Never throws — the caller must
+ * open SSE headers before calling this function.
+ */
+export const executeReconnect = async (
+  context: ReconnectContext,
+  writer: SseWriter,
+  isClientConnected: () => boolean,
+): Promise<void> => {
+  const { attempt } = context;
+
+  writer({
+    type: 'generation_started',
+    data: { quizAttemptId: attempt.id, totalExpected: attempt.questionCount },
+  });
+
+  for (const q of attempt.questions) {
+    writer({
+      type: 'question',
+      data: {
+        id: q.id,
+        questionNumber: q.questionNumber,
+        questionType: q.questionType,
+        questionText: q.questionText,
+        options: q.options as string[] | null,
+      },
+    });
+  }
+
+  const activeWriters = activeGenerations.get(attempt.id);
+  if (activeWriters) {
+    activeWriters.add(writer);
+    await new Promise<void>((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (!isClientConnected() || !activeGenerations.has(attempt.id)) {
+          clearInterval(checkInterval);
+          activeWriters.delete(writer);
+          resolve();
+        }
+      }, RECONNECT_POLL_INTERVAL_MS);
+    });
+  } else {
+    if (attempt.status === QuizStatus.GENERATING) {
+      await prisma.quizAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: QuizStatus.IN_PROGRESS,
+          questionCount: attempt.questions.length,
+        },
+      });
+    }
+    writer({ type: 'complete', data: { quizAttemptId: attempt.id } });
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Sentry helpers for malformed question capture (RFC §3.3)
 // ---------------------------------------------------------------------------
 

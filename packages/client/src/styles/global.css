@@ -287,3 +287,17 @@ strong {
   text-align: center;
 }
 
+.text-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  padding: 0;
+  text-decoration: underline;
+}
+
+.text-link:hover {
+  color: var(--color-primary-hover);
+}
+
