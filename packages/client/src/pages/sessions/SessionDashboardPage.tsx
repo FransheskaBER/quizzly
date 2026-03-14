@@ -124,14 +124,13 @@ const SessionDashboardPage = () => {
 
   // Show only attempts that are either:
   //  (a) submitted (grading / submitted_ungraded / completed), or
-  //  (b) in_progress AND the user has already opened the quiz (startedAt set), or
-  //  (c) the just-submitted quiz while the backend still shows in_progress.
+  //  (b) in_progress (generation finished, user can take or continue the quiz).
+  // Hide only 'generating' status (quiz still being created by LLM).
   const attemptsToShow = session
     ? session.quizAttempts.filter(
         (q: QuizAttemptSummary) =>
           SUBMITTED_STATUSES.includes(q.status) ||
-          (q.status === QuizStatus.IN_PROGRESS &&
-            (q.startedAt != null || q.id === justSubmittedQuizId)),
+          q.status === QuizStatus.IN_PROGRESS,
       )
     : [];
 
