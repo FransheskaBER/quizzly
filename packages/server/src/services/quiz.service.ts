@@ -19,7 +19,7 @@ import { Sentry } from '../config/sentry.js';
 import { prisma } from '../config/database.js';
 import { assertOwnership } from '../utils/ownership.js';
 import { decrypt } from '../utils/encryption.utils.js';
-import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
+import { AppError, BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
 import { captureExceptionOnce } from '../utils/sentry.utils.js';
 import { LLM_MODEL } from '../prompts/constants.js';
 import {
@@ -616,7 +616,10 @@ export const executeGeneration = async (
     captureExceptionOnce(err, { extra: { sessionId } });
 
     if (!timedOut) {
-      writer({ type: 'error', message: 'Generation failed. Please try again.' });
+      const userMessage = err instanceof AppError
+        ? err.message
+        : 'Generation failed. Please try again.';
+      writer({ type: 'error', message: userMessage });
     }
 
     // Remove only uncommitted GENERATING attempts so users can retry immediately

@@ -2,6 +2,40 @@
 
 LLM-powered skills training platform for software engineers
 
+## Commands
+
+```bash
+# Setup
+docker-compose up -d                  # Start local Postgres (port 5432)
+cp .env.example .env                  # Configure environment variables
+npm install                           # Install all workspace dependencies
+npx prisma generate                   # Generate Prisma client (required before build/test)
+npx prisma migrate deploy             # Apply database migrations
+
+# Development
+npm run dev                           # Start all packages in parallel (client :5173, server :3000)
+
+# Quality checks
+npm run lint                          # ESLint across all packages
+npm run typecheck                     # TypeScript checking across all packages
+npm test                              # Vitest across all packages
+npm run dev:e2e                       # Start server + client in test mode for E2E
+cd packages/client && npm run e2e     # Run Playwright E2E tests
+
+# Build
+npm run build                         # Build all packages
+npm run build:production              # Build in order: shared → server → client
+```
+
+## Environment Setup
+
+All env vars are documented in `.env.example`. Key variables:
+- `DATABASE_URL` — Local: `postgresql://skills_dev:skills_dev@localhost:5432/skills_trainer`
+- `TEST_DATABASE_URL` — Must be local (e.g., `postgresql://...@localhost:5432/quizzly_test`). Never remote.
+- `JWT_SECRET`, `REFRESH_SECRET`, `API_KEY_ENCRYPTION_KEY` — Required for auth.
+- `ANTHROPIC_API_KEY` — Required for LLM quiz generation.
+- Client env vars are prefixed `VITE_` (only `VITE_API_URL`, `VITE_SENTRY_DSN`).
+
 ## Tech Stack
 
 - Frontend:
@@ -169,6 +203,17 @@ After implementation:
 - Commit messages: `type: description` (types: feat, fix, docs, refactor, test, chore)
 - Pre-push: run lint, typecheck, and tests locally before pushing. Do not push failing code.
 - PRs: one feature branch per spec. PR description references the spec file path.
+
+## Gotchas
+
+- **Import path**: Use `@skills-trainer/shared` (npm package name), not the `@shared/*` path alias in tsconfig.base.json — that alias is unused.
+- **Sentry init order**: `./config/sentry.js` must be imported first in `app.ts` — before all other imports — so Sentry can instrument the full request lifecycle.
+- **requestIdMiddleware is first**: Must run before helmet/cors/everything else so `req.requestId` exists before any error can be thrown.
+- **Vite dev proxy**: Client dev server (`:5173`) proxies `/api` requests to `VITE_API_URL` (default `localhost:3000`).
+- **Test DB safety**: `TEST_DATABASE_URL` is required and must point to localhost. Tests fail loudly if missing or remote. Server tests run serially to prevent `cleanDatabase()` race conditions.
+- **Email globally mocked in tests**: `setup.ts` mocks `email.service.js` — tests never send real emails.
+- **Rate limiters relaxed in tests**: Auth rate limits are 100 req/hr in test mode (vs 5 in prod) so E2E tests don't get blocked.
+- **Render port**: Production backend listens on PORT `10000` (Render assignment), not `3000`.
 
 ## Reference Documents
 

@@ -54,6 +54,7 @@ import { prisma } from '../../config/database.js';
 import { Sentry } from '../../config/sentry.js';
 import { streamQuestions, generateReplacementQuestion } from '../llm.service.js';
 import { executeGeneration } from '../quiz.service.js';
+import { BadRequestError } from '../../utils/errors.js';
 import type { StreamQuestionsResult, MalformedSlot } from '../llm.service.js';
 
 // ---------------------------------------------------------------------------
@@ -462,5 +463,58 @@ describe('executeGeneration — streaming ACs', () => {
     // $transaction should set questionCount = 4 (actual valid)
     const transactionCall = vi.mocked(prisma.$transaction).mock.calls[0];
     expect(transactionCall).toBeDefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // SSE error message forwarding (RFC AC1-AC5)
+  // -------------------------------------------------------------------------
+
+  it('forwards BadRequestError message via SSE when streamQuestions throws AppError (AC1/AC2/AC3)', async () => {
+    const apiKeyError = new BadRequestError(
+      'Could not generate your quiz. Your API key appears to be invalid. Please verify you added the correct key.',
+    );
+    vi.mocked(streamQuestions as Mock).mockRejectedValue(apiKeyError);
+
+    const writer = vi.fn();
+    await executeGeneration(BYOK_PARAMS, writer);
+
+    const errorEvents = writer.mock.calls
+      .map(([e]: [{ type: string; message?: string }]) => e)
+      .filter((e: { type: string }) => e.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    expect((errorEvents[0] as { message: string }).message).toBe(
+      'Could not generate your quiz. Your API key appears to be invalid. Please verify you added the correct key.',
+    );
+  });
+
+  it('sends generic message via SSE when non-AppError is thrown (AC5)', async () => {
+    vi.mocked(streamQuestions as Mock).mockRejectedValue(new Error('unexpected failure'));
+
+    const writer = vi.fn();
+    await executeGeneration(BYOK_PARAMS, writer);
+
+    const errorEvents = writer.mock.calls
+      .map(([e]: [{ type: string; message?: string }]) => e)
+      .filter((e: { type: string }) => e.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    expect((errorEvents[0] as { message: string }).message).toBe('Generation failed. Please try again.');
+  });
+
+  it('sends generic message for free trial failure (AC6 regression)', async () => {
+    const validQuestions = Array.from({ length: 4 }, (_, i) => makeMcqQuestion(i + 1));
+    const malformedSlot = makeMalformedSlot(5);
+
+    setupStreamMock(validQuestions, [malformedSlot]);
+    vi.mocked(generateReplacementQuestion as Mock).mockResolvedValue(null);
+
+    const writer = vi.fn();
+    await executeGeneration(BASE_PARAMS, writer);
+
+    // Free trial fails with plain Error → generic message
+    const errorEvents = writer.mock.calls
+      .map(([e]: [{ type: string; message?: string }]) => e)
+      .filter((e: { type: string }) => e.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    expect((errorEvents[0] as { message: string }).message).toBe('Generation failed. Please try again.');
   });
 });

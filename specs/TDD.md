@@ -1592,7 +1592,9 @@ STRUCTURED SENTRY CAPTURES (not thrown errors — captured for observability):
 
 | What Can Fail | System Response | Recovery |
 |---|---|---|
-| Anthropic API down | SSE error event. Status → 'failed'. Sentry. | User retries |
+| Anthropic API down | SSE error event: generic message. Status → 'failed'. Sentry. | User retries |
+| BYOK: invalid or revoked API key (401/403) | SSE error event: `"Could not generate your quiz. Your API key appears to be invalid. Please verify you added the correct key."` Sentry. Quiz attempt cleaned up. | User checks/updates their API key in settings |
+| BYOK: rate limit or insufficient credits (429) | SSE error event: `"Could not generate your quiz. Your Anthropic account may have insufficient credits or has hit a rate limit. Please check your account balance."` Sentry. Quiz attempt cleaned up. | User checks Anthropic account balance or waits for rate limit reset |
 | Single question malformed (Zod validation fails) | Skip malformed question, continue parsing remaining questions. Renumber valid questions sequentially (no gaps). After main stream: 1 replacement LLM call for the malformed slot. If replacement valid → save as last questionNumber. Sentry warning. | Automatic. User never notices — replacement fills last slot while they answer earlier questions. |
 | Replacement also fails (both attempts exhausted) | Send `question_failed` SSE event with reassuring message for last slot. Update questionCount to actual valid count. Sentry error with rawLlmOutput + zodValidationErrors. | User sees info card explaining generation stopped to protect their API tokens. Score based on answered questions only. |
 | 2+ questions permanently failed (>20% of requested) | Same as above for each failed slot. Sentry error with `high_priority` tag. | User takes quiz with reduced question count. Alerts developer to investigate prompt quality. |
@@ -1977,5 +1979,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-13] Updated Sections 5.2, 5.9, 6.1, 6.4 per specs/features/auth-db-backed-sessions/RFC.md
 - [2026-03-14] Updated Sections 3.5, 5, 5.9, 6.1 per specs/features/auth-jwt-refresh/RFC.md
 - [2026-03-14] Updated Sections 1.3, 2, 3.2, 3.3, 3.5, 5.5, 7.3, 7.5, 7.6, 7.7, 8.2 per specs/features/streaming-quiz-generation/RFC.md
+- [2026-03-14] Updated Section 7.5 per specs/features/sse-anthropic-error-messages/RFC.md
 
 *End of Technical Design Document*

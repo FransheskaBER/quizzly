@@ -2,11 +2,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { QuizDifficulty, AnswerFormat, QuestionType } from '@skills-trainer/shared';
 
+const mockByokStream = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => {
-  class MockAnthropic {
-    messages = { stream: vi.fn() };
+  class AuthenticationError extends Error {
+    status = 401;
+    constructor(message: string) {
+      super(message);
+      this.name = 'AuthenticationError';
+    }
   }
-  return { default: MockAnthropic };
+  class PermissionDeniedError extends Error {
+    status = 403;
+    constructor(message: string) {
+      super(message);
+      this.name = 'PermissionDeniedError';
+    }
+  }
+  class RateLimitError extends Error {
+    status = 429;
+    constructor(message: string) {
+      super(message);
+      this.name = 'RateLimitError';
+    }
+  }
+  class MockAnthropic {
+    messages = { stream: mockByokStream };
+  }
+  (MockAnthropic as Record<string, unknown>).AuthenticationError = AuthenticationError;
+  (MockAnthropic as Record<string, unknown>).PermissionDeniedError = PermissionDeniedError;
+  (MockAnthropic as Record<string, unknown>).RateLimitError = RateLimitError;
+  return { default: MockAnthropic, AuthenticationError, PermissionDeniedError, RateLimitError };
 });
 
 vi.mock('../../config/anthropic.js', () => ({
@@ -24,9 +49,15 @@ vi.mock('../../utils/sanitize.utils.js', () => ({
   logSuspiciousPatterns: vi.fn(),
   escapeXml: vi.fn((s: string) => s),
 }));
+vi.mock('../../utils/sentry.utils.js', () => ({
+  captureExceptionOnce: vi.fn(),
+  markErrorAsCaptured: vi.fn(),
+}));
 
 import anthropic from '../../config/anthropic.js';
 import { streamQuestions, generateReplacementQuestion } from '../llm.service.js';
+import { BadRequestError } from '../../utils/errors.js';
+import { captureExceptionOnce } from '../../utils/sentry.utils.js';
 import type { GenerateQuizParams } from '../llm.service.js';
 
 // --- Helpers ---
@@ -298,6 +329,94 @@ describe('streamQuestions', () => {
       expect.objectContaining({ questionText: questionWithBraces.questionText }),
       1,
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Anthropic error handling (RFC AC1-AC4)
+  // -------------------------------------------------------------------------
+
+  it('throws BadRequestError with invalid key message when AuthenticationError occurs (AC1)', async () => {
+    const { AuthenticationError } = await import('@anthropic-ai/sdk') as unknown as {
+      AuthenticationError: new (msg: string) => Error;
+    };
+    vi.mocked(anthropic.messages.stream).mockImplementation(() => {
+      throw new AuthenticationError('Invalid API Key — raw SDK details');
+    });
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(BadRequestError);
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(
+      'Your API key appears to be invalid',
+    );
+  });
+
+  it('throws BadRequestError with invalid key message when PermissionDeniedError occurs (AC2)', async () => {
+    const { PermissionDeniedError } = await import('@anthropic-ai/sdk') as unknown as {
+      PermissionDeniedError: new (msg: string) => Error;
+    };
+    vi.mocked(anthropic.messages.stream).mockImplementation(() => {
+      throw new PermissionDeniedError('Permission denied — raw SDK details');
+    });
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(BadRequestError);
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(
+      'Your API key appears to be invalid',
+    );
+  });
+
+  it('throws BadRequestError with rate limit message when RateLimitError occurs (AC3)', async () => {
+    const { RateLimitError } = await import('@anthropic-ai/sdk') as unknown as {
+      RateLimitError: new (msg: string) => Error;
+    };
+    vi.mocked(anthropic.messages.stream).mockImplementation(() => {
+      throw new RateLimitError('Rate limit exceeded — raw SDK details');
+    });
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(BadRequestError);
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow(
+      'insufficient credits or has hit a rate limit',
+    );
+  });
+
+  it('logs and captures Sentry before re-throwing Anthropic errors (AC4)', async () => {
+    const { AuthenticationError } = await import('@anthropic-ai/sdk') as unknown as {
+      AuthenticationError: new (msg: string) => Error;
+    };
+    vi.mocked(anthropic.messages.stream).mockImplementation(() => {
+      throw new AuthenticationError('raw SDK error');
+    });
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow();
+
+    expect(captureExceptionOnce).toHaveBeenCalledWith(
+      expect.any(AuthenticationError),
+      expect.objectContaining({
+        extra: expect.objectContaining({ operation: 'streamQuestions' }),
+      }),
+    );
+  });
+
+  it('re-throws non-Anthropic errors without sanitizing', async () => {
+    const networkError = new Error('ECONNREFUSED');
+    vi.mocked(anthropic.messages.stream).mockImplementation(() => {
+      throw networkError;
+    });
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    await expect(streamQuestions(DEFAULT_PARAMS, onValid, onMalformed)).rejects.toThrow('ECONNREFUSED');
   });
 });
 
