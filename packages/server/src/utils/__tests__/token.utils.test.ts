@@ -13,6 +13,10 @@ import {
   hashToken,
 } from '../token.utils.js';
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('generateAccessToken', () => {
   it('returns a valid JWT signed with JWT_SECRET', () => {
     const token = generateAccessToken({ userId: 'user-123', email: 'test@example.com' });
