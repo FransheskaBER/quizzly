@@ -9,7 +9,7 @@ const envSchema = z.object({
   DATABASE_URL: isTest ? z.string().optional() : z.string().min(1),
   TEST_DATABASE_URL: isTest ? z.string().min(1) : z.string().optional(),
   JWT_SECRET: z.string().min(32),
-  JWT_EXPIRES_IN: z.string().default('7d'),
+  REFRESH_SECRET: z.string().min(32),
   AWS_ACCESS_KEY_ID: isTest ? z.string().optional() : z.string().min(1),
   AWS_SECRET_ACCESS_KEY: isTest ? z.string().optional() : z.string().min(1),
   AWS_REGION: isTest ? z.string().optional() : z.string().min(1),

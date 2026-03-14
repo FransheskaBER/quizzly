@@ -4,9 +4,38 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import pino from 'pino';
 
 import { Sentry } from '../config/sentry.js';
-import { AppError, UnauthorizedError } from '../utils/errors.js';
+import {
+  AppError,
+  UnauthorizedError,
+  EmailNotVerifiedError,
+  ValidationError,
+  ConflictError,
+  BadRequestError,
+} from '../utils/errors.js';
 
 const logger = pino({ name: 'error-handler' });
+
+const isAuthRoute = (routePath: string): boolean =>
+  routePath.startsWith('/api/auth/');
+
+const isExpectedAuthError = (err: AppError, routePath: string): boolean => {
+  // Failed login attempt (wrong email/password)
+  if (err instanceof UnauthorizedError && err.message === 'Invalid email or password' && routePath === '/api/auth/login') return true;
+  // Unauthenticated session check
+  if (err instanceof UnauthorizedError && err.message === 'Missing or invalid token' && routePath === '/api/auth/me') return true;
+  // Expired/invalid refresh token
+  if (err instanceof UnauthorizedError && isAuthRoute(routePath) && routePath.includes('/refresh')) return true;
+  // Email not verified
+  if (err instanceof EmailNotVerifiedError) return true;
+  // Validation errors on auth routes
+  if (err instanceof ValidationError && isAuthRoute(routePath)) return true;
+  // Duplicate email on signup
+  if (err instanceof ConflictError && routePath === '/api/auth/signup') return true;
+  // Bad request on auth routes (invalid/expired verification/reset links)
+  if (err instanceof BadRequestError && isAuthRoute(routePath)) return true;
+
+  return false;
+};
 
 export const errorHandler = (
   err: Error,
@@ -28,15 +57,7 @@ export const errorHandler = (
   if (err instanceof AppError) {
     logger.warn({ err, ...requestContext }, 'Handled application error');
     const routePath = req.originalUrl?.split('?')[0] ?? req.path;
-    const isExpectedUnauthorized =
-      err instanceof UnauthorizedError &&
-      (
-        // Failed login attempt (wrong email/password) — normal user behavior
-        (err.message === 'Invalid email or password' && routePath === '/api/auth/login') ||
-        // Unauthenticated session check (user not logged in yet)
-        (err.message === 'Missing or invalid token' && routePath === '/api/auth/me')
-      );
-    if (!isExpectedUnauthorized) {
+    if (!isExpectedAuthError(err, routePath)) {
       Sentry.captureException(err, {
         extra: {
           ...requestContext,
@@ -57,12 +78,15 @@ export const errorHandler = (
   // 400 — validation errors.
   if (err instanceof ZodError) {
     logger.warn({ err, ...requestContext }, 'Handled validation error');
-    Sentry.captureException(err, {
-      extra: {
-        ...requestContext,
-        operation: 'error.middleware.validationError',
-      },
-    });
+    const routePath = req.originalUrl?.split('?')[0] ?? req.path;
+    if (!isAuthRoute(routePath)) {
+      Sentry.captureException(err, {
+        extra: {
+          ...requestContext,
+          operation: 'error.middleware.validationError',
+        },
+      });
+    }
     res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
