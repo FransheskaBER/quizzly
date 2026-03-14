@@ -37,11 +37,8 @@ vi.mock('../../utils/sanitize.utils.js', () => ({
 
 import anthropic from '../../config/anthropic.js';
 import { Sentry } from '../../config/sentry.js';
-import {
-  LLM_GENERATION_TEMPERATURE,
-  LLM_GRADING_TEMPERATURE,
-} from '../../prompts/constants.js';
-import { extractBlock, generateQuiz, gradeAnswers } from '../llm.service.js';
+import { LLM_GRADING_TEMPERATURE } from '../../prompts/constants.js';
+import { extractBlock, gradeAnswers, streamQuestions } from '../llm.service.js';
 import { BadRequestError } from '../../utils/errors.js';
 import { QuizDifficulty, AnswerFormat, QuestionType } from '@skills-trainer/shared';
 import type { GenerateQuizParams, GradeAnswersParams } from '../llm.service.js';
@@ -51,6 +48,21 @@ import type { GenerateQuizParams, GradeAnswersParams } from '../llm.service.js';
 const mockStream = (text: string) => ({
   finalText: vi.fn().mockResolvedValue(text),
 });
+
+/** Creates a mock async iterable that yields SSE-like text_delta events for streamQuestions. */
+const mockStreamEvents = (text: string) => {
+  const events = text.split('').map((char) => ({
+    type: 'content_block_delta' as const,
+    delta: { type: 'text_delta' as const, text: char },
+  }));
+  return {
+    [Symbol.asyncIterator]: async function* () {
+      for (const event of events) {
+        yield event;
+      }
+    },
+  };
+};
 
 const VALID_MCQ_QUESTION = {
   questionNumber: 1,
@@ -126,106 +138,6 @@ describe('extractBlock', () => {
     const response = '<analysis>reasoning</analysis><questions>[42]</questions>';
     expect(extractBlock(response, 'questions')).toBe('[42]');
     expect(extractBlock(response, 'analysis')).toBe('reasoning');
-  });
-});
-
-// --- generateQuiz ---
-
-describe('generateQuiz', () => {
-  it('returns parsed questions on a successful first attempt', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    const onQuestion = vi.fn();
-    const result = await generateQuiz(DEFAULT_GENERATE_PARAMS, onQuestion);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].questionText).toBe(VALID_MCQ_QUESTION.questionText);
-    expect(result[0].correctAnswer).toBe(VALID_MCQ_QUESTION.correctAnswer);
-  });
-
-  it('calls onQuestion once per returned question', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    const onQuestion = vi.fn();
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, onQuestion);
-
-    expect(onQuestion).toHaveBeenCalledOnce();
-    expect(onQuestion).toHaveBeenCalledWith(expect.objectContaining({ questionNumber: 1 }));
-  });
-
-  it('retries once when the first response fails validation', async () => {
-    const badResponse = '<questions>not valid json</questions>';
-    vi.mocked(anthropic.messages.stream)
-      .mockReturnValueOnce(mockStream(badResponse) as ReturnType<typeof anthropic.messages.stream>)
-      .mockReturnValueOnce(
-        mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-      );
-
-    const onQuestion = vi.fn();
-    const result = await generateQuiz(DEFAULT_GENERATE_PARAMS, onQuestion);
-
-    expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
-    expect(result).toHaveLength(1);
-    expect(Sentry.captureException).toHaveBeenCalled();
-  });
-
-  it('retries when the questions block is missing entirely', async () => {
-    const noBlock = '<analysis>thinking but no output block</analysis>';
-    vi.mocked(anthropic.messages.stream)
-      .mockReturnValueOnce(mockStream(noBlock) as ReturnType<typeof anthropic.messages.stream>)
-      .mockReturnValueOnce(
-        mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-      );
-
-    const result = await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
-    expect(result).toHaveLength(1);
-  });
-
-  it('throws BadRequestError when both attempts fail', async () => {
-    const badResponse = '<questions>{"not": "an array"}</questions>';
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(badResponse) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await expect(generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn())).rejects.toThrow(BadRequestError);
-    expect(anthropic.messages.stream).toHaveBeenCalledTimes(2);
-  });
-
-  it('propagates the error when the Anthropic SDK itself throws (e.g. RateLimitError)', async () => {
-    const apiError = Object.assign(new Error('Rate limit exceeded'), { name: 'RateLimitError', status: 429 });
-    vi.mocked(anthropic.messages.stream).mockReturnValue({
-      finalText: vi.fn().mockRejectedValue(apiError),
-    } as unknown as ReturnType<typeof anthropic.messages.stream>);
-
-    await expect(generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn())).rejects.toThrow('Rate limit exceeded');
-    // SDK error propagates on first attempt — no retry since it is not a parse failure
-    expect(anthropic.messages.stream).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws BadRequestError when response contains the system marker', async () => {
-    const exfiltrationResponse = `<questions>[] [SYSTEM_MARKER_DO_NOT_REPEAT]</questions>`;
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(exfiltrationResponse) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await expect(generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn())).rejects.toThrow(BadRequestError);
-    // Exfiltration detected on first call — no retry
-    expect(anthropic.messages.stream).toHaveBeenCalledTimes(1);
-  });
-
-  it('passes generation temperature to the API', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    expect(call).toMatchObject({ temperature: LLM_GENERATION_TEMPERATURE });
   });
 });
 
@@ -376,81 +288,6 @@ describe('gradeAnswers', () => {
   });
 });
 
-// --- generateQuiz — prompt assembly ---
-
-describe('generateQuiz — prompt assembly', () => {
-  it('includes subject and goal in the assembled user message', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userMessageContent = (call.messages[0] as { content: string }).content;
-    expect(userMessageContent).toContain('React Hooks');
-    expect(userMessageContent).toContain('Understand the useState API');
-  });
-
-  it('includes difficulty, format, and count in the assembled user message', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userMessageContent = (call.messages[0] as { content: string }).content;
-    expect(userMessageContent).toContain(QuizDifficulty.EASY);
-    expect(userMessageContent).toContain(AnswerFormat.MCQ);
-    expect(userMessageContent).toContain('1');
-  });
-
-  it('includes materials text in the user message when materialsText is provided', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz(
-      { ...DEFAULT_GENERATE_PARAMS, materialsText: 'Hooks let you use state in functional components.' },
-      vi.fn(),
-    );
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userMessageContent = (call.messages[0] as { content: string }).content;
-    expect(userMessageContent).toContain('Hooks let you use state in functional components.');
-  });
-
-  it('uses "No materials provided." placeholder when materialsText is null in the user message', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz({ ...DEFAULT_GENERATE_PARAMS, materialsText: null }, vi.fn());
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userMessageContent = (call.messages[0] as { content: string }).content;
-    expect(userMessageContent).toContain('No materials provided.');
-  });
-
-  it('wraps user-supplied content in XML delimiter tags in the user message', async () => {
-    vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
-    );
-
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
-
-    const call = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
-    const userMessageContent = (call.messages[0] as { content: string }).content;
-    expect(userMessageContent).toContain('<subject>');
-    expect(userMessageContent).toContain('</subject>');
-    expect(userMessageContent).toContain('<goal>');
-    expect(userMessageContent).toContain('</goal>');
-    expect(userMessageContent).toContain('<study_materials>');
-    expect(userMessageContent).toContain('</study_materials>');
-  });
-});
-
 // --- gradeAnswers — prompt assembly ---
 
 describe('gradeAnswers — prompt assembly', () => {
@@ -472,9 +309,9 @@ describe('gradeAnswers — prompt assembly', () => {
 
 describe('BYOK — per-request client', () => {
   it('uses a per-request client (not the default) when apiKey is provided', async () => {
-    mockByokStream.mockReturnValue(mockStream(VALID_GENERATION_RESPONSE));
+    mockByokStream.mockReturnValue(mockStreamEvents(VALID_GENERATION_RESPONSE));
 
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-test-nonsecret-key-123');
+    await streamQuestions(DEFAULT_GENERATE_PARAMS, vi.fn(), vi.fn(), 'sk-ant-test-nonsecret-key-123');
 
     expect(mockByokStream).toHaveBeenCalled();
     // Default client should NOT be used
@@ -483,10 +320,10 @@ describe('BYOK — per-request client', () => {
 
   it('uses default client when no apiKey is provided', async () => {
     vi.mocked(anthropic.messages.stream).mockReturnValue(
-      mockStream(VALID_GENERATION_RESPONSE) as ReturnType<typeof anthropic.messages.stream>,
+      mockStreamEvents(VALID_GENERATION_RESPONSE) as unknown as ReturnType<typeof anthropic.messages.stream>,
     );
 
-    await generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn());
+    await streamQuestions(DEFAULT_GENERATE_PARAMS, vi.fn(), vi.fn());
 
     expect(anthropic.messages.stream).toHaveBeenCalled();
   });
@@ -499,12 +336,14 @@ describe('BYOK — per-request client', () => {
       throw new AuthenticationError('Invalid API Key supplied — raw SDK error details here');
     });
 
+    // gradeAnswers exercises the callLlmStream → resolveAnthropicClient path
+    // which sanitizes AuthenticationError into BadRequestError.
     await expect(
-      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
+      gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
     ).rejects.toThrow(BadRequestError);
 
     await expect(
-      generateQuiz(DEFAULT_GENERATE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
+      gradeAnswers(DEFAULT_GRADE_PARAMS, vi.fn(), 'sk-ant-invalid-nonsecret-key-456'),
     ).rejects.toThrow('Invalid API key. Please check your key and try again.');
     expect(Sentry.captureException).toHaveBeenCalled();
   });

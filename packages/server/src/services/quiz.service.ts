@@ -1,3 +1,6 @@
+import pino from 'pino';
+import { Prisma } from '@prisma/client';
+
 import {
   QuizStatus,
   QuestionType,
@@ -12,19 +15,13 @@ import {
   type LlmGeneratedQuestion,
 } from '@skills-trainer/shared';
 
-/** Checks whether a generated question is MCQ type. */
-const isMcqQuestion = (question: LlmGeneratedQuestion): boolean =>
-  question.questionType === QuestionType.MCQ;
-
-import pino from 'pino';
-import { Prisma } from '@prisma/client';
-
 import { Sentry } from '../config/sentry.js';
 import { prisma } from '../config/database.js';
 import { assertOwnership } from '../utils/ownership.js';
 import { decrypt } from '../utils/encryption.utils.js';
 import { BadRequestError, ConflictError, NotFoundError, TrialExhaustedError } from '../utils/errors.js';
 import { captureExceptionOnce } from '../utils/sentry.utils.js';
+import { LLM_MODEL } from '../prompts/constants.js';
 import {
   streamQuestions,
   generateReplacementQuestion,
@@ -33,6 +30,14 @@ import {
 } from './llm.service.js';
 import type { FreeTextAnswer, GenerateQuizParams } from './llm.service.js';
 import type { SseWriter } from '../utils/sse.utils.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Checks whether a generated question is MCQ type. */
+const isMcqQuestion = (question: LlmGeneratedQuestion): boolean =>
+  question.questionType === QuestionType.MCQ;
 
 const logger = pino({ name: 'quiz.service' });
 
@@ -155,18 +160,7 @@ export const prepareGeneration = async (
   const materialsText = session.materials.map((m) => m.extractedText).join('\n\n');
 
   // Decrypt the user's API key for BYOK generations; free trial uses the server key.
-  let userApiKey: string | undefined;
-  if (!isFreeTrialGeneration) {
-    try {
-      userApiKey = decrypt(user.encryptedApiKey!);
-    } catch (err) {
-      logger.warn({ err, userId }, 'Failed to decrypt stored API key');
-      captureExceptionOnce(err, { extra: { userId, operation: 'quiz.prepareGeneration.decrypt' } });
-      throw new BadRequestError(
-        'Could not read your saved API key. Please re-save it in your profile.',
-      );
-    }
-  }
+  const userApiKey = isFreeTrialGeneration ? undefined : await resolveUserApiKey(userId);
 
   return {
     sessionSubject: session.subject,
@@ -207,17 +201,24 @@ interface MalformedQuestionContext {
   successfulQuestions: number;
 }
 
+/** Extracts questionType from raw LLM output via regex. Falls back to 'unknown'. */
+const extractQuestionType = (rawOutput: string): string => {
+  const match = rawOutput.match(/"questionType"\s*:\s*"([^"]+)"/);
+  return match ? match[1] : 'unknown';
+};
+
 const captureMalformedQuestionSentry = (
   ctx: MalformedQuestionContext,
   failureType: 'malformed_question' | 'replacement_failed' | 'threshold_exceeded',
   level: 'warning' | 'error',
 ): void => {
+  const questionType = extractQuestionType(ctx.slot.rawLlmOutput);
   const error = new Error(`QuizQuestionGenerationFailed: ${failureType}`);
   Sentry.captureException(error, {
     level,
     tags: {
       'quiz.generation.failure_type': failureType,
-      'quiz.generation.question_type': ctx.slot.rawLlmOutput.includes('"mcq"') ? 'mcq' : 'free_text',
+      'quiz.generation.question_type': questionType,
       'quiz.generation.key_type': ctx.isServerKey ? 'server' : 'byok',
       ...(failureType === 'threshold_exceeded' ? { high_priority: 'true' } : {}),
     },
@@ -228,9 +229,9 @@ const captureMalformedQuestionSentry = (
       rawLlmOutput: ctx.slot.rawLlmOutput,
       zodValidationErrors: ctx.slot.zodErrors.format(),
       difficulty: ctx.difficulty,
-      questionType: ctx.slot.rawLlmOutput.includes('"mcq"') ? 'mcq' : 'free_text',
+      questionType,
       materialType: ctx.materialsUsed ? 'provided' : 'none',
-      modelUsed: 'claude-sonnet-4-6',
+      modelUsed: LLM_MODEL,
       isServerKey: ctx.isServerKey,
       totalQuestionsRequested: ctx.totalQuestionsRequested,
       successfulQuestions: ctx.successfulQuestions,
@@ -356,7 +357,7 @@ export const executeGeneration = async (
     const writers = new Set<SseWriter>([writer]);
     activeGenerations.set(quizAttempt.id, writers);
 
-    writer({ type: 'generation_started', data: { quizAttemptId: quizAttempt.id } });
+    writer({ type: 'generation_started', data: { quizAttemptId: quizAttempt.id, totalExpected: questionCount } });
     writer({ type: 'progress', message: 'Analyzing materials...' });
 
     const allTags: string[] = [];

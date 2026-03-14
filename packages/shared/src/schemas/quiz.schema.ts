@@ -215,6 +215,7 @@ export const sseGenerationStartedEventSchema = z.object({
   type: z.literal('generation_started'),
   data: z.object({
     quizAttemptId: uuidSchema,
+    totalExpected: z.number(),
   }),
 });
 

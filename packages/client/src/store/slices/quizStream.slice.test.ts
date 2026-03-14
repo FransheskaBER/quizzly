@@ -2,10 +2,42 @@ import { describe, it, expect } from 'vitest';
 
 import reducer, {
   generationStarted,
+  questionsBatchReceived,
   questionFailed,
   generationReset,
   type FailedSlot,
 } from './quizStream.slice';
+import type { Question } from '@skills-trainer/shared';
+
+const makeQuestion = (id: string, num: number): Question => ({
+  id,
+  questionNumber: num,
+  questionType: 'mcq',
+  questionText: `Q${num}?`,
+  options: ['A', 'B'],
+} as Question);
+
+describe('quizStream.slice — questionsBatchReceived dedup', () => {
+  it('does not add duplicate questions when dispatched twice with the same batch', () => {
+    const batch = [makeQuestion('q1', 1), makeQuestion('q2', 2)];
+    let state = reducer(undefined, generationStarted(5));
+    state = reducer(state, questionsBatchReceived(batch));
+    state = reducer(state, questionsBatchReceived(batch));
+
+    expect(state.questions).toHaveLength(2);
+  });
+
+  it('adds only new questions when batch overlaps with existing', () => {
+    const batch1 = [makeQuestion('q1', 1)];
+    const batch2 = [makeQuestion('q1', 1), makeQuestion('q2', 2)];
+    let state = reducer(undefined, generationStarted(5));
+    state = reducer(state, questionsBatchReceived(batch1));
+    state = reducer(state, questionsBatchReceived(batch2));
+
+    expect(state.questions).toHaveLength(2);
+    expect(state.questions.map((q) => q.id)).toEqual(['q1', 'q2']);
+  });
+});
 
 describe('quizStream.slice — questionFailed', () => {
   it('adds a failed slot to failedSlots array', () => {
