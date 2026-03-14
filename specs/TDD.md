@@ -68,6 +68,8 @@ These don't need resolution now but constrain today's schema:
 5. Log every failure for prompt spec iteration
 6. Generate 50+ questions pre-launch, validate structure and quality (BL-013)
 
+**Note:** Steps 3-4 describe the batch `runWithRetry` strategy, which is still used for grading. Quiz generation uses a different strategy: per-question incremental validation with skip + replace (see §7.5 for details).
+
 ### 1.4 LLM Prompt Injection Safeguards
 
 Users control three text inputs injected into LLM prompts: subject, goal description, and uploaded file content. All are potential injection vectors.
@@ -154,6 +156,9 @@ FRONTEND
 ├── Framework: React 18 with Vite — Fast builds, developer familiarity, Vite is modern standard
 ├── State Management: Redux Toolkit (RTK) + RTK Query — Developer specified Redux. RTK Query
 │   handles API caching/fetching, eliminates boilerplate for server state.
+│   React Context used sparingly as a route-scoped state bridge (QuizGenerationProvider) —
+│   keeps SSE hooks alive across page navigation. Not a replacement for Redux; Redux still
+│   owns the data, Context only controls hook lifecycle.
 ├── Routing: React Router DOM v6 — Developer specified. Standard choice.
 ├── Styling: CSS Modules — Plain CSS scoped per component. Enables paste-in styling from
 │   external tools (Gemini). global.css for resets and CSS variables.
@@ -332,7 +337,7 @@ DEVOPS & INFRASTRUCTURE
 | Pattern | Where Used | Why |
 |---|---|---|
 | REST (JSON) | All CRUD operations | Standard, stateless, simple. RTK Query handles caching. |
-| SSE (Server-Sent Events) | Quiz generation streaming, quiz grading streaming | Unidirectional server→client. Simpler than WebSockets. Native EventSource on client, res.write on server. |
+| SSE (Server-Sent Events) | Quiz generation streaming, quiz grading streaming | Unidirectional server→client. Simpler than WebSockets. fetch + ReadableStream on client (not EventSource — need credentials), res.write on server. Quiz generation uses **per-question incremental parsing** (each question validated and sent as it's parsed from the LLM stream). Grading uses batch parsing via `runWithRetry`. |
 | Presigned URL (S3) | File uploads and downloads | Files go browser→S3 directly. Server never touches file bytes. |
 
 ### 3.3 Critical Data Flows
@@ -356,16 +361,28 @@ DEVOPS & INFRASTRUCTURE
 **Flow 2: Generate Quiz (SSE)**
 
 ```
-1. [Frontend] User configures preferences → opens SSE: GET /api/sessions/:sid/quizzes/generate
-2. [API Route] Auth middleware validates JWT
-3. [Quiz Service] Loads session (subject, goal) + materials (extracted_text from DB)
-4. [Quiz Service] Assembles prompt: system template + context + materials + defenses
-5. [LLM Service] Calls Anthropic streaming API (Claude Sonnet 4)
-6. [LLM Service] Streams chunks → parses for <analysis> and <questions> blocks
-7. [Quiz Service] As each question parsed: validates against Zod, SSE event to frontend, stores in DB
-8. [Quiz Service] Creates quiz_attempt (status: 'in_progress'), answer records (empty)
-9. [Frontend] Receives SSE events, renders questions progressively
+1.  [Frontend] User configures preferences → opens SSE: GET /api/sessions/:sid/quizzes/generate
+2.  [API Route] Auth middleware validates JWT (pre-stream phase — errors return JSON, not SSE)
+3.  [Quiz Service] prepareGeneration(): loads session, materials, decrypts BYOK key. Throws AppError on failure.
+4.  [Quiz Service] Creates quiz_attempt (status: 'generating'). Opens SSE stream.
+5.  [Quiz Service] Assembles prompt: system template + context + materials + defenses
+6.  [LLM Service] streamQuestions(): calls Anthropic streaming API (Claude Sonnet 4)
+7.  [LLM Service] Parses LLM stream incrementally — detects complete JSON objects inside <questions> block
+    using brace-depth counting. For each complete object:
+    a. Validate against llmGeneratedQuestionSchema (single question, not array)
+    b. If valid → onValidQuestion callback: save to DB, send SSE question event, assign sequential questionNumber
+    c. If malformed → onMalformedQuestion callback: log, skip, continue parsing (no questionNumber assigned)
+8.  [Quiz Service] After main stream completes, for each malformed slot:
+    a. Single replacement LLM call requesting 1 question (includes already-generated topics to avoid duplicates)
+    b. If valid → save to DB as last questionNumber, send SSE question event
+    c. If replacement also fails → send SSE question_failed event with reassuring message, capture in Sentry
+9.  [Quiz Service] Commit: update quiz_attempt (status → 'in_progress', questionCount → actual valid count).
+    If free trial: mark freeTrialUsedAt atomically.
 10. [SSE] Final event: { type: 'complete', data: { quizAttemptId } }
+11. [Frontend] QuizGenerationProvider receives SSE events, dispatches to Redux quizStream slice.
+    User can start quiz after first question arrives — navigates to QuizTakingPage while generation continues.
+12. [Frontend] On page refresh during generation: fetch existing questions via getQuiz API,
+    reconnect SSE via ?reconnect=true&quizAttemptId={id} for remaining questions.
 ```
 
 **Flow 3: Submit & Grade Quiz (SSE)**
@@ -524,6 +541,8 @@ quizzly/
 │           │   ├── useSSEStream.ts       # Generic SSE hook
 │           │   ├── useQuizGeneration.ts
 │           │   └── useQuizGrading.ts
+│           ├── providers/
+│           │   └── QuizGenerationProvider.tsx  # Context wrapping session routes; keeps SSE alive across page navigation
 │           ├── pages/
 │           │   ├── auth/
 │           │   │   ├── LoginPage.tsx
@@ -561,6 +580,7 @@ quizzly/
 │           │   │   └── MaterialUploader.tsx / MaterialUploader.module.css
 │           │   └── quiz/
 │           │       ├── QuestionCard.tsx / QuestionCard.module.css
+│           │       ├── QuestionFailedCard.tsx / QuestionFailedCard.module.css  # Info card for permanently failed question slots
 │           │       ├── QuestionNav.tsx / QuestionNav.module.css
 │           │       ├── MCQOptions.tsx / MCQOptions.module.css
 │           │       ├── FreeTextInput.tsx / FreeTextInput.module.css
@@ -1198,6 +1218,7 @@ Rate Limit: 10/user/hour, 50/user/day
 BYOK: Server reads encrypted API key from DB for post-trial users. No client header needed.
 
 Query: ?difficulty=medium&format=mixed&count=10
+       ?reconnect=true&quizAttemptId={id}  (SSE reconnection after page refresh — skips attempt creation, resumes event stream)
 
 Response: SSE stream (text/event-stream)
 
@@ -1205,10 +1226,16 @@ Events:
 ├── { "type": "progress", "message": "Analyzing materials..." }
 ├── { "type": "question", "data": { "id", "questionNumber", "questionType", "questionText", "options" } }
 │   (correct_answer and explanation NOT sent during generation)
+│   (questions sent incrementally as each is parsed and validated — not batched)
+│   (questionNumber assigned sequentially in validation order — malformed questions are skipped and renumbered)
+├── { "type": "question_failed", "data": { "questionNumber": 5, "message": "We tried twice to generate this question..." } }
+│   (sent for permanently failed question slots — replacement attempted once, both attempts failed)
+│   (recoverable event — stream continues, this is NOT terminal)
 ├── { "type": "complete", "data": { "quizAttemptId": "uuid" } }
 └── { "type": "error", "message": "Generation failed..." }
 
 Pre-stream errors: 401, 403 (TRIAL_EXHAUSTED), 404, 429
+Reconnect: If ?reconnect=true and no in-memory generation found (server restarted), returns complete event with partial results.
 ```
 
 #### GET /api/quizzes/:id
@@ -1504,6 +1531,20 @@ GLOBAL ERROR MIDDLEWARE (single exit point):
 ├── ZodError → 400 with field-level details
 ├── PrismaClientKnownRequestError → translated (P2002→409, P2025→404)
 └── Unknown Error → 500 generic message, full log to Sentry
+
+STRUCTURED SENTRY CAPTURES (not thrown errors — captured for observability):
+├── QuizQuestionGenerationFailed
+│   ├── When: LLM produces a question that fails Zod validation during quiz generation
+│   ├── NOT an AppError subclass — generation continues, Sentry.captureException called inline
+│   ├── Severity levels:
+│   │   ├── warning  — malformed question, replacement succeeded (self-healed)
+│   │   ├── error    — malformed question, replacement also failed (user got reassuring note)
+│   │   └── error + high_priority tag — 2+ questions permanently failed (threshold hit)
+│   ├── Extra context: quizAttemptId, questionSlot, attemptNumber (1 or 2), rawLlmOutput,
+│   │   zodValidationErrors, questionType, difficulty, materialType, modelUsed, isServerKey,
+│   │   totalQuestionsRequested, successfulQuestions
+│   └── Tags: quiz.generation.failure_type (malformed_question | replacement_failed | threshold_exceeded),
+│       quiz.generation.question_type (mcq | free_text), quiz.generation.key_type (server | byok)
 ```
 
 ### 7.4 DRY Code Patterns
@@ -1549,9 +1590,14 @@ GLOBAL ERROR MIDDLEWARE (single exit point):
 | What Can Fail | System Response | Recovery |
 |---|---|---|
 | Anthropic API down | SSE error event. Status → 'failed'. Sentry. | User retries |
-| Malformed LLM JSON | Retry once with corrective prompt. If fails → error. | User retries. Logged for investigation. |
+| Single question malformed (Zod validation fails) | Skip malformed question, continue parsing remaining questions. Renumber valid questions sequentially (no gaps). After main stream: 1 replacement LLM call for the malformed slot. If replacement valid → save as last questionNumber. Sentry warning. | Automatic. User never notices — replacement fills last slot while they answer earlier questions. |
+| Replacement also fails (both attempts exhausted) | Send `question_failed` SSE event with reassuring message for last slot. Update questionCount to actual valid count. Sentry error with rawLlmOutput + zodValidationErrors. | User sees info card explaining generation stopped to protect their API tokens. Score based on answered questions only. |
+| 2+ questions permanently failed (>20% of requested) | Same as above for each failed slot. Sentry error with `high_priority` tag. | User takes quiz with reduced question count. Alerts developer to investigate prompt quality. |
+| Free trial: any question permanently fails | Entire generation fails (free trial requires exactly 5 questions). Quiz attempt deleted. | User retries. Free trial not consumed. |
 | Fewer questions than requested | Accept partial. Update count. | User takes available questions |
-| SSE connection drops | Already-received questions saved in DB | Refresh page → resume from saved state |
+| SSE connection drops | Already-received questions saved in DB | Refresh page → fetch existing questions via getQuiz, reconnect SSE via ?reconnect=true for remaining |
+| Page refresh during generation | Redux state lost (in-memory). DB has saved questions. | Frontend fetches questions from API, reconnects SSE if quiz status is still 'generating' |
+| Server restart during generation | In-memory generation lost. Partial questions saved in DB. | Reconnect endpoint detects no active generation → returns complete event with partial results, updates status to 'in_progress' |
 | User navigates away | Server completes call. Questions saved. | Return later → quiz available |
 | Spam Generate button | 409: "Quiz already generating for this session" | One at a time per session |
 
@@ -1567,8 +1613,14 @@ GLOBAL ERROR MIDDLEWARE (single exit point):
 
 ```
 PRE-STREAM: Normal JSON error responses (auth, validation, rate limit)
-MID-STREAM: SSE error event + close stream + update DB status
-CLIENT: No auto-reconnect. Show message. Manual retry.
+MID-STREAM (terminal): SSE error event + close stream + update DB status
+MID-STREAM (recoverable): SSE question_failed event — stream continues. Sent when a single
+    question's generation fails permanently (2 attempts exhausted). Does NOT close the stream.
+    Remaining questions and the complete event still follow.
+CLIENT: No auto-reconnect on error. Show message. Manual retry.
+CLIENT (page refresh): Fetch saved questions via getQuiz API. If quiz status is 'generating',
+    reconnect SSE via ?reconnect=true&quizAttemptId={id}. If server has no active generation
+    (restart/crash), reconnect returns complete event with partial results.
 TIMEOUT: 120s server-side. 30s client-side no-event warning.
 ```
 
@@ -1579,6 +1631,7 @@ TIMEOUT: 120s server-side. 30s client-side no-event warning.
 3. **Log everything:** request ID, user ID, endpoint, timestamp. Structured JSON via pino.
 4. **Sentry alerts:** any 5xx, 10+ rate limit hits/5min, 3+ consecutive LLM failures.
 5. **No fire-and-forget.** All async operations must be awaited with try/catch. Best-effort operations use await + try/catch + Sentry capture, not `.catch()` chains.
+6. **Malformed question Sentry alerts:** `replacement_failed` > 5 occurrences/hour → alert (prompt tuning needed). `threshold_exceeded` any occurrence → immediate alert (systemic generation quality issue).
 
 ---
 
@@ -1602,10 +1655,10 @@ TIMEOUT: 120s server-side. 30s client-side no-event warning.
 |---|---|---|---|
 | Shared schemas | Unit | Vitest | ~20 |
 | Server utils | Unit | Vitest | ~15 |
-| Server services | Unit (mocked deps) | Vitest | ~30 |
+| Server services | Unit (mocked deps) | Vitest | ~40 |
 | Server prompts | Unit | Vitest | ~10 |
-| Server API | Integration (real Postgres) | Vitest + Supertest | ~25 |
-| Client components | Component | Vitest + React Testing Library | ~15 |
+| Server API | Integration (real Postgres) | Vitest + Supertest | ~30 |
+| Client components | Component | Vitest + React Testing Library | ~20 |
 | Critical paths | E2E | Playwright | 5 |
 
 ### 8.3 E2E Tests (Playwright)
@@ -1914,5 +1967,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-12] Updated Section 4 per specs/features/refactor-quiz-key-source/RFC.md
 - [2026-03-13] Updated Sections 5.2, 5.9, 6.1, 6.4 per specs/features/auth-db-backed-sessions/RFC.md
 - [2026-03-14] Updated Sections 3.5, 5, 5.9, 6.1 per specs/features/auth-jwt-refresh/RFC.md
+- [2026-03-14] Updated Sections 1.3, 2, 3.2, 3.3, 3.5, 5.5, 7.3, 7.5, 7.6, 7.7, 8.2 per specs/features/streaming-quiz-generation/RFC.md
 
 *End of Technical Design Document*
