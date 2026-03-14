@@ -1,5 +1,7 @@
 import type { QuizDifficulty, AnswerFormat } from '@skills-trainer/shared';
 
+import { escapeXml } from '../../utils/sanitize.utils.js';
+
 export interface GenerationUserPromptParams {
   subject: string;
   goal: string;
@@ -13,11 +15,11 @@ export const buildGenerationUserMessage = (params: GenerationUserPromptParams): 
   const { subject, goal, difficulty, answerFormat, questionCount, materialsText } = params;
 
   return `<subject>
-${subject}
+${escapeXml(subject)}
 </subject>
 
 <goal>
-${goal}
+${escapeXml(goal)}
 </goal>
 
 <difficulty>
@@ -33,7 +35,7 @@ ${questionCount}
 </question_count>
 
 <study_materials>
-${materialsText ?? 'No materials provided.'}
+${materialsText !== null ? escapeXml(materialsText) : 'No materials provided.'}
 </study_materials>
 
 Please generate the exercises based on the provided system instructions and inputs.`.trim();

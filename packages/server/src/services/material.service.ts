@@ -13,6 +13,7 @@ import { sanitizeString } from '../utils/sanitize.utils.js';
 import { estimateTokenCount } from '../utils/tokenCount.utils.js';
 import { generateUploadUrl, getObjectBuffer, deleteObject } from './s3.service.js';
 import { BadRequestError, NotFoundError } from '../utils/errors.js';
+import { validateUrlSafety } from '../utils/url-validation.utils.js';
 import {
   MaterialStatus,
   MAX_FILES_PER_SESSION,
@@ -172,6 +173,8 @@ const extractDocxText = async (buffer: Buffer, materialId?: string): Promise<str
 const extractTxtText = (buffer: Buffer): string => buffer.toString('utf-8');
 
 const fetchAndExtractUrl = async (url: string): Promise<string> => {
+  await validateUrlSafety(url);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
 

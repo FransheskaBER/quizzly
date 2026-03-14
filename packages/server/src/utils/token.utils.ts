@@ -64,7 +64,7 @@ const extractPayload = (decoded: jwt.JwtPayload): TokenPayload | null => {
 /** Verifies a JWT access token. Returns payload or null if invalid/expired/malformed. */
 export const verifyAccessToken = (token: string): TokenPayload | null => {
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
     return extractPayload(decoded);
   } catch {
     return null;
@@ -74,7 +74,7 @@ export const verifyAccessToken = (token: string): TokenPayload | null => {
 /** Verifies a JWT refresh token. Returns payload or null if invalid/expired/malformed. */
 export const verifyRefreshToken = (token: string): TokenPayload | null => {
   try {
-    const decoded = jwt.verify(token, env.REFRESH_SECRET) as jwt.JwtPayload;
+    const decoded = jwt.verify(token, env.REFRESH_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
     return extractPayload(decoded);
   } catch {
     return null;

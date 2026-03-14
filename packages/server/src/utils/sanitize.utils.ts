@@ -30,6 +30,10 @@ export const sanitizeForPrompt = (input: string): string => {
     .trim();
 };
 
+/** Escapes XML-significant characters so user content cannot break out of XML tag boundaries. */
+export const escapeXml = (input: string): string =>
+  input.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 // Common injection-attempt patterns to detect in user-provided content
 const SUSPICIOUS_PATTERNS = [
   /ignore\s+(previous|above|all)\s+instructions/i,
