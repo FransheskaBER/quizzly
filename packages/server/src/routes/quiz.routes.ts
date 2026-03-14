@@ -4,6 +4,7 @@ import {
   quizParamsSchema,
   saveAnswersSchema,
   submitQuizBodySchema,
+  QuizStatus,
   type GenerateQuizQuery,
   type QuizParams,
   type SaveAnswersRequest,
@@ -13,6 +14,7 @@ import {
 import pino from 'pino';
 import { Router } from 'express';
 
+import { prisma } from '../config/database.js';
 import { auth } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
@@ -23,7 +25,8 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSSEEvent } from '../utils/sse.utils.js';
 import * as quizService from '../services/quiz.service.js';
-import { UnauthorizedError } from '../utils/errors.js';
+import { UnauthorizedError, NotFoundError } from '../utils/errors.js';
+import { assertOwnership } from '../utils/ownership.js';
 
 const logger = pino({ name: 'quiz.routes' });
 
@@ -33,9 +36,100 @@ const router = Router();
 // Opens an SSE stream that delivers validated questions one by one as they are
 // saved to the database. Pre-stream errors (auth, ownership, concurrency) are
 // returned as standard JSON before any SSE headers are written.
+//
+// Supports reconnection via ?reconnect=true&quizAttemptId={id} — skips
+// prepareGeneration and quiz creation, subscribes to in-progress generation
+// or returns existing questions if the server restarted.
 router.get(
   '/:sessionId/quizzes/generate',
   auth,
+  asyncHandler(async (req, res, next) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+
+    const reconnect = req.query.reconnect === 'true';
+    const quizAttemptId = req.query.quizAttemptId as string | undefined;
+
+    if (reconnect && quizAttemptId) {
+      // Reconnect flow: skip validation, rate limits, and quiz creation
+      const userId = req.user.userId;
+
+      // Verify ownership of the quiz attempt
+      const attempt = await prisma.quizAttempt.findUnique({
+        where: { id: quizAttemptId },
+        include: {
+          questions: { orderBy: { questionNumber: 'asc' } },
+        },
+      });
+
+      if (!attempt) throw new NotFoundError('Quiz attempt not found');
+      assertOwnership(attempt.userId, userId);
+
+      // Open SSE stream
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+
+      let clientConnected = true;
+      req.on('close', () => { clientConnected = false; });
+
+      const writer = (event: { type: string; data?: unknown; message?: string }) => {
+        if (clientConnected) sendSSEEvent(res, event);
+      };
+
+      // Send existing questions from DB
+      for (const q of attempt.questions) {
+        writer({
+          type: 'question',
+          data: {
+            id: q.id,
+            questionNumber: q.questionNumber,
+            questionType: q.questionType,
+            questionText: q.questionText,
+            options: q.options as string[] | null,
+          },
+        });
+      }
+
+      // Check for in-memory active generation
+      const activeWriters = quizService.getActiveGeneration(quizAttemptId);
+      if (activeWriters) {
+        // Subscribe this writer to receive remaining events
+        activeWriters.add(writer);
+        // Wait for generation to complete — the writer will receive events
+        // from executeGeneration as they happen. We keep the connection
+        // open until the generation finishes or the client disconnects.
+        await new Promise<void>((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (!clientConnected || !quizService.getActiveGeneration(quizAttemptId)) {
+              clearInterval(checkInterval);
+              activeWriters.delete(writer);
+              resolve();
+            }
+          }, 500);
+        });
+      } else {
+        // Server restarted — no in-memory generation. Return current state.
+        if (attempt.status === QuizStatus.GENERATING) {
+          await prisma.quizAttempt.update({
+            where: { id: quizAttemptId },
+            data: {
+              status: QuizStatus.IN_PROGRESS,
+              questionCount: attempt.questions.length,
+            },
+          });
+        }
+        writer({ type: 'complete', data: { quizAttemptId } });
+      }
+
+      res.end();
+      return;
+    }
+
+    // Normal generation flow — apply rate limits and validation via next()
+    next();
+  }),
   quizGenerationHourlyLimiter,
   quizGenerationDailyLimiter,
   validate({ params: quizSessionParamsSchema, query: generateQuizQuerySchema }),

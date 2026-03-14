@@ -18,6 +18,15 @@
   animation: spin 0.8s linear infinite;
 }
 
+.spinnerSm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: var(--spacing-xs);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

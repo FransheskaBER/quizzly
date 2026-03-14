@@ -19,6 +19,7 @@ interface QuizProgressProps {
   warning: string | null;
   error: string | null;
   quizAttemptId: string | null;
+  sessionId: string;
   onReset: () => void;
 }
 
@@ -30,6 +31,7 @@ const QuizProgressInner = ({
   warning,
   error,
   quizAttemptId,
+  sessionId,
   onReset,
 }: QuizProgressProps) => {
   const navigate = useNavigate();
@@ -51,7 +53,7 @@ const QuizProgressInner = ({
         <p className={styles.completeMessage}>
           Quiz ready — {questions.length} question{questions.length !== 1 ? 's' : ''} generated.
         </p>
-        <Button variant="primary" onClick={() => navigate(`/quiz/${quizAttemptId}`)}>
+        <Button variant="primary" onClick={() => navigate(`/sessions/${sessionId}/quiz/${quizAttemptId}`)}>
           Start Quiz
         </Button>
       </div>

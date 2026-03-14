@@ -114,3 +114,14 @@ Specifically:
 Error middleware owns response formatting. Route handlers own resource cleanup on failure. These are separate responsibilities.
 
 When writing tests for failure-path side effects, assert the side effect explicitly — not just the status code. A test named "returns 401 and clears cookies" must verify both the 401 AND the cookie-clearing headers.
+
+## Rule 9: Verify Frontend-Backend Data Path
+
+When a frontend feature depends on backend state, verify the spec defines the complete data path (API endpoint, SSE event, query param). If not, flag as a gap before implementing.
+
+Before writing any frontend code that reads or reacts to server data:
+1. Identify every piece of backend state the UI depends on.
+2. Confirm the spec explicitly defines how that state reaches the frontend — the exact endpoint, SSE event name, query parameter, or response field.
+3. If any part of the data path is missing or ambiguous, go back to Rule 1: STOP and ask.
+
+Never assume an endpoint exists, invent a query param, or guess an SSE event shape. The spec must document the full path from backend to UI.

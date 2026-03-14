@@ -18,7 +18,7 @@ const isTerminalStatus = (status: string): boolean =>
   status === QuizStatus.COMPLETED || status === QuizStatus.SUBMITTED_UNGRADED;
 
 const QuizResultsPage = () => {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id = '', sessionId = '' } = useParams<{ id: string; sessionId: string }>();
   const navigate = useNavigate();
 
   // Stop polling once the quiz reaches a terminal status so we don't keep hitting
@@ -69,7 +69,7 @@ const QuizResultsPage = () => {
       quiz &&
       (quiz.status === QuizStatus.GENERATING || quiz.status === QuizStatus.IN_PROGRESS)
     ) {
-      navigate(`/quiz/${id}`, { replace: true });
+      navigate(`/sessions/${sessionId}/quiz/${id}`, { replace: true });
     }
   }, [quiz, id, navigate]);
 
@@ -94,8 +94,6 @@ const QuizResultsPage = () => {
   }
 
   if (!quiz) return null;
-
-  const sessionId = quiz.sessionId;
 
   // ---------------------------------------------------------------------------
   // Status: generating or in_progress — redirect handled by useEffect above
