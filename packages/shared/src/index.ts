@@ -120,6 +120,8 @@ export {
   sseErrorEventSchema,
   sseGradedEventSchema,
   sseGradeCompleteEventSchema,
+  sseGenerationStartedEventSchema,
+  sseQuestionFailedEventSchema,
   dashboardResponseSchema,
 } from './schemas/quiz.schema.js';
 
@@ -183,6 +185,8 @@ export type {
   SseErrorEvent,
   SseGradedEvent,
   SseGradeCompleteEvent,
+  SseGenerationStartedEvent,
+  SseQuestionFailedEvent,
   DashboardResponse,
   SaveApiKeyRequest,
   ApiKeyStatusResponse,

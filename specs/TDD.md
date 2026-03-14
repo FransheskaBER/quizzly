@@ -1224,6 +1224,9 @@ Response: SSE stream (text/event-stream)
 
 Events:
 ├── { "type": "progress", "message": "Analyzing materials..." }
+├── { "type": "generation_started", "data": { "quizAttemptId": "uuid", "totalExpected": 5 } }
+│   (sent immediately after quiz attempt creation, before LLM stream begins)
+│   (provides quizAttemptId and expected question count so frontend can initialize state and enable "Start Quiz" link)
 ├── { "type": "question", "data": { "id", "questionNumber", "questionType", "questionText", "options" } }
 │   (correct_answer and explanation NOT sent during generation)
 │   (questions sent incrementally as each is parsed and validated — not batched)
@@ -1953,6 +1956,12 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 **Why it was added:** During E2E test development (task 030) a second bootstrapping step emerged: after `verify-email` creates a usable account, tests need to sign in with a specific password. Without this endpoint the only option is to create the account via the signup form in the test itself — which couples account creation to every test that needs an authenticated session. The `/dev/set-password` endpoint lets setup scripts or `beforeAll` hooks directly set a known password hash, making tests faster and more independent.
 
 **Security posture:** Both endpoints are guarded by the same condition — the router is never mounted when `NODE_ENV !== 'development'`. They are not available in the production build on Render.
+
+---
+
+### Update Log
+
+- [2026-03-14] Updated Section 5.5 per specs/features/streaming-quiz-generation/RFC.md — added `generation_started` SSE event type to quiz generation endpoint event inventory.
 
 **Side effects:** None. The endpoint updates only the `passwordHash` field on an existing user row. It does not clear sessions, invalidate tokens, or change `emailVerified` state.
 

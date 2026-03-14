@@ -15,7 +15,7 @@ import { Button } from '@/components/common/Button';
 import { parseApiError } from '@/hooks/useApiError';
 import { useToast } from '@/hooks/useToast';
 import { extractHttpStatus, getUserMessage } from '@/utils/error-messages';
-import { useQuizGeneration } from '@/hooks/useQuizGeneration';
+import { useQuizGenerationContext } from '@/providers/QuizGenerationProvider';
 import { QuizPreferences } from '@/components/quiz/QuizPreferences';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { formatDate, formatScore } from '@/utils/formatters';
@@ -65,7 +65,7 @@ const persistViewedFeedbackIds = (ids: string[]): void => {
 };
 
 const SessionDashboardPage = () => {
-  const { id } = useParams<{ id: string }>();
+  const { sessionId: id } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { showError, showSuccess } = useToast();
@@ -97,7 +97,8 @@ const SessionDashboardPage = () => {
     warning,
     progressMessage,
     reset: resetGeneration,
-  } = useQuizGeneration(id ?? '');
+    isGenerating,
+  } = useQuizGenerationContext();
 
   useEffect(() => {
     if (!session) return;
@@ -320,22 +321,33 @@ const SessionDashboardPage = () => {
               </p>
             ) : generationStatus === 'idle' ? (
               <QuizPreferences
-                onGenerate={generate}
+                onGenerate={(prefs) => generate(id ?? '', prefs)}
                 isDisabled={false}
                 error={null}
                 isByok={meData?.hasUsedFreeTrial === true && meData?.hasApiKey === true}
               />
             ) : (
-              <QuizProgress
-                status={generationStatus}
-                questions={questions}
-                totalExpected={totalExpected}
-                progressMessage={progressMessage}
-                warning={warning}
-                error={generationError}
-                quizAttemptId={quizAttemptId}
-                onReset={resetGeneration}
-              />
+              <>
+                <QuizProgress
+                  status={generationStatus}
+                  questions={questions}
+                  totalExpected={totalExpected}
+                  progressMessage={progressMessage}
+                  warning={warning}
+                  error={generationError}
+                  quizAttemptId={quizAttemptId}
+                  onReset={resetGeneration}
+                  sessionId={id ?? ''}
+                />
+                {generationStatus === 'generating' && questions.length >= 1 && quizAttemptId && (
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate(`/sessions/${id}/quiz/${quizAttemptId}`)}
+                  >
+                    Start Quiz
+                  </Button>
+                )}
+              </>
             )}
           </ComponentErrorBoundary>
         </div>
@@ -419,7 +431,7 @@ const SessionDashboardPage = () => {
                         </span>
                       </div>
                       <div className={styles.quizRight}>
-                        <Link to={`/quiz/${q.id}/results`} className={styles.quizStalledLink}>
+                        <Link to={`/sessions/${id}/quiz/${q.id}/results`} className={styles.quizStalledLink}>
                           Open Regrade
                         </Link>
                         <span className={`${styles.statusBadge} ${styles[`status_${q.status}`]}`}>
@@ -436,7 +448,7 @@ const SessionDashboardPage = () => {
                 return (
                   <Link
                     key={q.id}
-                    to={q.status === QuizStatus.COMPLETED ? `/quiz/${q.id}/results` : `/quiz/${q.id}`}
+                    to={q.status === QuizStatus.COMPLETED ? `/sessions/${id}/quiz/${q.id}/results` : `/sessions/${id}/quiz/${q.id}`}
                     className={styles.quizRow}
                     onClick={() => {
                       if (showViewFeedbackPrompt) {

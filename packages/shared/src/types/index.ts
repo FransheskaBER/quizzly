@@ -92,6 +92,8 @@ import type {
   sseErrorEventSchema,
   sseGradedEventSchema,
   sseGradeCompleteEventSchema,
+  sseGenerationStartedEventSchema,
+  sseQuestionFailedEventSchema,
   dashboardResponseSchema,
 } from '../schemas/quiz.schema.js';
 
@@ -115,6 +117,8 @@ export type SseCompleteEvent = z.infer<typeof sseCompleteEventSchema>;
 export type SseErrorEvent = z.infer<typeof sseErrorEventSchema>;
 export type SseGradedEvent = z.infer<typeof sseGradedEventSchema>;
 export type SseGradeCompleteEvent = z.infer<typeof sseGradeCompleteEventSchema>;
+export type SseGenerationStartedEvent = z.infer<typeof sseGenerationStartedEventSchema>;
+export type SseQuestionFailedEvent = z.infer<typeof sseQuestionFailedEventSchema>;
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 
 // User

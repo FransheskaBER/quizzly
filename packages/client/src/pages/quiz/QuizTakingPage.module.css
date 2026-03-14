@@ -53,6 +53,28 @@
   padding: var(--spacing-md) 0;
 }
 
+/* ---- Navigation buttons ---- */
+
+.navButtons {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.saveLink {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  padding: 0;
+  text-decoration: underline;
+}
+
+.saveLink:hover {
+  color: var(--color-primary-hover);
+}
+
 /* ---- Error / loading states ---- */
 
 .errorPage {
