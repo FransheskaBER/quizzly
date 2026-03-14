@@ -126,9 +126,10 @@ const QuizGenerationProviderInner = ({ children }: { children: ReactNode }) => {
   }, [dispatch, sessionId, flushBuffer, stopFlushInterval]);
 
   const onError = useCallback((message: string): void => {
+    flushBuffer();
     stopFlushInterval();
     dispatch(generationFailed(message));
-  }, [dispatch, stopFlushInterval]);
+  }, [dispatch, flushBuffer, stopFlushInterval]);
 
   const onComplete = useCallback((): void => {
     stopFlushInterval();
@@ -188,6 +189,14 @@ const QuizGenerationProviderInner = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     hasReconnectedRef.current = false;
   }, [sessionId]);
+
+  // Cleanup SSE connection and flush interval on unmount
+  useEffect(() => {
+    return () => {
+      closeRef.current();
+      stopFlushInterval();
+    };
+  }, [stopFlushInterval]);
 
   const generate = useCallback((sid: string, preferences: GenerateQuizQuery): void => {
     questionBufferRef.current = [];

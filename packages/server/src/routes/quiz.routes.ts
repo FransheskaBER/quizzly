@@ -64,6 +64,11 @@ router.get(
       if (!attempt) throw new NotFoundError('Quiz attempt not found');
       assertOwnership(attempt.userId, userId);
 
+      // Ensure the attempt belongs to the session in the URL
+      if (attempt.sessionId !== req.params.sessionId) {
+        throw new NotFoundError('Quiz attempt not found');
+      }
+
       // Open SSE stream
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -77,6 +82,12 @@ router.get(
       const writer = (event: { type: string; data?: unknown; message?: string }) => {
         if (clientConnected) sendSSEEvent(res, event);
       };
+
+      // Initialize client state with attempt metadata
+      writer({
+        type: 'generation_started',
+        data: { quizAttemptId: attempt.id, totalExpected: attempt.questionCount },
+      });
 
       // Send existing questions from DB
       for (const q of attempt.questions) {
