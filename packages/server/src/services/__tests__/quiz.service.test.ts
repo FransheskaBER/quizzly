@@ -41,7 +41,6 @@ vi.mock('../llm.service.js', () => {
     tags: ['ts'],
   };
   return {
-    generateQuiz: vi.fn(),
     gradeAnswers: vi.fn(),
     streamQuestions: vi.fn(async (
       _params: unknown,
@@ -67,7 +66,7 @@ vi.mock('../../utils/encryption.utils.js', () => ({
 
 import { prisma } from '../../config/database.js';
 import { Sentry } from '../../config/sentry.js';
-import { generateQuiz as llmGenerateQuiz, gradeAnswers as llmGradeAnswers } from '../llm.service.js';
+import { gradeAnswers as llmGradeAnswers, streamQuestions as llmStreamQuestions } from '../llm.service.js';
 import { decrypt } from '../../utils/encryption.utils.js';
 import { markErrorAsCaptured } from '../../utils/sentry.utils.js';
 import {
@@ -432,7 +431,7 @@ describe('prepareGeneration', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ operation: 'quiz.prepareGeneration.decrypt' }),
+        extra: expect.objectContaining({ operation: 'quiz.resolveUserApiKey.decrypt' }),
       }),
     );
   });
@@ -451,7 +450,16 @@ describe('executeGeneration', () => {
     vi.mocked(prisma.quizAttempt.deleteMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.user.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([]);
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
+    // Restore default streamQuestions mock (5 valid MCQ questions)
+    vi.mocked(llmStreamQuestions).mockImplementation(async (
+      _params: unknown,
+      onValid: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      for (let i = 1; i <= 5; i++) {
+        await onValid({ ...mockLlmQuestion, questionNumber: i }, i);
+      }
+      return { validCount: 5, malformedSlots: [] };
+    });
   });
 
   it('creates a quiz_attempt record with keySource SERVER_KEY for free-trial generation', async () => {
@@ -484,7 +492,7 @@ describe('executeGeneration', () => {
   });
 
   it('creates a question record and an answer record for each LLM question', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
+
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -494,7 +502,7 @@ describe('executeGeneration', () => {
   });
 
   it('sends one SSE question event per generated question', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(mockFiveMcqLlmQuestions);
+
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -563,7 +571,7 @@ describe('executeGeneration', () => {
   });
 
   it('completes via $transaction when BYOK generation returns fewer questions than requested', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
+
     const writer = vi.fn();
 
     await executeGeneration(
@@ -580,7 +588,7 @@ describe('executeGeneration', () => {
   });
 
   it('still sends the complete event when BYOK generation returns fewer questions than requested', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
+
     const writer = vi.fn();
 
     await executeGeneration(
@@ -599,7 +607,13 @@ describe('executeGeneration', () => {
   });
 
   it('fails free-trial generation when LLM returns fewer than 5 questions', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([mockLlmQuestion]);
+    vi.mocked(llmStreamQuestions).mockImplementation(async (
+      _params: unknown,
+      onValid: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      await onValid({ ...mockLlmQuestion, questionNumber: 1 }, 1);
+      return { validCount: 1, malformedSlots: [] };
+    });
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -614,10 +628,19 @@ describe('executeGeneration', () => {
   });
 
   it('fails free-trial generation when any generated question is non-MCQ', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue([
+    const questionsToStream = [
       ...mockFiveMcqLlmQuestions.slice(0, 4),
       { ...mockSecondLlmQuestion, questionNumber: 5 },
-    ]);
+    ];
+    vi.mocked(llmStreamQuestions).mockImplementation(async (
+      _params: unknown,
+      onValid: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      for (const q of questionsToStream) {
+        await onValid(q, q.questionNumber);
+      }
+      return { validCount: 5, malformedSlots: [] };
+    });
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -645,7 +668,7 @@ describe('executeGeneration', () => {
   });
 
   it('sends an SSE error event when the LLM call throws', async () => {
-    vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
+    vi.mocked(llmStreamQuestions).mockRejectedValue(new Error('Anthropic unavailable'));
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -662,7 +685,7 @@ describe('executeGeneration', () => {
   });
 
   it('does not throw when the LLM call throws — errors are sent as SSE events', async () => {
-    vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
+    vi.mocked(llmStreamQuestions).mockRejectedValue(new Error('Anthropic unavailable'));
     const writer = vi.fn();
 
     await expect(executeGeneration(BASE_EXECUTION_PARAMS, writer)).resolves.toBeUndefined();
@@ -671,7 +694,7 @@ describe('executeGeneration', () => {
   it('does not recapture generation errors already captured upstream', async () => {
     const capturedError = new Error('Already captured upstream');
     markErrorAsCaptured(capturedError);
-    vi.mocked(llmGenerateQuiz).mockRejectedValue(capturedError);
+    vi.mocked(llmStreamQuestions).mockRejectedValue(capturedError);
     const writer = vi.fn();
 
     await executeGeneration(BASE_EXECUTION_PARAMS, writer);
@@ -689,8 +712,9 @@ describe('executeGeneration', () => {
       writer,
     );
 
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: null }),
+      expect.any(Function),
       expect.any(Function),
       undefined,
     );
@@ -704,8 +728,9 @@ describe('executeGeneration', () => {
       writer,
     );
 
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.any(Object),
+      expect.any(Function),
       expect.any(Function),
       byokKey,
     );
@@ -723,8 +748,9 @@ describe('executeGeneration', () => {
         data: expect.objectContaining({ answerFormat: AnswerFormat.MCQ }),
       }),
     );
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.objectContaining({ answerFormat: AnswerFormat.MCQ }),
+      expect.any(Function),
       expect.any(Function),
       undefined,
     );
@@ -750,8 +776,9 @@ describe('executeGeneration', () => {
         }),
       }),
     );
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.objectContaining({ answerFormat: AnswerFormat.FREE_TEXT }),
+      expect.any(Function),
       expect.any(Function),
       'sk-ant-byok-nonsecret-key-123',
     );

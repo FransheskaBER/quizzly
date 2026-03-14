@@ -16,7 +16,7 @@ import type { QuizDifficulty } from '@skills-trainer/shared';
  * adherence constraints, difficulty calibrations, and injection defenses.
  *
  * WHEN IT'S USED:
- * Called by generateQuiz() in llm.service.ts immediately before the API
+ * Called by streamQuestions() in llm.service.ts immediately before the API
  * call — every time a user clicks "Generate Quiz." The returned string is
  * passed as the `system` parameter to anthropic.messages.stream(). No other
  * function modifies it — what this returns is exactly what the LLM sees.

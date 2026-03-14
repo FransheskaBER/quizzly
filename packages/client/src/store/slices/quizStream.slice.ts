@@ -64,7 +64,9 @@ const quizStreamSlice = createSlice({
     questionsBatchReceived: (state, action: PayloadAction<Question[]>) => {
       if (action.payload.length > 0) {
         state.status = 'generating';
-        state.questions.push(...action.payload);
+        const existingIds = new Set(state.questions.map((q) => q.id));
+        const newQuestions = action.payload.filter((q) => !existingIds.has(q.id));
+        state.questions.push(...newQuestions);
       }
     },
     generationCompleted: (state, action: PayloadAction<string>) => {

@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-14
 **Spec file**: RFC.md
-**Overall result**: All deviations fixed. Most test gaps covered — 20 of 25 acceptance criteria have explicit tests (~30 tests across 6 files). Remaining 6 gaps are integration- or E2E-level.
+**Overall result**: All deviations fixed. Most test gaps covered — 19 of 25 acceptance criteria have explicit tests (~30 tests across 6 files). Remaining 6 gaps are integration- or E2E-level.
 
 ## Deviations (All Resolved)
 
@@ -95,7 +95,7 @@
 ## Coverage Summary
 
 - **25 acceptance criteria total**
-- **20 tested** (up from 7)
+- **19 tested** (up from 7)
 - **6 remaining gaps**: AC11 (Start Quiz button visibility), AC12 (SSE survives navigation), AC19 (score calculation), AC20 (refresh fetch), AC21 (SSE reconnect), AC24 (wait-for-completion flow)
 - All remaining gaps are integration- or E2E-level; some require `QuizGenerationProvider.test.tsx` or E2E verification
 

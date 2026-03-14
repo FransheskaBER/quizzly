@@ -26,7 +26,6 @@ vi.mock('../../services/llm.service.js', () => {
     tags: ['ts'],
   };
   return {
-    generateQuiz: vi.fn(),
     gradeAnswers: vi.fn(),
     streamQuestions: vi.fn(async (
       _params: unknown,
@@ -45,7 +44,7 @@ import { createApp } from '../../app.js';
 import { prisma, cleanDatabase, closeDatabase } from '../../__tests__/helpers/db.helper.js';
 import { createTestUser, getAuthToken } from '../../__tests__/helpers/auth.helper.js';
 import { createQuizWithAnswers } from '../../__tests__/helpers/quiz.helper.js';
-import { generateQuiz as llmGenerateQuiz } from '../../services/llm.service.js';
+import { streamQuestions as llmStreamQuestions } from '../../services/llm.service.js';
 
 const app = createApp();
 
@@ -63,12 +62,6 @@ const VALID_LLM_QUESTION: LlmGeneratedQuestion = {
   difficulty: QuizDifficulty.EASY,
   tags: ['typescript'],
 };
-
-const FIVE_VALID_LLM_QUESTIONS: LlmGeneratedQuestion[] = Array.from({ length: 5 }, (_, index) => ({
-  ...VALID_LLM_QUESTION,
-  questionNumber: index + 1,
-  questionText: `What does TypeScript add to JavaScript? (${index + 1})`,
-}));
 
 // Query string used in every happy-path test.
 const VALID_QUERY = `difficulty=${QuizDifficulty.EASY}&format=${AnswerFormat.MCQ}&count=${MIN_QUESTION_COUNT}`;
@@ -132,7 +125,7 @@ afterAll(async () => {
 
 describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   it('200 with Content-Type text/event-stream', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -147,7 +140,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('SSE stream contains progress, question, and complete events', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -165,7 +158,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('question SSE event does NOT include correctAnswer or explanation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -186,7 +179,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('question SSE event includes id, questionNumber, questionType, questionText, options', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -206,7 +199,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('complete event carries a quizAttemptId', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -226,7 +219,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('DB — quiz_attempt is in_progress with correct questionCount after successful generation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -251,7 +244,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('DB — free-trial generation enforces MCQ format even when free_text is requested', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -275,7 +268,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('DB — one question and one answer record exist after successful generation', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
+
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -300,7 +293,6 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
   });
 
   it('passes materialsText from ready materials to the LLM call', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -311,15 +303,15 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
       .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: 'Specific extracted content for the test' }),
+      expect.any(Function),
       expect.any(Function),
       undefined, // free-trial user — no stored API key
     );
   });
 
   it('passes materialsText as null when session has no ready materials', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -329,8 +321,9 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — happy path', () => {
       .set('Authorization', `Bearer ${token}`)
       .buffer(true);
 
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.objectContaining({ materialsText: null }),
+      expect.any(Function),
       expect.any(Function),
       undefined, // free-trial user — no stored API key
     );
@@ -345,7 +338,6 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
   const BYOK_API_KEY = 'sk-ant-test-byok-nonsecret-value-1234567890abcdef';
 
   it('generates quiz using the stored user API key after free trial is used', async () => {
-    vi.mocked(llmGenerateQuiz).mockResolvedValue(FIVE_VALID_LLM_QUESTIONS);
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -373,9 +365,10 @@ describe('BYOK — save API key then generate quiz (AC1)', () => {
     expect(genRes.status).toBe(200);
     expect(genRes.headers['content-type']).toContain('text/event-stream');
 
-    // The decrypted stored key must be passed to the LLM call as the third argument
-    expect(llmGenerateQuiz).toHaveBeenCalledWith(
+    // The decrypted stored key must be passed to streamQuestions as the 4th argument
+    expect(llmStreamQuestions).toHaveBeenCalledWith(
       expect.any(Object),
+      expect.any(Function),
       expect.any(Function),
       BYOK_API_KEY,
     );
@@ -500,7 +493,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — pre-stream errors', 
 
 describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => {
   it('sends an SSE error event (not a JSON error) when the LLM throws', async () => {
-    vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
+    vi.mocked(llmStreamQuestions).mockRejectedValue(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -518,7 +511,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
   });
 
   it('does not send a complete event when the LLM throws', async () => {
-    vi.mocked(llmGenerateQuiz).mockRejectedValue(new Error('Anthropic unavailable'));
+    vi.mocked(llmStreamQuestions).mockRejectedValue(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
     const token = await getAuthToken(user);
     const session = await createSession(user.id);
@@ -533,7 +526,7 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
   });
 
   it('does not consume free trial on generation failure and allows retry', async () => {
-    vi.mocked(llmGenerateQuiz).mockRejectedValueOnce(new Error('Anthropic unavailable'));
+    vi.mocked(llmStreamQuestions).mockRejectedValueOnce(new Error('Anthropic unavailable'));
     const { user } = await createTestUser();
     const session = await createSession(user.id);
     const token = await getAuthToken(user);
@@ -558,7 +551,19 @@ describe('GET /api/sessions/:sessionId/quizzes/generate — LLM failure', () => 
     });
     expect(generatingAttempts).toBe(0);
 
-    vi.mocked(llmGenerateQuiz).mockResolvedValueOnce(FIVE_VALID_LLM_QUESTIONS);
+    // Restore default streamQuestions mock for retry (mockRejectedValueOnce
+    // doesn't fall back to factory implementation after clearAllMocks)
+    vi.mocked(llmStreamQuestions).mockImplementation(async (
+      _params: unknown,
+      onValid: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      const validQ = { ...VALID_LLM_QUESTION };
+      for (let i = 1; i <= 5; i++) {
+        await onValid({ ...validQ, questionNumber: i }, i);
+      }
+      return { validCount: 5, malformedSlots: [] };
+    });
+
     const retryRes = await request(app)
       .get(`/api/sessions/${session.id}/quizzes/generate?${VALID_QUERY}`)
       .set('Authorization', `Bearer ${token}`)

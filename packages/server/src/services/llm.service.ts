@@ -53,7 +53,6 @@ export interface GradeAnswersParams {
   answers: FreeTextAnswer[];
 }
 
-export type OnQuestionCallback = (question: LlmGeneratedQuestion) => void;
 export type OnGradedCallback = (answer: LlmGradedAnswer) => void;
 
 // --- Pure helpers ---
@@ -199,46 +198,6 @@ async function runWithRetry<T>(
 }
 
 // --- Public service functions ---
-
-export const generateQuiz = async (
-  params: GenerateQuizParams,
-  onQuestion: OnQuestionCallback,
-  apiKey?: string,
-): Promise<LlmGeneratedQuestion[]> => {
-  const subject = sanitizeForPrompt(params.subject);
-  const goal = sanitizeForPrompt(params.goal);
-  const materialsText =
-    params.materialsText !== null ? sanitizeForPrompt(params.materialsText) : null;
-
-  logSuspiciousPatterns(subject, 'subject');
-  logSuspiciousPatterns(goal, 'goal');
-  if (materialsText !== null) logSuspiciousPatterns(materialsText, 'materials');
-
-  const promptParams = {
-    ...params,
-    subject,
-    goal,
-    materialsText,
-  };
-  const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
-  const userMessage = buildGenerationUserMessage(promptParams);
-  const client = resolveAnthropicClient(apiKey);
-
-  const questions = await runWithRetry<LlmGeneratedQuestion[]>(
-    systemPrompt,
-    userMessage,
-    'questions',
-    llmQuizOutputSchema,
-    LLM_GENERATION_TEMPERATURE,
-    client,
-  );
-
-  for (const question of questions) {
-    onQuestion(question);
-  }
-
-  return questions;
-};
 
 // --- Streaming quiz generation ---
 
