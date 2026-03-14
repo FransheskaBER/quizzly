@@ -29,10 +29,32 @@ vi.mock('../../config/database.js', () => ({
   },
 }));
 
-vi.mock('../llm.service.js', () => ({
-  generateQuiz: vi.fn(),
-  gradeAnswers: vi.fn(),
-}));
+vi.mock('../llm.service.js', () => {
+  const validQ = {
+    questionNumber: 1,
+    questionType: 'mcq',
+    questionText: 'Q?',
+    options: ['A', 'B', 'C', 'D'],
+    correctAnswer: 'A',
+    explanation: '',
+    difficulty: 'easy',
+    tags: ['ts'],
+  };
+  return {
+    generateQuiz: vi.fn(),
+    gradeAnswers: vi.fn(),
+    streamQuestions: vi.fn(async (
+      _params: unknown,
+      onValidQuestion: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      for (let i = 1; i <= 5; i++) {
+        await onValidQuestion({ ...validQ, questionNumber: i }, i);
+      }
+      return { validCount: 5, malformedSlots: [] };
+    }),
+    generateReplacementQuestion: vi.fn(),
+  };
+});
 
 vi.mock('../../config/sentry.js', () => ({
   Sentry: { captureException: vi.fn() },

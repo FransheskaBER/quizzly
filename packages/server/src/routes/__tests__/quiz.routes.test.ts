@@ -14,10 +14,32 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
   regradeRateLimiter: (_req: never, _res: never, next: () => void) => next(),
 }));
 
-vi.mock('../../services/llm.service.js', () => ({
-  generateQuiz: vi.fn(),
-  gradeAnswers: vi.fn(),
-}));
+vi.mock('../../services/llm.service.js', () => {
+  const VALID_Q = {
+    questionNumber: 1,
+    questionType: 'mcq',
+    questionText: 'What does TypeScript add?',
+    options: ['A', 'B', 'C', 'D'],
+    correctAnswer: 'A',
+    explanation: 'TS adds types.',
+    difficulty: 'easy',
+    tags: ['ts'],
+  };
+  return {
+    generateQuiz: vi.fn(),
+    gradeAnswers: vi.fn(),
+    streamQuestions: vi.fn(async (
+      _params: unknown,
+      onValidQuestion: (q: unknown, n: number) => Promise<void>,
+    ) => {
+      for (let i = 1; i <= 5; i++) {
+        await onValidQuestion({ ...VALID_Q, questionNumber: i, questionText: `Q${i}?` }, i);
+      }
+      return { validCount: 5, malformedSlots: [] };
+    }),
+    generateReplacementQuestion: vi.fn(),
+  };
+});
 
 import { createApp } from '../../app.js';
 import { prisma, cleanDatabase, closeDatabase } from '../../__tests__/helpers/db.helper.js';
