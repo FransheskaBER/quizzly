@@ -205,6 +205,99 @@ describe('streamQuestions', () => {
     expect(result.validCount).toBe(1);
     expect(onValid).toHaveBeenCalledTimes(1);
   });
+
+  it('parses correctly when response arrives as large multi-character chunks', async () => {
+    const q1Json = JSON.stringify(VALID_QUESTION_1);
+    const q2Json = JSON.stringify(VALID_QUESTION_2);
+    // Simulate realistic Anthropic deltas — variable-size chunks
+    const chunks = [
+      '<analysis>thinking</analy',
+      'sis>\n<questions>[',
+      q1Json,
+      ',',
+      q2Json,
+      ']</questions>',
+    ];
+
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStreamEvents(chunks) as unknown as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    const result = await streamQuestions(DEFAULT_PARAMS, onValid, onMalformed);
+
+    expect(result.validCount).toBe(2);
+    expect(onMalformed).not.toHaveBeenCalled();
+  });
+
+  it('parses correctly when the entire response arrives as a single chunk', async () => {
+    const q1Json = JSON.stringify(VALID_QUESTION_1);
+    const fullResponse = `<analysis>thinking</analysis>\n<questions>[${q1Json}]</questions>`;
+
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStreamEvents([fullResponse]) as unknown as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    const result = await streamQuestions(DEFAULT_PARAMS, onValid, onMalformed);
+
+    expect(result.validCount).toBe(1);
+    expect(onMalformed).not.toHaveBeenCalled();
+  });
+
+  it('parses correctly when <questions> tag is split across chunk boundaries', async () => {
+    const q1Json = JSON.stringify(VALID_QUESTION_1);
+    // Split the tag: '<ques' in one chunk, 'tions>' in the next
+    const chunks = ['<analysis>ok</analysis><ques', `tions>[${q1Json}]</questions>`];
+
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStreamEvents(chunks) as unknown as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    const result = await streamQuestions(DEFAULT_PARAMS, onValid, onMalformed);
+
+    expect(result.validCount).toBe(1);
+    expect(onMalformed).not.toHaveBeenCalled();
+  });
+
+  it('ignores braces inside JSON string values (e.g. code snippets)', async () => {
+    const questionWithBraces = {
+      ...VALID_QUESTION_1,
+      questionText: 'What does {} mean in Go? Consider: func main() { fmt.Println("hello") }',
+      explanation: 'Braces {} delimit blocks in Go.',
+    };
+    const q1Json = JSON.stringify(questionWithBraces);
+    const fullResponse = `<questions>[${q1Json}]</questions>`;
+
+    // Use multi-character chunks — realistic Anthropic deltas are 5-50 chars
+    const chunks: string[] = [];
+    for (let i = 0; i < fullResponse.length; i += 20) {
+      chunks.push(fullResponse.slice(i, i + 20));
+    }
+
+    vi.mocked(anthropic.messages.stream).mockReturnValue(
+      mockStreamEvents(chunks) as unknown as ReturnType<typeof anthropic.messages.stream>,
+    );
+
+    const onValid = vi.fn().mockResolvedValue(undefined);
+    const onMalformed = vi.fn();
+
+    const result = await streamQuestions(DEFAULT_PARAMS, onValid, onMalformed);
+
+    expect(result.validCount).toBe(1);
+    expect(onMalformed).not.toHaveBeenCalled();
+    expect(onValid).toHaveBeenCalledWith(
+      expect.objectContaining({ questionText: questionWithBraces.questionText }),
+      1,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

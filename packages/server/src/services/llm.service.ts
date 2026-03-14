@@ -1,7 +1,7 @@
 import pino from 'pino';
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
-import { type ZodType, type ZodTypeDef, type ZodError } from 'zod';
+import { ZodError, type ZodType, type ZodTypeDef } from 'zod';
 import {
   llmQuizOutputSchema,
   llmGradedAnswersOutputSchema,
@@ -254,7 +254,14 @@ export const streamQuestions = async (
   let currentObject = '';
   let slotNumber = 0;
   let assignedNumber = 1;
+  // String-aware state: track whether we're inside a JSON string value
+  let inString = false;
+  let escaped = false;
+  // Tracks how many characters have been processed for tag detection
+  let processedIndex = 0;
   const malformedSlots: MalformedSlot[] = [];
+
+  const QUESTIONS_TAG = '<questions>';
 
   for await (const event of stream) {
     if (event.type !== 'content_block_delta' || event.delta.type !== 'text_delta') continue;
@@ -266,25 +273,45 @@ export const streamQuestions = async (
     checkExfiltration(fullText);
 
     for (const char of chunk) {
+      processedIndex++;
+
       if (!insideQuestions) {
-        // Detect the start of the <questions> block — look for opening bracket
-        const questionsTag = '<questions>';
-        if (fullText.endsWith(questionsTag)) {
+        // Chunk-safe tag detection: check the text processed so far
+        if (
+          processedIndex >= QUESTIONS_TAG.length &&
+          fullText.substring(processedIndex - QUESTIONS_TAG.length, processedIndex) === QUESTIONS_TAG
+        ) {
           insideQuestions = true;
         }
         continue;
       }
 
-      // Inside <questions> block — track brace depth to find complete objects
-      if (char === '{') {
+      // Inside <questions> block — string-aware brace depth tracking.
+      // Braces inside JSON string values (e.g. code snippets) are ignored.
+      if (braceDepth > 0 || char === '{') {
+        currentObject += char;
+      }
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"' && braceDepth > 0) {
+        inString = true;
+      } else if (char === '{') {
         if (braceDepth === 0) {
-          currentObject = '';
+          currentObject = '{';
         }
         braceDepth++;
-        currentObject += char;
       } else if (char === '}') {
         braceDepth--;
-        currentObject += char;
 
         if (braceDepth === 0) {
           // Complete JSON object found
@@ -304,19 +331,23 @@ export const streamQuestions = async (
               onMalformedQuestion(currentObject, result.error, slotNumber);
             }
           } catch {
-            // JSON.parse failed — treat as malformed
-            const parseError = llmGeneratedQuestionSchema.safeParse(null);
+            // JSON.parse failed — create an explicit ZodError
+            const jsonParseError = new ZodError([{
+              code: 'custom',
+              path: [],
+              message: `Invalid JSON: ${currentObject.slice(0, 200)}`,
+            }]);
             malformedSlots.push({
               originalSlotNumber: slotNumber,
               rawLlmOutput: currentObject,
-              zodErrors: parseError.error!,
+              zodErrors: jsonParseError,
             });
-            onMalformedQuestion(currentObject, parseError.error!, slotNumber);
+            onMalformedQuestion(currentObject, jsonParseError, slotNumber);
           }
           currentObject = '';
+          inString = false;
+          escaped = false;
         }
-      } else if (braceDepth > 0) {
-        currentObject += char;
       }
     }
   }
