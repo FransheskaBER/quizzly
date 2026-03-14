@@ -75,8 +75,14 @@ const QuizTakingPage = () => {
   saveRef.current = saveAnswers;
   idRef.current = id;
 
+  // Failed slots beyond the last question are navigable (user can see the info card)
+  const trailingFailedSlots = failedSlots.filter(
+    (f) => f.questionNumber > mergedQuestions.length,
+  ).length;
+  const totalSlots = mergedQuestions.length + trailingFailedSlots;
+
   // Track if the next question is not yet available
-  const nextQuestionExists = currentIndex + 1 < mergedQuestions.length;
+  const nextQuestionExists = currentIndex + 1 < totalSlots;
   const isWaitingForNext = !nextQuestionExists && isGenerationInProgress;
 
   // Start/stop wait timer for tiered messaging
@@ -293,7 +299,7 @@ const QuizTakingPage = () => {
   };
 
   const nextButton = getNextButtonContent();
-  const isLastQuestion = !isGenerationInProgress && currentIndex === mergedQuestions.length - 1;
+  const isLastQuestion = !isGenerationInProgress && currentIndex === totalSlots - 1;
 
   return (
     <div className={styles.layout}>
@@ -301,7 +307,9 @@ const QuizTakingPage = () => {
         <QuestionNav
           questions={mergedQuestions}
           answers={effectiveAnswers}
+          failedSlots={failedSlots}
           currentIndex={currentIndex}
+          totalSlots={totalSlots}
           onNavigate={setCurrentIndex}
         />
 
@@ -355,7 +363,7 @@ const QuizTakingPage = () => {
               question={currentQuestion}
               currentAnswer={currentAnswer}
               onAnswerChange={handleAnswerChange}
-              totalQuestions={mergedQuestions.length}
+              totalQuestions={totalSlots}
             />
           </ComponentErrorBoundary>
         )}
@@ -389,7 +397,7 @@ const QuizTakingPage = () => {
           <p className={styles.hint}>
             <button
               type="button"
-              className={styles.saveLink}
+              className="text-link"
               onClick={() => navigate(`/sessions/${sessionId}`)}
             >
               Save progress and come back later

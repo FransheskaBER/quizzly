@@ -401,7 +401,9 @@ export const generateReplacementQuestion = async (
     checkExfiltration(response);
     const questions = await parseBlock(response, 'questions', llmQuizOutputSchema);
     return questions?.[0] ?? null;
-  } catch {
+  } catch (err) {
+    logger.warn({ err, subject: params.subject, operation: 'generateReplacementQuestion' }, 'Replacement question generation failed');
+    captureExceptionOnce(err, { extra: { subject: params.subject, operation: 'generateReplacementQuestion' } });
     return null;
   }
 };

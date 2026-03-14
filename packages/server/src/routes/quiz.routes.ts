@@ -4,7 +4,6 @@ import {
   quizParamsSchema,
   saveAnswersSchema,
   submitQuizBodySchema,
-  QuizStatus,
   type GenerateQuizQuery,
   type QuizParams,
   type SaveAnswersRequest,
@@ -14,7 +13,6 @@ import {
 import pino from 'pino';
 import { Router } from 'express';
 
-import { prisma } from '../config/database.js';
 import { auth } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
@@ -25,8 +23,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSSEEvent } from '../utils/sse.utils.js';
 import * as quizService from '../services/quiz.service.js';
-import { UnauthorizedError, NotFoundError } from '../utils/errors.js';
-import { assertOwnership } from '../utils/ownership.js';
+import { UnauthorizedError } from '../utils/errors.js';
 
 const logger = pino({ name: 'quiz.routes' });
 
@@ -50,26 +47,14 @@ router.get(
     const quizAttemptId = req.query.quizAttemptId as string | undefined;
 
     if (reconnect && quizAttemptId) {
-      // Reconnect flow: skip validation, rate limits, and quiz creation
+      // Reconnect flow: skip schema validation, rate limits, and quiz creation.
       const userId = req.user.userId;
+      const sessionId = req.params.sessionId as string;
 
-      // Verify ownership of the quiz attempt
-      const attempt = await prisma.quizAttempt.findUnique({
-        where: { id: quizAttemptId },
-        include: {
-          questions: { orderBy: { questionNumber: 'asc' } },
-        },
-      });
+      // Phase 1: pre-SSE validation — throws AppErrors caught by asyncHandler
+      const context = await quizService.prepareReconnect(quizAttemptId, userId, sessionId);
 
-      if (!attempt) throw new NotFoundError('Quiz attempt not found');
-      assertOwnership(attempt.userId, userId);
-
-      // Ensure the attempt belongs to the session in the URL
-      if (attempt.sessionId !== req.params.sessionId) {
-        throw new NotFoundError('Quiz attempt not found');
-      }
-
-      // Open SSE stream
+      // Phase 2: open SSE stream
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -83,56 +68,7 @@ router.get(
         if (clientConnected) sendSSEEvent(res, event);
       };
 
-      // Initialize client state with attempt metadata
-      writer({
-        type: 'generation_started',
-        data: { quizAttemptId: attempt.id, totalExpected: attempt.questionCount },
-      });
-
-      // Send existing questions from DB
-      for (const q of attempt.questions) {
-        writer({
-          type: 'question',
-          data: {
-            id: q.id,
-            questionNumber: q.questionNumber,
-            questionType: q.questionType,
-            questionText: q.questionText,
-            options: q.options as string[] | null,
-          },
-        });
-      }
-
-      // Check for in-memory active generation
-      const activeWriters = quizService.getActiveGeneration(quizAttemptId);
-      if (activeWriters) {
-        // Subscribe this writer to receive remaining events
-        activeWriters.add(writer);
-        // Wait for generation to complete — the writer will receive events
-        // from executeGeneration as they happen. We keep the connection
-        // open until the generation finishes or the client disconnects.
-        await new Promise<void>((resolve) => {
-          const checkInterval = setInterval(() => {
-            if (!clientConnected || !quizService.getActiveGeneration(quizAttemptId)) {
-              clearInterval(checkInterval);
-              activeWriters.delete(writer);
-              resolve();
-            }
-          }, 500);
-        });
-      } else {
-        // Server restarted — no in-memory generation. Return current state.
-        if (attempt.status === QuizStatus.GENERATING) {
-          await prisma.quizAttempt.update({
-            where: { id: quizAttemptId },
-            data: {
-              status: QuizStatus.IN_PROGRESS,
-              questionCount: attempt.questions.length,
-            },
-          });
-        }
-        writer({ type: 'complete', data: { quizAttemptId } });
-      }
+      await quizService.executeReconnect(context, writer, () => clientConnected);
 
       res.end();
       return;
