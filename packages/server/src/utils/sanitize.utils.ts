@@ -3,6 +3,9 @@ import pino from 'pino';
 // Exported so tests can vi.spyOn(logger, 'warn')
 export const logger = pino({ name: 'sanitize' });
 
+/** Normalize fullwidth/compatibility Unicode to ASCII equivalents before sanitization. */
+const NORMALIZATION_FORM = 'NFKC' as const;
+
 /**
  * Strips control characters, zero-width unicode, and invisible text from a string.
  * Applied to user-provided content (subject, goal, material text) before storage
@@ -21,10 +24,11 @@ export const sanitizeString = (input: string): string => {
 
 /**
  * Sanitizes a string for use in LLM prompts.
- * Extends sanitizeString with soft hyphen stripping, newline collapsing, and trimming.
+ * Applies NFKC normalization (converts fullwidth/compatibility characters to ASCII),
+ * then extends sanitizeString with soft hyphen stripping, newline collapsing, and trimming.
  */
 export const sanitizeForPrompt = (input: string): string => {
-  return sanitizeString(input)
+  return sanitizeString(input.normalize(NORMALIZATION_FORM))
     .replace(/\u00AD/g, '')       // strip soft hyphen
     .replace(/\n{3,}/g, '\n\n')   // collapse 3+ newlines to 2
     .trim();
