@@ -487,7 +487,7 @@ quizzly/
 │   │       │   ├── errors.ts            # AppError hierarchy
 │   │       │   ├── asyncHandler.ts      # Route wrapper
 │   │       │   ├── ownership.ts         # assertOwnership helper
-│   │       │   ├── token.utils.ts       # JWT sign/verify
+│   │       │   ├── token.utils.ts       # JWT access/refresh token sign/verify, verification/reset token hashing
 │   │       │   ├── password.utils.ts    # bcrypt hash/compare
 │   │       │   ├── sanitize.utils.ts    # Prompt injection defense
 │   │       │   ├── tokenCount.utils.ts  # Approximate token counting
@@ -993,8 +993,9 @@ Request:
 { "email": "user@example.com", "password": "securePass123" }
 
 200: { "user": { "id": "uuid", "email": "...", "username": "Alex" } }
-    + Set-Cookie: quizzly_session=<opaque-token>; HttpOnly; Path=/api; ...
-    (no token in response body — session stored in httpOnly cookie)
+    + Set-Cookie: quizzly_session=<jwt-access-token>; HttpOnly; Path=/api; Max-Age=900
+    + Set-Cookie: quizzly_refresh=<jwt-refresh-token>; HttpOnly; Path=/api/auth/refresh; Max-Age=604800
+    (no token in response body — session stored in httpOnly cookies)
 401: UNAUTHORIZED ("Invalid email or password" — same for both)
 401: EMAIL_NOT_VERIFIED
 429: RATE_LIMITED
@@ -1003,10 +1004,24 @@ Request:
 #### POST /api/auth/logout
 
 ```
-Auth: None
+Auth: None (reads refresh token from httpOnly cookie if present)
 
 200: { "message": "Logged out" }
-    + Set-Cookie: quizzly_session=; Max-Age=0; Path=/api (clears cookie)
+    + Set-Cookie: quizzly_session=; Max-Age=0; Path=/api (clears access cookie)
+    + Set-Cookie: quizzly_refresh=; Max-Age=0; Path=/api/auth/refresh (clears refresh cookie)
+    (deletes refresh token from DB if present)
+```
+
+#### POST /api/auth/refresh
+
+```
+Auth: None (reads refresh token from httpOnly cookie)
+
+200: { "message": "Token refreshed" }
+    + Set-Cookie: quizzly_session=<jwt-access-token>; HttpOnly; Path=/api; Max-Age=900
+    + Set-Cookie: quizzly_refresh=<jwt-refresh-token>; HttpOnly; Path=/api/auth/refresh; Max-Age=604800
+    (rotates refresh token: old DB row deleted, new row created)
+401: UNAUTHORIZED (missing, invalid, or expired refresh token — both cookies cleared)
 ```
 
 #### POST /api/auth/verify-email
@@ -1333,7 +1348,8 @@ Auth: None
 |---|---|---|---|
 | POST | /api/auth/signup | No | Create account |
 | POST | /api/auth/login | No | Login, get session cookie |
-| POST | /api/auth/logout | No | Logout, clear cookie |
+| POST | /api/auth/logout | No | Logout, clear cookies, revoke refresh token |
+| POST | /api/auth/refresh | No | Refresh access token (reads refresh cookie) |
 | POST | /api/auth/verify-email | No | Verify email |
 | POST | /api/auth/resend-verification | No | Resend verification |
 | POST | /api/auth/forgot-password | No | Request reset |
@@ -1360,7 +1376,7 @@ Auth: None
 | POST | /api/quizzes/:id/regrade | Yes | Retry grading (SSE) |
 | GET | /api/health | No | Health check |
 
-**Total: 29 endpoints.**
+**Total: 30 endpoints.**
 
 ---
 
@@ -1369,19 +1385,24 @@ Auth: None
 ### 6.1 Authentication Strategy
 
 ```
-METHOD: DB-backed opaque session token (access token only)
+METHOD: JWT access token (stateless) + JWT refresh token (DB-backed, rotated)
 
 Token Lifecycle:
-├── Login → creates access_tokens row (token hash), sets httpOnly cookie
-├── Expiry: from JWT_EXPIRES_IN (e.g. 7 days)
-├── Storage: httpOnly cookie (quizzly_session, Path /api) — no localStorage
-├── Every request: cookie sent automatically (credentials: 'include'); server also accepts Authorization: Bearer (for tests, API clients)
-├── Logout → clears cookie; token row can remain until expiry
-├── On expiry: user logs in again (no refresh token for MVP)
+├── Login → signs JWT access token (15min, JWT_SECRET) + JWT refresh token (7d, REFRESH_SECRET)
+│   ├── Access token: stateless, verified by signature only (no DB call)
+│   └── Refresh token: SHA-256 hash stored in refresh_tokens table for revocation
+├── Storage: two httpOnly cookies
+│   ├── quizzly_session: access token, 15min maxAge, Path /api
+│   └── quizzly_refresh: refresh token, 7d maxAge, Path /api/auth/refresh (scoped)
+├── Every request: access token cookie sent automatically (credentials: 'include'); server also accepts Authorization: Bearer (for tests, API clients)
+├── On access token expiry: frontend auto-calls POST /api/auth/refresh
+│   ├── Server verifies refresh JWT + DB lookup → issues new access token + rotates refresh token (new DB row, old deleted)
+│   └── Rolling 7-day window: active users never get logged out
+├── On refresh token expiry (7d inactivity): user must log in again
+├── Logout → clears both cookies + deletes refresh token from DB
 └── On password change: no token invalidation (unchanged per TDD)
 
-Why no refresh tokens: adds complexity, 7-day expiry acceptable,
-no financial data. Add when BL-012 payments make it higher stakes.
+Env vars: JWT_SECRET (access tokens), REFRESH_SECRET (refresh tokens) — both min 32 chars, validated on startup.
 ```
 
 ### 6.2 Password Policy
@@ -1892,5 +1913,6 @@ The `set-password` endpoint was added alongside `verify-email` to support local 
 - [2026-03-11] Updated Sections 3.5, 4.2, 4.3, 5.2, 5.5, 5.6–5.9, 6.4 per specs/features/byok-api-key-storage/RFC.md
 - [2026-03-12] Updated Section 4 per specs/features/refactor-quiz-key-source/RFC.md
 - [2026-03-13] Updated Sections 5.2, 5.9, 6.1, 6.4 per specs/features/auth-db-backed-sessions/RFC.md
+- [2026-03-14] Updated Sections 3.5, 5, 5.9, 6.1 per specs/features/auth-jwt-refresh/RFC.md
 
 *End of Technical Design Document*

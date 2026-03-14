@@ -19,7 +19,10 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
 const app = createApp();
 
 beforeAll(async () => {
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  execSync('npx prisma migrate deploy', {
+    env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+    stdio: 'inherit',
+  });
 });
 
 afterEach(async () => {
