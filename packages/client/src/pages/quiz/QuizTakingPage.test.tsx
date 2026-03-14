@@ -326,9 +326,7 @@ describe('QuizTakingPage — streaming generation UX', () => {
     expect(saveLink).toBeDefined();
   });
 
-  it('renders QuestionFailedCard when navigated to a failed slot index (AC18)', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
+  it('renders QuestionFailedCard when navigated to a failed slot index (AC18)', () => {
     // Provide 2 streaming questions so the Next button is available, plus a
     // failed slot at questionNumber 2 that matches the second position.
     mockGenerationContext.mockReturnValue({

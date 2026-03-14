@@ -4,11 +4,10 @@ import {
   AnswerFormat,
   QuestionType,
   QuizStatus,
-  KeySource,
   FREE_TRIAL_QUESTION_COUNT,
 } from '@skills-trainer/shared';
 import type { LlmGeneratedQuestion } from '@skills-trainer/shared';
-import { ZodError, z } from 'zod';
+import { ZodError } from 'zod';
 
 // ---------------------------------------------------------------------------
 // Mocks

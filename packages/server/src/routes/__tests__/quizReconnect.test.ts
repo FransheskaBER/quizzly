@@ -38,13 +38,14 @@ vi.mock('../../middleware/rateLimiter.middleware.js', () => ({
 }));
 
 vi.mock('../../utils/asyncHandler.js', () => ({
-  asyncHandler: (fn: Function) => async (req: unknown, res: unknown, next: unknown) => {
-    try {
-      await fn(req, res, next);
-    } catch (err) {
-      // Swallow — tests handle assertions directly
-    }
-  },
+  asyncHandler: (fn: (req: unknown, res: unknown, next: unknown) => Promise<void>) =>
+    async (req: unknown, res: unknown, next: unknown) => {
+      try {
+        await fn(req, res, next);
+      } catch {
+        // Swallow — tests handle assertions directly
+      }
+    },
 }));
 
 vi.mock('../../utils/sse.utils.js', () => ({
@@ -81,13 +82,15 @@ const createMockRes = () => {
   };
 };
 
+type EventCallback = (...args: unknown[]) => void;
+
 const createMockReq = (query: Record<string, string> = {}, params: Record<string, string> = {}) => {
-  const listeners: Record<string, Function[]> = {};
+  const listeners: Record<string, EventCallback[]> = {};
   return {
     query,
     params,
     user: { userId: 'user-1' },
-    on: vi.fn((event: string, cb: Function) => {
+    on: vi.fn((event: string, cb: EventCallback) => {
       listeners[event] = listeners[event] || [];
       listeners[event].push(cb);
     }),
@@ -143,11 +146,11 @@ describe('Quiz reconnect route — server restarted scenario (AC22)', () => {
     app.use('/', quizRouter);
 
     // Use supertest-like approach with the raw handler
-    const req = createMockReq(
+    createMockReq(
       { reconnect: 'true', quizAttemptId: 'attempt-1' },
       { sessionId: 'session-1' },
     );
-    const res = createMockRes();
+    createMockRes();
 
     // Extract the route handler and call it directly
     // The reconnect flow is in the first handler of GET /:sessionId/quizzes/generate

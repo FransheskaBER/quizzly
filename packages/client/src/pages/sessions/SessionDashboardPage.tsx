@@ -97,7 +97,6 @@ const SessionDashboardPage = () => {
     warning,
     progressMessage,
     reset: resetGeneration,
-    isGenerating,
   } = useQuizGenerationContext();
 
   useEffect(() => {

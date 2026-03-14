@@ -71,7 +71,7 @@ const QuizResultsPage = () => {
     ) {
       navigate(`/sessions/${sessionId}/quiz/${id}`, { replace: true });
     }
-  }, [quiz, id, navigate]);
+  }, [quiz, id, sessionId, navigate]);
 
   // ---------------------------------------------------------------------------
   // Loading / error states
