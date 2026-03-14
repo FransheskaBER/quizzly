@@ -88,7 +88,7 @@ const clampScore = (raw: number): 0 | 0.5 | 1 => {
 
 const checkExfiltration = (response: string): void => {
   if (response.includes(SYSTEM_MARKER)) {
-    throw new BadRequestError(
+    throw new Error(
       'LLM response contains system marker — possible prompt exfiltration attempt',
     );
   }
@@ -240,14 +240,6 @@ export const streamQuestions = async (
   const userMessage = buildGenerationUserMessage(promptParams);
   const client = resolveAnthropicClient(apiKey);
 
-  const stream = client.messages.stream({
-    model: LLM_MODEL,
-    max_tokens: LLM_MAX_TOKENS,
-    temperature: LLM_GENERATION_TEMPERATURE,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
   let fullText = '';
   let insideQuestions = false;
   let braceDepth = 0;
@@ -263,93 +255,127 @@ export const streamQuestions = async (
 
   const QUESTIONS_TAG = '<questions>';
 
-  for await (const event of stream) {
-    if (event.type !== 'content_block_delta' || event.delta.type !== 'text_delta') continue;
+  try {
+    const stream = client.messages.stream({
+      model: LLM_MODEL,
+      max_tokens: LLM_MAX_TOKENS,
+      temperature: LLM_GENERATION_TEMPERATURE,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
 
-    const chunk = event.delta.text;
-    fullText += chunk;
+    for await (const event of stream) {
+      if (event.type !== 'content_block_delta' || event.delta.type !== 'text_delta') continue;
 
-    // Periodically check for exfiltration
-    checkExfiltration(fullText);
+      const chunk = event.delta.text;
+      fullText += chunk;
 
-    for (const char of chunk) {
-      processedIndex++;
+      // Periodically check for exfiltration
+      checkExfiltration(fullText);
 
-      if (!insideQuestions) {
-        // Chunk-safe tag detection: check the text processed so far
-        if (
-          processedIndex >= QUESTIONS_TAG.length &&
-          fullText.substring(processedIndex - QUESTIONS_TAG.length, processedIndex) === QUESTIONS_TAG
-        ) {
-          insideQuestions = true;
+      for (const char of chunk) {
+        processedIndex++;
+
+        if (!insideQuestions) {
+          // Chunk-safe tag detection: check the text processed so far
+          if (
+            processedIndex >= QUESTIONS_TAG.length &&
+            fullText.substring(processedIndex - QUESTIONS_TAG.length, processedIndex) === QUESTIONS_TAG
+          ) {
+            insideQuestions = true;
+          }
+          continue;
         }
-        continue;
-      }
 
-      // Inside <questions> block — string-aware brace depth tracking.
-      // Braces inside JSON string values (e.g. code snippets) are ignored.
-      if (braceDepth > 0 || char === '{') {
-        currentObject += char;
-      }
-
-      if (inString) {
-        if (escaped) {
-          escaped = false;
-        } else if (char === '\\') {
-          escaped = true;
-        } else if (char === '"') {
-          inString = false;
+        // Inside <questions> block — string-aware brace depth tracking.
+        // Braces inside JSON string values (e.g. code snippets) are ignored.
+        if (braceDepth > 0 || char === '{') {
+          currentObject += char;
         }
-        continue;
-      }
 
-      if (char === '"' && braceDepth > 0) {
-        inString = true;
-      } else if (char === '{') {
-        if (braceDepth === 0) {
-          currentObject = '{';
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (char === '\\') {
+            escaped = true;
+          } else if (char === '"') {
+            inString = false;
+          }
+          continue;
         }
-        braceDepth++;
-      } else if (char === '}') {
-        braceDepth--;
 
-        if (braceDepth === 0) {
-          // Complete JSON object found
-          slotNumber++;
-          try {
-            const parsed: unknown = JSON.parse(currentObject);
-            const result = llmGeneratedQuestionSchema.safeParse(parsed);
-            if (result.success) {
-              await onValidQuestion(result.data, assignedNumber);
-              assignedNumber++;
-            } else {
+        if (char === '"' && braceDepth > 0) {
+          inString = true;
+        } else if (char === '{') {
+          if (braceDepth === 0) {
+            currentObject = '{';
+          }
+          braceDepth++;
+        } else if (char === '}') {
+          braceDepth--;
+
+          if (braceDepth === 0) {
+            // Complete JSON object found
+            slotNumber++;
+            try {
+              const parsed: unknown = JSON.parse(currentObject);
+              const result = llmGeneratedQuestionSchema.safeParse(parsed);
+              if (result.success) {
+                await onValidQuestion(result.data, assignedNumber);
+                assignedNumber++;
+              } else {
+                malformedSlots.push({
+                  originalSlotNumber: slotNumber,
+                  rawLlmOutput: currentObject,
+                  zodErrors: result.error,
+                });
+                onMalformedQuestion(currentObject, result.error, slotNumber);
+              }
+            } catch {
+              // JSON.parse failed — create an explicit ZodError
+              const jsonParseError = new ZodError([{
+                code: 'custom',
+                path: [],
+                message: `Invalid JSON: ${currentObject.slice(0, 200)}`,
+              }]);
               malformedSlots.push({
                 originalSlotNumber: slotNumber,
                 rawLlmOutput: currentObject,
-                zodErrors: result.error,
+                zodErrors: jsonParseError,
               });
-              onMalformedQuestion(currentObject, result.error, slotNumber);
+              onMalformedQuestion(currentObject, jsonParseError, slotNumber);
             }
-          } catch {
-            // JSON.parse failed — create an explicit ZodError
-            const jsonParseError = new ZodError([{
-              code: 'custom',
-              path: [],
-              message: `Invalid JSON: ${currentObject.slice(0, 200)}`,
-            }]);
-            malformedSlots.push({
-              originalSlotNumber: slotNumber,
-              rawLlmOutput: currentObject,
-              zodErrors: jsonParseError,
-            });
-            onMalformedQuestion(currentObject, jsonParseError, slotNumber);
+            currentObject = '';
+            inString = false;
+            escaped = false;
           }
-          currentObject = '';
-          inString = false;
-          escaped = false;
         }
       }
     }
+  } catch (err) {
+    logger.error(
+      { err, provider: 'anthropic', model: LLM_MODEL, operation: 'streamQuestions' },
+      'LLM stream request failed during quiz generation',
+    );
+    captureExceptionOnce(err, {
+      extra: { provider: 'anthropic', model: LLM_MODEL, operation: 'streamQuestions' },
+    });
+
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      const sanitizedError = new BadRequestError(
+        'Could not generate your quiz. Your API key appears to be invalid. Please verify you added the correct key.',
+      );
+      markErrorAsCaptured(sanitizedError);
+      throw sanitizedError;
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      const sanitizedError = new BadRequestError(
+        'Could not generate your quiz. Your Anthropic account may have insufficient credits or has hit a rate limit. Please check your account balance.',
+      );
+      markErrorAsCaptured(sanitizedError);
+      throw sanitizedError;
+    }
+    throw err;
   }
 
   // Final exfiltration check on complete response
