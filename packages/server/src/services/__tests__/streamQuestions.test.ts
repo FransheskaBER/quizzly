@@ -22,6 +22,7 @@ vi.mock('../../config/sentry.js', () => ({
 vi.mock('../../utils/sanitize.utils.js', () => ({
   sanitizeForPrompt: vi.fn((s: string) => s),
   logSuspiciousPatterns: vi.fn(),
+  escapeXml: vi.fn((s: string) => s),
 }));
 
 import anthropic from '../../config/anthropic.js';
