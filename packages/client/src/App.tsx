@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
@@ -11,20 +11,21 @@ import { ToastContainer } from '@/components/common/ToastContainer';
 import { useAppDispatch } from '@/store/store';
 import { logout } from '@/store/slices/auth.slice';
 import { useGetMeQuery } from '@/api/auth.api';
+import { lazyWithRetry } from '@/utils/lazy-with-retry';
 
-const LandingPage = lazy(() => import('@/pages/landing/LandingPage'));
-const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
-const SignupPage = lazy(() => import('@/pages/auth/SignupPage'));
-const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmailPage'));
-const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'));
-const HomeDashboardPage = lazy(() => import('@/pages/dashboard/HomeDashboardPage'));
-const SessionListPage = lazy(() => import('@/pages/sessions/SessionListPage'));
-const CreateSessionPage = lazy(() => import('@/pages/sessions/CreateSessionPage'));
-const SessionDashboardPage = lazy(() => import('@/pages/sessions/SessionDashboardPage'));
-const QuizTakingPage = lazy(() => import('@/pages/quiz/QuizTakingPage'));
-const QuizResultsPage = lazy(() => import('@/pages/quiz/QuizResultsPage'));
-const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
+const LandingPage = lazyWithRetry(() => import('@/pages/landing/LandingPage'));
+const LoginPage = lazyWithRetry(() => import('@/pages/auth/LoginPage'));
+const SignupPage = lazyWithRetry(() => import('@/pages/auth/SignupPage'));
+const VerifyEmailPage = lazyWithRetry(() => import('@/pages/auth/VerifyEmailPage'));
+const ForgotPasswordPage = lazyWithRetry(() => import('@/pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazyWithRetry(() => import('@/pages/auth/ResetPasswordPage'));
+const HomeDashboardPage = lazyWithRetry(() => import('@/pages/dashboard/HomeDashboardPage'));
+const SessionListPage = lazyWithRetry(() => import('@/pages/sessions/SessionListPage'));
+const CreateSessionPage = lazyWithRetry(() => import('@/pages/sessions/CreateSessionPage'));
+const SessionDashboardPage = lazyWithRetry(() => import('@/pages/sessions/SessionDashboardPage'));
+const QuizTakingPage = lazyWithRetry(() => import('@/pages/quiz/QuizTakingPage'));
+const QuizResultsPage = lazyWithRetry(() => import('@/pages/quiz/QuizResultsPage'));
+const ProfilePage = lazyWithRetry(() => import('@/pages/profile/ProfilePage'));
 
 /**
  * Discovers session on app load via getMe (cookie sent automatically with credentials: 'include').
