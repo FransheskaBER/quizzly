@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
+
+import { env } from '../../config/env.js';
 
 // vi.mock calls are hoisted to run before imports — mock factory can use vi.fn()
 vi.mock('../../config/database.js', () => ({
@@ -8,8 +11,11 @@ vi.mock('../../config/database.js', () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
-    accessToken: {
+    refreshToken: {
       create: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
     passwordReset: {
       findFirst: vi.fn(),
@@ -164,24 +170,31 @@ describe('signup', () => {
 // login
 // ---------------------------------------------------------------------------
 describe('login', () => {
-  it('returns user profile and creates access token for valid verified credentials', async () => {
+  it('returns user profile, JWT access token, and stores refresh token hash in DB', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: true });
     vi.mocked(comparePassword).mockResolvedValue(true);
-    vi.mocked(prisma.accessToken.create).mockResolvedValue({} as never);
+    vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as never);
 
     const result = await authService.login({
       email: 'test@example.com',
       password: 'valid-test-password-123!',
     });
 
-    expect(result.rawToken).toBeTypeOf('string');
-    expect(result.rawToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.accessToken).toBeTypeOf('string');
+    expect(result.refreshToken).toBeTypeOf('string');
+    // Access token is a JWT (three dot-separated parts)
+    expect(result.accessToken.split('.')).toHaveLength(3);
+    // Verify the access token contains correct payload
+    const decoded = jwt.verify(result.accessToken, env.JWT_SECRET) as jwt.JwtPayload;
+    expect(decoded.userId).toBe(mockUser.id);
+    expect(decoded.email).toBe(mockUser.email);
+
     expect(result.user).toEqual({
       id: mockUser.id,
       email: mockUser.email,
       username: mockUser.username,
     });
-    expect(prisma.accessToken.create).toHaveBeenCalledWith(
+    expect(prisma.refreshToken.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           userId: mockUser.id,
@@ -192,20 +205,20 @@ describe('login', () => {
     );
   });
 
-  it('stores hashed token in access_tokens table', async () => {
+  it('stores hashed refresh token in refresh_tokens table (not the raw JWT)', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ ...mockUser, emailVerified: true });
     vi.mocked(comparePassword).mockResolvedValue(true);
-    vi.mocked(prisma.accessToken.create).mockResolvedValue({} as never);
+    vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as never);
 
-    const { rawToken } = await authService.login({
+    const { refreshToken } = await authService.login({
       email: 'test@example.com',
       password: 'valid-test-password-123!',
     });
 
-    expect(rawToken).toHaveLength(64);
-    const createCall = vi.mocked(prisma.accessToken.create).mock.calls[0][0];
-    expect(createCall.data.tokenHash).toHaveLength(64);
-    expect(createCall.data.tokenHash).not.toBe(rawToken);
+    const createCall = vi.mocked(prisma.refreshToken.create).mock.calls[0][0];
+    // Hash is SHA-256 (64 hex chars), not the raw JWT
+    expect(createCall.data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(createCall.data.tokenHash).not.toBe(refreshToken);
   });
 
   it('throws UnauthorizedError when user is not found', async () => {
@@ -259,6 +272,72 @@ describe('login', () => {
 });
 
 // ---------------------------------------------------------------------------
+// refreshAccessToken
+// ---------------------------------------------------------------------------
+describe('refreshAccessToken', () => {
+  it('verifies refresh token JWT, atomically deletes old DB row, creates new token pair and DB row', async () => {
+    const oldRefreshToken = jwt.sign(
+      { userId: mockUser.id, email: mockUser.email },
+      env.REFRESH_SECRET,
+      { expiresIn: '7d' },
+    );
+
+    vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as never);
+
+    const result = await authService.refreshAccessToken(oldRefreshToken);
+
+    expect(result.accessToken).toBeTypeOf('string');
+    expect(result.refreshToken).toBeTypeOf('string');
+    expect(result.accessToken.split('.')).toHaveLength(3);
+    expect(result.refreshToken.split('.')).toHaveLength(3);
+    expect(prisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { tokenHash: expect.any(String) },
+    });
+    expect(prisma.refreshToken.create).toHaveBeenCalled();
+  });
+
+  it('throws UnauthorizedError when refresh token JWT is expired', async () => {
+    const expiredRefreshToken = jwt.sign(
+      { userId: mockUser.id, email: mockUser.email },
+      env.REFRESH_SECRET,
+      { expiresIn: '0s' },
+    );
+
+    await expect(authService.refreshAccessToken(expiredRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(prisma.refreshToken.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('throws UnauthorizedError when refresh token hash is not in DB (concurrent rotation)', async () => {
+    const validRefreshToken = jwt.sign(
+      { userId: mockUser.id, email: mockUser.email },
+      env.REFRESH_SECRET,
+      { expiresIn: '7d' },
+    );
+
+    vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 0 });
+
+    await expect(authService.refreshAccessToken(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// logout
+// ---------------------------------------------------------------------------
+describe('logout', () => {
+  it('deletes all refresh tokens for the user', async () => {
+    vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 1 });
+
+    await authService.logout(mockUser.id);
+
+    expect(prisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: mockUser.id },
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // verifyEmail
 // ---------------------------------------------------------------------------
 describe('verifyEmail', () => {
@@ -276,8 +355,6 @@ describe('verifyEmail', () => {
     const result = await authService.verifyEmail({ token: 'raw_token' });
 
     expect(result.message).toMatch(/verified/i);
-    // Token is NOT cleared — keeping it lets re-clicks find the user and return
-    // "already verified" (CONFLICT) instead of "invalid link" (BAD_REQUEST).
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: verifiableUser.id },
       data: { emailVerified: true },

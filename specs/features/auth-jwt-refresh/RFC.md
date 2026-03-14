@@ -1,9 +1,9 @@
 # RFC: Auth Refactor — JWT Access Tokens + Refresh Token Rotation
 
-**Date**: 2026-03-13
-**Status**: Draft
+**Date**: 2026-03-14
+**Status**: Approved
 **Type**: Refactor
-**TDD Updates Required**: Yes
+**TDD Updates Required**: Yes (applied)
 
 ## 1. Context
 
@@ -36,16 +36,16 @@ Install `jsonwebtoken` + `@types/jsonwebtoken`. Chosen over `jose` to match refe
 
 ### 3.2 Prisma schema
 
-Rename `AccessToken` model → `RefreshToken`. Same structure (id, userId, tokenHash, expiresAt, createdAt). Table renamed `access_tokens` → `refresh_tokens`. Existing rows truncated in migration (all sessions invalidated — users re-login once).
+Rename `AccessToken` model to `RefreshToken`. Same structure (id, userId, tokenHash, expiresAt, createdAt). Table renamed `access_tokens` to `refresh_tokens`. Existing rows truncated in migration (all sessions invalidated — users re-login once).
 
 ### 3.3 Token utilities (`token.utils.ts`)
 
 Remove `generateOpaqueAccessToken`. Add:
 
-- `generateAccessToken({ userId, email })` → signs JWT with `JWT_SECRET`, 15min expiry
-- `generateRefreshToken({ userId, email })` → signs JWT with `REFRESH_SECRET`, 7d expiry
-- `verifyAccessToken(token)` → returns `TokenPayload | null`
-- `verifyRefreshToken(token)` → returns `TokenPayload | null`
+- `generateAccessToken({ userId, email })` — signs JWT with `JWT_SECRET`, 15min expiry
+- `generateRefreshToken({ userId, email })` — signs JWT with `REFRESH_SECRET`, 7d expiry
+- `verifyAccessToken(token)` — returns `TokenPayload | null`
+- `verifyRefreshToken(token)` — returns `TokenPayload | null`
 
 Keep: `hashToken`, `generateVerificationToken`, `generateResetToken`, `parseExpiresInMs`.
 
@@ -60,18 +60,18 @@ Add `setRefreshCookie()`, `clearRefreshCookie()`, `getRefreshCookieName()`.
 
 ### 3.5 Auth middleware
 
-Replace DB lookup with `verifyAccessToken(token)`. No Prisma import needed. On valid JWT → attach `{ userId, email }` to `req.user`. On invalid/expired → 401.
+Replace DB lookup with `verifyAccessToken(token)`. No Prisma import needed. On valid JWT, attach `{ userId, email }` to `req.user`. On invalid/expired, return 401.
 
 ### 3.6 Auth service changes
 
 - `login()`: Generate JWT access token + JWT refresh token. Store refresh token hash in `RefreshToken` table. Return both tokens to route handler.
 - New `refreshAccessToken(refreshToken)`: Verify JWT → hash token → find in DB → if valid: delete old refresh token, generate new access + refresh tokens, store new refresh hash → return both tokens. If invalid: throw `UnauthorizedError`.
-- `logout(refreshToken)`: Delete refresh token from DB if present.
+- `logout(userId)`: Delete all refresh tokens for the user from DB.
 
 ### 3.7 Auth routes changes
 
 - Login handler: set both cookies via `setSessionCookie` + `setRefreshCookie`.
-- Logout handler: read refresh token from cookie, call `authService.logout(refreshToken)`, clear both cookies.
+- Logout handler: require `auth` middleware, call `authService.logout(req.user.userId)`, clear both cookies. Note: the refresh cookie is scoped to `/api/auth/refresh` so it won't be sent to `/api/auth/logout` by browsers — revoking by userId avoids this path-scoping limitation.
 - New `POST /refresh`: read refresh token from cookie, call `authService.refreshAccessToken()`, set both new cookies.
 
 ### 3.8 Env config
@@ -88,7 +88,7 @@ Expand `isExpectedAuthError` to cover: failed login, session check 401, `EmailNo
 
 ### 3.11 Frontend (`store/api.ts`)
 
-Update `baseQueryWithAuth`: on 401 → if not the refresh endpoint itself → call `POST /api/auth/refresh` → if success, retry original request → if fail, dispatch `logout()`. Use mutex to prevent concurrent refresh calls.
+Update `baseQueryWithAuth`: on 401 → if not the refresh endpoint itself and not `/auth/me` (unauthenticated session check — no session to refresh) → call `POST /api/auth/refresh` → if success, retry original request → if fail, dispatch `logout()`. Use mutex to prevent concurrent refresh calls.
 
 ### 3.12 Test helper (`auth.helper.ts`)
 
@@ -152,17 +152,20 @@ Update `baseQueryWithAuth`: on 401 → if not the refresh endpoint itself → ca
 2. Auth middleware verifies JWT without DB call, attaches `{ userId, email }` to `req.user`.
 3. `POST /api/auth/refresh` with valid refresh token returns new access token cookie, rotates refresh token (new cookie + new DB row, old row deleted).
 4. `POST /api/auth/refresh` with expired refresh token returns 401, clears both cookies.
-5. Logout clears both cookies and deletes refresh token from DB.
+5. Logout requires authentication, clears both cookies, and deletes all refresh tokens for the user from DB.
 6. Frontend intercepts 401, calls refresh, retries original request. Mutex prevents concurrent refreshes.
 7. Failed login, unauthenticated `/me` check, `EmailNotVerifiedError`, validation errors on auth routes, `ConflictError` on signup, `BadRequestError` on auth routes, and refresh 401 are all excluded from Sentry.
 8. Signup, email verification, password reset, and resend verification flows work unchanged.
 9. All protected routes (sessions, materials, quizzes, dashboard, user) work with JWT auth.
 10. Tests use `TEST_DATABASE_URL` (no fallback), validate localhost, and include `REFRESH_SECRET` in test env.
 
-## 7. TDD Updates Required (not implementation scope)
+## 7. TDD Updates Required (applied)
 
-1. **Section 6.1**: Replace opaque token strategy with JWT access (15min) + refresh token (7d, rotated). Remove "no refresh token for MVP" rationale.
-2. **Section 6.1**: Update token lifecycle to describe two-cookie flow and refresh rotation.
-3. **Section 6.1**: Add `REFRESH_SECRET` env var requirement.
-4. **Section 3.5**: Update `token.utils.ts` description to list JWT functions.
-5. **Section 5**: Add `POST /api/auth/refresh` endpoint contract.
+1. **Section 6.1**: Replaced opaque token strategy with JWT access (15min) + refresh token (7d, rotated). Removed "no refresh token for MVP" rationale.
+2. **Section 6.1**: Updated token lifecycle to describe two-cookie flow and refresh rotation.
+3. **Section 6.1**: Added `REFRESH_SECRET` env var requirement.
+4. **Section 3.5**: Updated `token.utils.ts` description to list JWT functions.
+5. **Section 5**: Added `POST /api/auth/refresh` endpoint contract.
+6. **Section 5**: Updated login contract to show two cookies.
+7. **Section 5**: Updated logout contract to show cookie clearing and refresh token revocation.
+8. **Section 5.9**: Added refresh endpoint to summary table, updated endpoint count to 30.

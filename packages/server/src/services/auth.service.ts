@@ -3,6 +3,7 @@ import pino from 'pino';
 import {
   VERIFICATION_TOKEN_EXPIRY_HOURS,
   RESET_TOKEN_EXPIRY_HOURS,
+  REFRESH_TOKEN_EXPIRY,
 } from '@skills-trainer/shared';
 import type {
   SignupRequest,
@@ -19,13 +20,14 @@ import type {
 import { prisma } from '../config/database.js';
 import { hashPassword, comparePassword } from '../utils/password.utils.js';
 import {
-  generateOpaqueAccessToken,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
   generateVerificationToken,
   generateResetToken,
   hashToken,
   parseExpiresInMs,
 } from '../utils/token.utils.js';
-import { env } from '../config/env.js';
 import {
   ConflictError,
   UnauthorizedError,
@@ -65,8 +67,11 @@ export const signup = async (data: SignupRequest): Promise<MessageResponse> => {
   return { message: 'Account created. Please check your email to verify.' };
 };
 
-/** Internal: includes rawToken for cookie. Route strips before sending to client. */
-export type LoginResult = LoginResponse & { rawToken: string };
+/** Internal: includes tokens for cookie setting. Route strips before sending to client. */
+export interface LoginResult extends LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+}
 
 export const login = async (data: LoginRequest): Promise<LoginResult> => {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
@@ -85,21 +90,71 @@ export const login = async (data: LoginRequest): Promise<LoginResult> => {
     throw new EmailNotVerifiedError('Please verify your email before logging in');
   }
 
-  const { token: rawToken, hash: tokenHash } = generateOpaqueAccessToken();
-  const expiresAt = new Date(Date.now() + parseExpiresInMs(env.JWT_EXPIRES_IN));
+  const tokenPayload = { userId: user.id, email: user.email };
+  const accessToken = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken(tokenPayload);
+  const refreshTokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + parseExpiresInMs(REFRESH_TOKEN_EXPIRY));
 
-  await prisma.accessToken.create({
+  await prisma.refreshToken.create({
     data: {
       userId: user.id,
-      tokenHash,
+      tokenHash: refreshTokenHash,
       expiresAt,
     },
   });
 
   return {
     user: { id: user.id, email: user.email, username: user.username },
-    rawToken,
+    accessToken,
+    refreshToken,
   };
+};
+
+/** Verify refresh token JWT → find hash in DB → rotate tokens. */
+export interface RefreshResult {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export const refreshAccessToken = async (oldRefreshToken: string): Promise<RefreshResult> => {
+  const payload = verifyRefreshToken(oldRefreshToken);
+  if (!payload) {
+    throw new UnauthorizedError('Invalid or expired refresh token');
+  }
+
+  const oldTokenHash = hashToken(oldRefreshToken);
+
+  // Atomic delete — if a concurrent request already rotated this token, count is 0.
+  const { count } = await prisma.refreshToken.deleteMany({
+    where: { tokenHash: oldTokenHash },
+  });
+
+  if (count === 0) {
+    throw new UnauthorizedError('Invalid or expired refresh token');
+  }
+
+  // Generate new token pair
+  const tokenPayload = { userId: payload.userId, email: payload.email };
+  const accessToken = generateAccessToken(tokenPayload);
+  const newRefreshToken = generateRefreshToken(tokenPayload);
+  const newRefreshTokenHash = hashToken(newRefreshToken);
+  const expiresAt = new Date(Date.now() + parseExpiresInMs(REFRESH_TOKEN_EXPIRY));
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: payload.userId,
+      tokenHash: newRefreshTokenHash,
+      expiresAt,
+    },
+  });
+
+  return { accessToken, refreshToken: newRefreshToken };
+};
+
+/** Delete all refresh tokens for a user (revoke all sessions). */
+export const logout = async (userId: string): Promise<void> => {
+  await prisma.refreshToken.deleteMany({ where: { userId } });
 };
 
 export const verifyEmail = async (data: VerifyEmailRequest): Promise<MessageResponse> => {
