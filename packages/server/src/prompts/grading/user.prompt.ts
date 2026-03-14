@@ -1,3 +1,5 @@
+import { escapeXml } from '../../utils/sanitize.utils.js';
+
 export interface QAEntry {
   questionNumber: number;
   questionText: string;
@@ -19,20 +21,19 @@ export const buildGradingUserMessage = (params: GradingUserPromptParams): string
 
   const formattedQuestionsAndAnswers = questionsAndAnswers
     .map(({ questionNumber, questionText, correctAnswer }) => {
-      return `Question ${questionNumber}:\nQuestion: ${questionText}\nCorrect Answer: ${correctAnswer}`;
+      return `Question ${questionNumber}:\nQuestion: ${escapeXml(questionText)}\nCorrect Answer: ${escapeXml(correctAnswer)}`;
     })
     .join('\n\n');
 
   const formattedStudentAnswers = questionsAndAnswers
     .map(({ questionNumber, userAnswer }) => {
       const answer = userAnswer?.trim() ? userAnswer : '[No answer provided]';
-      const sanitizedAnswer = answer.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `Question ${questionNumber}:\nStudent Answer: ${sanitizedAnswer}`;
+      return `Question ${questionNumber}:\nStudent Answer: ${escapeXml(answer)}`;
     })
     .join('\n\n');
 
   return `<subject>
-${subject}
+${escapeXml(subject)}
 </subject>
 
 Here are the questions with their correct answers:

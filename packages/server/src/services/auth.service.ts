@@ -283,6 +283,9 @@ export const resetPassword = async (data: ResetPasswordRequest): Promise<Message
       where: { id: resetRecord.id },
       data: { usedAt: new Date() },
     }),
+    prisma.refreshToken.deleteMany({
+      where: { userId: resetRecord.userId },
+    }),
   ]);
 
   return { message: 'Password reset successfully.' };

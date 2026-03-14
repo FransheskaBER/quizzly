@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sanitizeForPrompt, logSuspiciousPatterns, logger } from '../sanitize.utils.js';
+import { sanitizeForPrompt, logSuspiciousPatterns, escapeXml, logger } from '../sanitize.utils.js';
 
 describe('sanitizeForPrompt', () => {
   it('strips soft hyphen (U+00AD)', () => {
@@ -31,6 +31,32 @@ describe('sanitizeForPrompt', () => {
   it('leaves normal text unchanged', () => {
     const input = 'Hello, this is a normal string with numbers 123.';
     expect(sanitizeForPrompt(input)).toBe(input);
+  });
+});
+
+describe('escapeXml', () => {
+  it('escapes angle brackets', () => {
+    expect(escapeXml('<script>alert("xss")</script>')).toBe(
+      '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;',
+    );
+  });
+
+  it('escapes ampersands before other characters to avoid double-escaping', () => {
+    expect(escapeXml('&lt;')).toBe('&amp;lt;');
+  });
+
+  it('escapes quotes and apostrophes', () => {
+    expect(escapeXml(`He said "it's fine"`)).toBe(
+      'He said &quot;it&apos;s fine&quot;',
+    );
+  });
+
+  it('returns an empty string unchanged', () => {
+    expect(escapeXml('')).toBe('');
+  });
+
+  it('leaves plain text unchanged', () => {
+    expect(escapeXml('Hello world 123')).toBe('Hello world 123');
   });
 });
 
