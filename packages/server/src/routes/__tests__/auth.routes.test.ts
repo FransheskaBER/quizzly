@@ -30,7 +30,10 @@ const app = createApp();
 
 beforeAll(async () => {
   // Run migrations against the test database (idempotent — safe to run on every suite start)
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  execSync('npx prisma migrate deploy', {
+    env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
+    stdio: 'inherit',
+  });
 });
 
 afterEach(async () => {

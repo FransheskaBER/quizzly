@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "copy-db": "tsx scripts/copy-db-to-test.ts",
     "eval:generation": "tsx scripts/evaluate-generation.ts",
     "eval:grading": "tsx scripts/evaluate-grading.ts",
     "eval:scorecard": "tsx scripts/print-scorecard.ts"

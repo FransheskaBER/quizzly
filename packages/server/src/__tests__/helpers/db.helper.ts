@@ -1,14 +1,23 @@
 import { PrismaClient } from '@prisma/client';
 
-// Dedicated Prisma client for integration tests — reads DATABASE_URL from env,
-// which vitest.config.ts points at the test database.
-export const prisma = new PrismaClient();
+const testDbUrl = process.env.TEST_DATABASE_URL;
+if (!testDbUrl) {
+  throw new Error('Missing required test environment variable: TEST_DATABASE_URL');
+}
+
+// Dedicated Prisma client for integration tests — uses TEST_DATABASE_URL exclusively.
+// Never references DATABASE_URL; tests always run against the test database copy.
+export const prisma = new PrismaClient({ datasourceUrl: testDbUrl });
 
 /**
  * Truncates all tables between tests to ensure isolation.
  * Cascades to all child tables (sessions, materials, quiz_attempts, etc.)
+ * No-op when USE_DB_COPY=1 — tests run against the full copied dataset.
  */
 export const cleanDatabase = async (): Promise<void> => {
+  if (process.env.USE_DB_COPY === '1' || process.env.USE_DB_COPY === 'true') {
+    return;
+  }
   await prisma.$executeRawUnsafe(
     'TRUNCATE TABLE users, password_resets CASCADE',
   );
