@@ -32,6 +32,16 @@ describe('sanitizeForPrompt', () => {
     const input = 'Hello, this is a normal string with numbers 123.';
     expect(sanitizeForPrompt(input)).toBe(input);
   });
+
+  it('normalizes fullwidth angle brackets to ASCII via NFKC', () => {
+    // U+FF1C (fullwidth <) and U+FF1E (fullwidth >) must become ASCII equivalents
+    expect(sanitizeForPrompt('\uFF1Cscript\uFF1E')).toBe('<script>');
+  });
+
+  it('normalizes fullwidth Latin letters to ASCII via NFKC', () => {
+    // U+FF49 (fullwidth i), U+FF47 (fullwidth g), etc.
+    expect(sanitizeForPrompt('\uFF49\uFF47\uFF4E\uFF4F\uFF52\uFF45')).toBe('ignore');
+  });
 });
 
 describe('escapeXml', () => {
