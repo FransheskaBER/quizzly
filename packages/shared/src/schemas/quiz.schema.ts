@@ -211,6 +211,22 @@ export const sseGradeCompleteEventSchema = z.object({
   }),
 });
 
+export const sseGenerationStartedEventSchema = z.object({
+  type: z.literal('generation_started'),
+  data: z.object({
+    quizAttemptId: uuidSchema,
+    totalExpected: z.number(),
+  }),
+});
+
+export const sseQuestionFailedEventSchema = z.object({
+  type: z.literal('question_failed'),
+  data: z.object({
+    questionNumber: z.number(),
+    message: z.string(),
+  }),
+});
+
 // Dashboard
 
 export const dashboardResponseSchema = z.object({

@@ -56,16 +56,18 @@ vi.mock('@/api/quizzes.api', () => ({
   useSubmitQuizMutation: vi.fn(() => [mockSubmitQuiz]),
 }));
 
-vi.mock('@/hooks/useQuizGeneration', () => ({
-  useQuizGeneration: vi.fn(() => ({
+vi.mock('@/providers/QuizGenerationProvider', () => ({
+  useQuizGenerationContext: vi.fn(() => ({
     generate: vi.fn(),
     status: 'idle',
     questions: [],
+    failedSlots: [],
     quizAttemptId: null,
     error: null,
     totalExpected: 0,
     warning: null,
     progressMessage: null,
+    isGenerating: false,
     reset: vi.fn(),
   })),
 }));
@@ -111,7 +113,7 @@ const renderPage = () =>
   render(
     <MemoryRouter initialEntries={['/sessions/session-1']}>
       <Routes>
-        <Route path="/sessions/:id" element={<SessionDashboardPage />} />
+        <Route path="/sessions/:sessionId" element={<SessionDashboardPage />} />
       </Routes>
     </MemoryRouter>,
   );

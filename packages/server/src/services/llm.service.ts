@@ -1,10 +1,11 @@
 import pino from 'pino';
 import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
-import type { ZodType, ZodTypeDef } from 'zod';
+import { ZodError, type ZodType, type ZodTypeDef } from 'zod';
 import {
   llmQuizOutputSchema,
   llmGradedAnswersOutputSchema,
+  llmGeneratedQuestionSchema,
   type LlmGeneratedQuestion,
   type LlmGradedAnswer,
   type QuizDifficulty,
@@ -52,7 +53,6 @@ export interface GradeAnswersParams {
   answers: FreeTextAnswer[];
 }
 
-export type OnQuestionCallback = (question: LlmGeneratedQuestion) => void;
 export type OnGradedCallback = (answer: LlmGradedAnswer) => void;
 
 // --- Pure helpers ---
@@ -199,11 +199,33 @@ async function runWithRetry<T>(
 
 // --- Public service functions ---
 
-export const generateQuiz = async (
+// --- Streaming quiz generation ---
+
+export interface MalformedSlot {
+  originalSlotNumber: number;
+  rawLlmOutput: string;
+  zodErrors: ZodError;
+}
+
+export interface StreamQuestionsResult {
+  validCount: number;
+  malformedSlots: MalformedSlot[];
+}
+
+/**
+ * Incrementally parses LLM output, yielding individual questions as they're
+ * completed. Uses brace-depth counting inside the <questions> JSON array to
+ * detect complete objects without buffering the entire response.
+ *
+ * `onValidQuestion` is async — the stream pauses while the caller saves to DB
+ * and sends SSE (~50ms). The SDK buffers tokens in memory, so no data is lost.
+ */
+export const streamQuestions = async (
   params: GenerateQuizParams,
-  onQuestion: OnQuestionCallback,
+  onValidQuestion: (question: LlmGeneratedQuestion, assignedNumber: number) => Promise<void>,
+  onMalformedQuestion: (rawOutput: string, zodErrors: ZodError, slotNumber: number) => void,
   apiKey?: string,
-): Promise<LlmGeneratedQuestion[]> => {
+): Promise<StreamQuestionsResult> => {
   const subject = sanitizeForPrompt(params.subject);
   const goal = sanitizeForPrompt(params.goal);
   const materialsText =
@@ -213,30 +235,177 @@ export const generateQuiz = async (
   logSuspiciousPatterns(goal, 'goal');
   if (materialsText !== null) logSuspiciousPatterns(materialsText, 'materials');
 
-  const promptParams = {
-    ...params,
-    subject,
-    goal,
-    materialsText,
-  };
+  const promptParams = { ...params, subject, goal, materialsText };
   const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
   const userMessage = buildGenerationUserMessage(promptParams);
   const client = resolveAnthropicClient(apiKey);
 
-  const questions = await runWithRetry<LlmGeneratedQuestion[]>(
-    systemPrompt,
-    userMessage,
-    'questions',
-    llmQuizOutputSchema,
-    LLM_GENERATION_TEMPERATURE,
-    client,
-  );
+  const stream = client.messages.stream({
+    model: LLM_MODEL,
+    max_tokens: LLM_MAX_TOKENS,
+    temperature: LLM_GENERATION_TEMPERATURE,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  });
 
-  for (const question of questions) {
-    onQuestion(question);
+  let fullText = '';
+  let insideQuestions = false;
+  let braceDepth = 0;
+  let currentObject = '';
+  let slotNumber = 0;
+  let assignedNumber = 1;
+  // String-aware state: track whether we're inside a JSON string value
+  let inString = false;
+  let escaped = false;
+  // Tracks how many characters have been processed for tag detection
+  let processedIndex = 0;
+  const malformedSlots: MalformedSlot[] = [];
+
+  const QUESTIONS_TAG = '<questions>';
+
+  for await (const event of stream) {
+    if (event.type !== 'content_block_delta' || event.delta.type !== 'text_delta') continue;
+
+    const chunk = event.delta.text;
+    fullText += chunk;
+
+    // Periodically check for exfiltration
+    checkExfiltration(fullText);
+
+    for (const char of chunk) {
+      processedIndex++;
+
+      if (!insideQuestions) {
+        // Chunk-safe tag detection: check the text processed so far
+        if (
+          processedIndex >= QUESTIONS_TAG.length &&
+          fullText.substring(processedIndex - QUESTIONS_TAG.length, processedIndex) === QUESTIONS_TAG
+        ) {
+          insideQuestions = true;
+        }
+        continue;
+      }
+
+      // Inside <questions> block — string-aware brace depth tracking.
+      // Braces inside JSON string values (e.g. code snippets) are ignored.
+      if (braceDepth > 0 || char === '{') {
+        currentObject += char;
+      }
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"' && braceDepth > 0) {
+        inString = true;
+      } else if (char === '{') {
+        if (braceDepth === 0) {
+          currentObject = '{';
+        }
+        braceDepth++;
+      } else if (char === '}') {
+        braceDepth--;
+
+        if (braceDepth === 0) {
+          // Complete JSON object found
+          slotNumber++;
+          try {
+            const parsed: unknown = JSON.parse(currentObject);
+            const result = llmGeneratedQuestionSchema.safeParse(parsed);
+            if (result.success) {
+              await onValidQuestion(result.data, assignedNumber);
+              assignedNumber++;
+            } else {
+              malformedSlots.push({
+                originalSlotNumber: slotNumber,
+                rawLlmOutput: currentObject,
+                zodErrors: result.error,
+              });
+              onMalformedQuestion(currentObject, result.error, slotNumber);
+            }
+          } catch {
+            // JSON.parse failed — create an explicit ZodError
+            const jsonParseError = new ZodError([{
+              code: 'custom',
+              path: [],
+              message: `Invalid JSON: ${currentObject.slice(0, 200)}`,
+            }]);
+            malformedSlots.push({
+              originalSlotNumber: slotNumber,
+              rawLlmOutput: currentObject,
+              zodErrors: jsonParseError,
+            });
+            onMalformedQuestion(currentObject, jsonParseError, slotNumber);
+          }
+          currentObject = '';
+          inString = false;
+          escaped = false;
+        }
+      }
+    }
   }
 
-  return questions;
+  // Final exfiltration check on complete response
+  checkExfiltration(fullText);
+
+  return {
+    validCount: assignedNumber - 1,
+    malformedSlots,
+  };
+};
+
+/**
+ * Generates a single replacement question for a malformed slot.
+ * Uses the same prompt structure but requests exactly 1 question and provides
+ * context about already-generated topics to avoid duplicates.
+ */
+export const generateReplacementQuestion = async (
+  params: GenerateQuizParams,
+  existingTags: string[],
+  apiKey?: string,
+): Promise<LlmGeneratedQuestion | null> => {
+  const subject = sanitizeForPrompt(params.subject);
+  const goal = sanitizeForPrompt(params.goal);
+  const materialsText =
+    params.materialsText !== null ? sanitizeForPrompt(params.materialsText) : null;
+
+  const systemPrompt = buildGenerationSystemPrompt(params.difficulty);
+  const topicContext = existingTags.length > 0
+    ? `\n\nAlready-generated question topics: ${existingTags.join(', ')}. Generate a question covering a DIFFERENT concept.`
+    : '';
+
+  const userMessage = buildGenerationUserMessage({
+    ...params,
+    subject,
+    goal,
+    materialsText,
+    questionCount: 1,
+  }) + topicContext;
+
+  const client = resolveAnthropicClient(apiKey);
+
+  try {
+    const response = await callLlmStream(
+      systemPrompt,
+      [{ role: 'user', content: userMessage }],
+      LLM_GENERATION_TEMPERATURE,
+      client,
+    );
+    checkExfiltration(response);
+    const questions = await parseBlock(response, 'questions', llmQuizOutputSchema);
+    return questions?.[0] ?? null;
+  } catch (err) {
+    logger.warn({ err, subject: params.subject, operation: 'generateReplacementQuestion' }, 'Replacement question generation failed');
+    captureExceptionOnce(err, { extra: { subject: params.subject, operation: 'generateReplacementQuestion' } });
+    return null;
+  }
 };
 
 export const gradeAnswers = async (

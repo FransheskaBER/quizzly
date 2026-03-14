@@ -13,6 +13,11 @@ export interface GradedQuestion {
   isCorrect: boolean;
 }
 
+export interface FailedSlot {
+  questionNumber: number;
+  message: string;
+}
+
 interface QuizStreamState {
   // Generation state
   status: GenerationStatus;
@@ -20,6 +25,7 @@ interface QuizStreamState {
   quizAttemptId: string | null;
   error: string | null;
   totalExpected: number;
+  failedSlots: FailedSlot[];
   // Grading state
   gradingStatus: GradingStatus;
   gradedQuestions: GradedQuestion[];
@@ -33,6 +39,7 @@ const initialState: QuizStreamState = {
   quizAttemptId: null,
   error: null,
   totalExpected: 0,
+  failedSlots: [],
   gradingStatus: 'idle',
   gradedQuestions: [],
   gradingError: null,
@@ -51,10 +58,15 @@ const quizStreamSlice = createSlice({
       state.error = null;
       state.totalExpected = action.payload;
     },
+    generationAttemptCreated: (state, action: PayloadAction<string>) => {
+      state.quizAttemptId = action.payload;
+    },
     questionsBatchReceived: (state, action: PayloadAction<Question[]>) => {
       if (action.payload.length > 0) {
         state.status = 'generating';
-        state.questions.push(...action.payload);
+        const existingIds = new Set(state.questions.map((q) => q.id));
+        const newQuestions = action.payload.filter((q) => !existingIds.has(q.id));
+        state.questions.push(...newQuestions);
       }
     },
     generationCompleted: (state, action: PayloadAction<string>) => {
@@ -65,12 +77,16 @@ const quizStreamSlice = createSlice({
       state.status = 'error';
       state.error = action.payload;
     },
+    questionFailed: (state, action: PayloadAction<FailedSlot>) => {
+      state.failedSlots.push(action.payload);
+    },
     generationReset: (state) => {
       state.status = initialState.status;
       state.questions = initialState.questions;
       state.quizAttemptId = initialState.quizAttemptId;
       state.error = initialState.error;
       state.totalExpected = initialState.totalExpected;
+      state.failedSlots = initialState.failedSlots;
     },
     // Grading actions
     gradingStarted: (state) => {
@@ -102,9 +118,11 @@ const quizStreamSlice = createSlice({
 
 export const {
   generationStarted,
+  generationAttemptCreated,
   questionsBatchReceived,
   generationCompleted,
   generationFailed,
+  questionFailed,
   generationReset,
   gradingStarted,
   questionGraded,

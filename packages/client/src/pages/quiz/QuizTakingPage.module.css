@@ -53,6 +53,14 @@
   padding: var(--spacing-md) 0;
 }
 
+/* ---- Navigation buttons ---- */
+
+.navButtons {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
 /* ---- Error / loading states ---- */
 
 .errorPage {

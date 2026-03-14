@@ -1,0 +1,24 @@
+.card {
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-subtle);
+  padding: var(--spacing-lg);
+}
+
+.header {
+  margin-bottom: var(--spacing-md);
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+.body {
+  color: var(--color-text-secondary);
+}
+
+.message {
+  margin: 0;
+  line-height: 1.6;
+}

@@ -33,9 +33,50 @@ const router = Router();
 // Opens an SSE stream that delivers validated questions one by one as they are
 // saved to the database. Pre-stream errors (auth, ownership, concurrency) are
 // returned as standard JSON before any SSE headers are written.
+//
+// Supports reconnection via ?reconnect=true&quizAttemptId={id} — skips
+// prepareGeneration and quiz creation, subscribes to in-progress generation
+// or returns existing questions if the server restarted.
 router.get(
   '/:sessionId/quizzes/generate',
   auth,
+  asyncHandler(async (req, res, next) => {
+    if (!req.user) throw new UnauthorizedError('Not authenticated');
+
+    const reconnect = req.query.reconnect === 'true';
+    const quizAttemptId = req.query.quizAttemptId as string | undefined;
+
+    if (reconnect && quizAttemptId) {
+      // Reconnect flow: skip schema validation, rate limits, and quiz creation.
+      const userId = req.user.userId;
+      const sessionId = req.params.sessionId as string;
+
+      // Phase 1: pre-SSE validation — throws AppErrors caught by asyncHandler
+      const context = await quizService.prepareReconnect(quizAttemptId, userId, sessionId);
+
+      // Phase 2: open SSE stream
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+
+      let clientConnected = true;
+      req.on('close', () => { clientConnected = false; });
+
+      const writer = (event: { type: string; data?: unknown; message?: string }) => {
+        if (clientConnected) sendSSEEvent(res, event);
+      };
+
+      await quizService.executeReconnect(context, writer, () => clientConnected);
+
+      res.end();
+      return;
+    }
+
+    // Normal generation flow — apply rate limits and validation via next()
+    next();
+  }),
   quizGenerationHourlyLimiter,
   quizGenerationDailyLimiter,
   validate({ params: quizSessionParamsSchema, query: generateQuizQuerySchema }),
