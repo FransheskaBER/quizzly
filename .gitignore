@@ -156,3 +156,18 @@ docs/local/LAUNCH-CHECKLIST*.md
 
 # Local docs: test rerun, personal notes (not committed)
 docs/local/
+
+# macOS
+.DS_Store
+
+# IDE — Cursor (personal config, not project-shared)
+.cursor/
+
+# Claude Code — personal config (rules/ stays committed via CLAUDE.md)
+.claude/commands/
+.claude/launch.json
+.claude/settings.local.json
+
+# Security & internal review docs (vulnerability details stay local)
+SECURITY_AUDIT_REPORT.md
+code-review-deferred-issues.md
