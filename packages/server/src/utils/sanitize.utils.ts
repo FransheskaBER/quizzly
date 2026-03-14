@@ -24,7 +24,7 @@ export const sanitizeString = (input: string): string => {
  * Extends sanitizeString with soft hyphen stripping, newline collapsing, and trimming.
  */
 export const sanitizeForPrompt = (input: string): string => {
-  return sanitizeString(input)
+  return sanitizeString(input.normalize('NFKC'))
     .replace(/\u00AD/g, '')       // strip soft hyphen
     .replace(/\n{3,}/g, '\n\n')   // collapse 3+ newlines to 2
     .trim();
